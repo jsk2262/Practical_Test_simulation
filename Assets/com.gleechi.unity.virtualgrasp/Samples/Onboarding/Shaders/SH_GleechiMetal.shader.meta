@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: ec3e122753a261148a52fe1f4b9f44c4
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  preprocessorOverride: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Onboarding/Shaders/SH_GleechiMetal.shader
+  uploadId: 641354

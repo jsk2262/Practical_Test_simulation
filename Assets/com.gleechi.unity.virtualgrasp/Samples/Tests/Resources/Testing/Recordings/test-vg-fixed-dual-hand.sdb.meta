@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 5fd5e399dcdf7cc419cc2b8f1d20bcc5
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Tests/Resources/Testing/Recordings/test-vg-fixed-dual-hand.sdb
+  uploadId: 641354

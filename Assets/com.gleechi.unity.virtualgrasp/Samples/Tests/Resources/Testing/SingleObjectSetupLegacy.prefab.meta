@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 586beb142a668414d86835f3af2c78b7
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Tests/Resources/Testing/SingleObjectSetupLegacy.prefab
+  uploadId: 641354

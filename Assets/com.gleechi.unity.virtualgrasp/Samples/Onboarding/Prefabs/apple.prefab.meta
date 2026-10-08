@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: ea65f85e90f7e5945905e87c4fa1a285
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Onboarding/Prefabs/apple.prefab
+  uploadId: 641354

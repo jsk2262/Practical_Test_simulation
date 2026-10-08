@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 8ed3954a02c4d824d92224e2d49dfd9a
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Onboarding/Prefabs/apple_jumpgrasp.prefab
+  uploadId: 641354

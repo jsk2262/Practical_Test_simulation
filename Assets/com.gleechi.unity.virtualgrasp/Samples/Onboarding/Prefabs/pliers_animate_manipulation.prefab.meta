@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 9ee9fe4280113eb43a777fba595a8e63
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Onboarding/Prefabs/pliers_animate_manipulation.prefab
+  uploadId: 641354

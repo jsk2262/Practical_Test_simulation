@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 83a73fa77e599d8438c9f20359a12a5f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Runtime/Resources/VG_ControllerProfiles/VG_CP_Oculus.OVRHand.HandTracking.asset
+  uploadId: 641354

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 4b4f5a22d6d960546ae78cbc4b2765af
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Tests/Resources/Testing/Recordings/test-vg-sticky-hand.sdb
+  uploadId: 641354

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 174ba87942c517b4497b11b5f1e7f8c7
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Onboarding/Prefabs/chain_assemble_vgarticulation_physical.prefab
+  uploadId: 641354

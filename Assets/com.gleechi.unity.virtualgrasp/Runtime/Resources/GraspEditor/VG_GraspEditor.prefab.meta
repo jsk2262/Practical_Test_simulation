@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: a3c88c7dcb9b7b74493f075e358b71ed
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Runtime/Resources/GraspEditor/VG_GraspEditor.prefab
+  uploadId: 641354

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 03023724fbfb9bf4db4b0272eb1dbe9b
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Onboarding/Prefabs/symmetric_assemble_curvedbar.prefab
+  uploadId: 641354

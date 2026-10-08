@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 0cee5de410258cc4a82648d911f7eabb
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Onboarding/Prefabs/wrench_jumpgrasp.prefab
+  uploadId: 641354

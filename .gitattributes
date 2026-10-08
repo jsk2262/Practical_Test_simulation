@@ -1,0 +1,35 @@
+﻿# Line endings: text files normalized, Unity's YAML kept as is
+* text=auto eol=lf
+*.cs text diff=csharp
+*.shader text
+*.cginc text
+*.hlsl text
+*.json text
+*.md text
+
+# Unity YAML (scenes, prefabs, assets): merged as text, never line-ending converted
+*.unity text eol=lf linguist-generated
+*.prefab text eol=lf linguist-generated
+*.asset text eol=lf linguist-generated
+*.mat text eol=lf linguist-generated
+*.anim text eol=lf linguist-generated
+*.controller text eol=lf linguist-generated
+*.meta text eol=lf
+
+# Binary assets
+*.fbx binary
+*.obj binary
+*.blend binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.tga binary
+*.psd binary
+*.exr binary
+*.hdr binary
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.ttf binary
+*.otf binary
+*.dll binary

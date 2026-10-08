@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: df31e828104e2844f83f74de06b49d01
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 1685658164, guid: c0773067c24247542bbe1f925318747d, type: 3}
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Tests/Resources/Testing/Recordings/test-chain-root-rigidbody-iskinematic.sdb
+  uploadId: 641354

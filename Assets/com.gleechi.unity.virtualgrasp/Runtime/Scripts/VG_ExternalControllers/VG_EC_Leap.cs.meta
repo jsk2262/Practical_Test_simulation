@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: c735f357c234e0b4e9a5c8db5e88f37c
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Runtime/Scripts/VG_ExternalControllers/VG_EC_Leap.cs
+  uploadId: 641354

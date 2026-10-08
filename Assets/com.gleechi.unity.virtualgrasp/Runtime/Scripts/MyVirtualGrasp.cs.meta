@@ -1,0 +1,19 @@
+fileFormatVersion: 2
+guid: 919761dfc44922242b6616aa92bf7903
+timeCreated: 1491831663
+licenseType: Store
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Runtime/Scripts/MyVirtualGrasp.cs
+  uploadId: 641354

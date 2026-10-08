@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 6ffe5c22c41287d4bbede58c85e24ffc
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Runtime/Resources/Prefabs/SensorAndReplayAvatars.prefab
+  uploadId: 641354

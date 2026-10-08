@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: e2e2cbf41750b3b4dab06fb3d822c05e
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Doc/VirtualGraspSDKUnityAPI.1.7.0.pdf
+  uploadId: 641354

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: f1c93f313856f304c89127e4b6640541
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 13400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Onboarding/PhysicsMaterials/Wood.physicMaterial
+  uploadId: 641354

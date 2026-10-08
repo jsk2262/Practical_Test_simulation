@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: ff5f927d74d1cb243a5e40114f628f2d
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Onboarding/Prefabs/chainloop_assemble.prefab
+  uploadId: 641354

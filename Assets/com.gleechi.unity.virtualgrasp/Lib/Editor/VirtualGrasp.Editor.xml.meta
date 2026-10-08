@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: aa539f2c5308d4147ac4f844fbd0291e
+TextScriptImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Lib/Editor/VirtualGrasp.Editor.xml
+  uploadId: 641354

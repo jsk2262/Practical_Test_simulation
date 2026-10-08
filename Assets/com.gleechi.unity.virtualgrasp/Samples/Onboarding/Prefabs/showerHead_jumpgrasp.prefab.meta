@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 00506af752ffa41498b1b63b83b42ac3
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Onboarding/Prefabs/showerHead_jumpgrasp.prefab
+  uploadId: 641354

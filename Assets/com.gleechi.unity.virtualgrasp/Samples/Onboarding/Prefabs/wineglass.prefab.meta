@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 5ded0cba96748b84196fa1c2dd5ee52b
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Onboarding/Prefabs/wineglass.prefab
+  uploadId: 641354

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: afc964f2c34b0f842942e697de78af1d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Tutorials/1_ProjectSetup/5_ConfigureController.asset
+  uploadId: 641354

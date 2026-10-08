@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 712bfe1e522444446bc8875c812a6f2a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Onboarding/Materials/M_Gleechi_UnlitTex.mat
+  uploadId: 641354

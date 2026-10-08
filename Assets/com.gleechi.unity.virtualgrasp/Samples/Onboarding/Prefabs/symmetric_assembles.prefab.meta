@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 29ad25dea6af14249a6e8ff885eca9d9
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Onboarding/Prefabs/symmetric_assembles.prefab
+  uploadId: 641354

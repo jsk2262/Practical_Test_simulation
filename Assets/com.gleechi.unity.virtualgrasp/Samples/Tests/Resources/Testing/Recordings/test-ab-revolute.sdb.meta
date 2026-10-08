@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: b87b83ef9997fcc419b3e4e3f5f2f325
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Tests/Resources/Testing/Recordings/test-ab-revolute.sdb
+  uploadId: 641354

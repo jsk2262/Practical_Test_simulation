@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 9a1bea04d5c84674ebf70033a011f783
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Tests/Resources/Testing/Hammer_vg_revolute.prefab
+  uploadId: 641354

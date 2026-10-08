@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 07ff9036a2334b74395bcacd68b52fd0
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Tests/Resources/Testing/Recordings/test-vg-revolute-snap-bounce.sdb
+  uploadId: 641354

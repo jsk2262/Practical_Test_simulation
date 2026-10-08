@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 9ca4420e1e3df1747be5640f96dca012
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Tests/Resources/Testing/Recordings/test-vg-prismatic-dual-hand.sdb
+  uploadId: 641354

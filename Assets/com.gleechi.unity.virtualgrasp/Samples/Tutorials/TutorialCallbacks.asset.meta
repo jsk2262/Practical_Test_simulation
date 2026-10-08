@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d66fbade1bcaed448b6398fd6ea84d2c
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Tutorials/TutorialCallbacks.asset
+  uploadId: 641354

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0a833c56b7025a04b88e81238b851875
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Tutorials/3_FingerTracking/1_Intro.asset
+  uploadId: 641354

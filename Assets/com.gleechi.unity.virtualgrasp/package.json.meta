@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 97388cc3d8108f24a9da99b074b24e16
+PackageManifestImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/package.json
+  uploadId: 641354

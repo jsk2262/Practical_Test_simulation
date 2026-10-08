@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: f740636478c945c46b2f4f0e44a5de24
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 13400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Onboarding/PhysicsMaterials/Slippery.physicMaterial
+  uploadId: 641354

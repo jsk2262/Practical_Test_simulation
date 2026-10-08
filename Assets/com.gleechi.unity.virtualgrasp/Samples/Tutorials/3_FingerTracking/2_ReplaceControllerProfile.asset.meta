@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 52bcec9d6dc50d844a301abcd566011f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Tutorials/3_FingerTracking/2_ReplaceControllerProfile.asset
+  uploadId: 641354

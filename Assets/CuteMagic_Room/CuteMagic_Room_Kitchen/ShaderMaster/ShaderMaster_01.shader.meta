@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 2a921f9a9489cc846b163a0382489e69
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 375558
+  packageName: Cute Low Poly Kitchen Pack - Colorful Interior Props
+  packageVersion: 1.0.0
+  assetPath: Assets/CuteMagic_Room/CuteMagic_Room_Kitchen/ShaderMaster/ShaderMaster_01.shader
+  uploadId: 904244

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 80d35ea75c5166b4fa91d8ff4d97cda7
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Tests/Resources/Testing/bottle_assemble_vgarticulation.prefab
+  uploadId: 641354

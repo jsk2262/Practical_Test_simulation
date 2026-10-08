@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 54ccd168a067e1f4ea3eab9bd6b8cdea
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Runtime/Resources/Prefabs/SeparateHandsSensorAvatar.prefab
+  uploadId: 641354

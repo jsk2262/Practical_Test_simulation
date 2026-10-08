@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: e1a114fd017cd6f489cc0e96ca379cf6
+AssemblyDefinitionImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Runtime/Scripts/Gleechi.VirtualGrasp.Runtime.asmdef
+  uploadId: 641354

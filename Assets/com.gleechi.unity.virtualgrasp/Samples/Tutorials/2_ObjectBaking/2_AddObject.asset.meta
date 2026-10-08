@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d99bd8e2650d8e7499d6f79736da8656
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Tutorials/2_ObjectBaking/2_AddObject.asset
+  uploadId: 641354

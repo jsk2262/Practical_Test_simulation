@@ -1,0 +1,65 @@
+# Unity - generated folders (rebuilt on open)
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Unity - crash/recovery and test captures
+/Assets/_Recovery/
+/Assets/_Recovery.meta
+/Captures/
+/Assets/Screenshots/
+/Assets/Screenshots.meta
+/Assets/AssetStoreTools*
+/Assets/Plugins/PlasticSCM*
+
+# IDE / generated project files
+.vs/
+.vscode/
+.idea/
+.gradle/
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# Builds
+*.apk
+*.aab
+*.unitypackage
+*.app
+crashlytics-build.properties
+sysinfo.txt
+
+# Unity Version Control (Plastic) - kept apart from git
+.plastic/
+ignore.conf
+*.private
+*.private.meta
+
+# Local backups (Assets.zip etc. - the folders themselves are in the repo)
+/*.zip
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini

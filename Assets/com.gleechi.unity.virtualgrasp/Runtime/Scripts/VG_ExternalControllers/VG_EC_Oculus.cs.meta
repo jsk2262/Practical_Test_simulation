@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: a6adfc75fbb3e8944a213eb006c326c6
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Runtime/Scripts/VG_ExternalControllers/VG_EC_Oculus.cs
+  uploadId: 641354

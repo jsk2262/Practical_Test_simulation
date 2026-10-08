@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 5d20f28ab07a8db4597673542116a9c8
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Tests/Resources/Testing/ScrewdriverAssemble.prefab
+  uploadId: 641354

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 5d305b5fa7f5d7d40a74e556ee9d01c4
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Samples/Tests/Resources/Testing/Off_pivot_vg_prismatic.prefab
+  uploadId: 641354

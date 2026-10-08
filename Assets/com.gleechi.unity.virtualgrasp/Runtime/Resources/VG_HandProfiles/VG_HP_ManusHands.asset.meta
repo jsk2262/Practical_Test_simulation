@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ebee767ce9adf274db8c56187f4782fc
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Runtime/Resources/VG_HandProfiles/VG_HP_ManusHands.asset
+  uploadId: 641354

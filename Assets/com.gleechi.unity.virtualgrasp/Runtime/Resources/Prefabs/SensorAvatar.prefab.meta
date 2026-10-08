@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 64950f8cab4aa004492a49d4dafcc8fb
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 240823
+  packageName: "VirtualGrasp\u2122 (Test version)"
+  packageVersion: 1.7.0
+  assetPath: Assets/com.gleechi.unity.virtualgrasp/Runtime/Resources/Prefabs/SensorAvatar.prefab
+  uploadId: 641354
