@@ -41,6 +41,16 @@ public static class Condiments
             case "참기름": return new Info(CondimentForm.Liquid, new Color(0.72f, 0.45f, 0.12f));
             case "식용유": return new Info(CondimentForm.Liquid, new Color(0.95f, 0.82f, 0.35f));
             case "고추기름": return new Info(CondimentForm.Liquid, new Color(0.8f, 0.2f, 0.05f)); // (strained through the cheesecloth)
+            case "탄 고추기름": return new Info(CondimentForm.Liquid, new Color(0.3f, 0.1f, 0.04f)); // (fried too long)
+            case "전분(전분물)": return new Info(CondimentForm.Powder, new Color(0.97f, 0.97f, 0.95f)); // (전분물의 전분 - 물은 따로 '물')
+            case "물기 많은 앙금": return new Info(CondimentForm.Liquid, new Color(0.9f, 0.92f, 0.93f)); // (윗물 안 버린 앙금)
+            // 달걀, a spoonful at a time (EggContents.SpoonName)
+            case "흰자": return new Info(CondimentForm.Liquid, new Color(0.9f, 0.89f, 0.74f));
+            case "푼 흰자": return new Info(CondimentForm.Liquid, new Color(0.93f, 0.92f, 0.82f));
+            case "노른자": return new Info(CondimentForm.Paste, new Color(1f, 0.66f, 0.1f));
+            case "푼 노른자": return new Info(CondimentForm.Liquid, new Color(1f, 0.7f, 0.15f));
+            case "전란": return new Info(CondimentForm.Liquid, new Color(0.98f, 0.8f, 0.35f));
+            case "계란물": return new Info(CondimentForm.Liquid, new Color(1f, 0.8f, 0.3f));
             case "두반장": return new Info(CondimentForm.Paste, new Color(0.55f, 0.12f, 0.06f));
             case "춘장": return new Info(CondimentForm.Paste, new Color(0.12f, 0.08f, 0.05f));
             case "굴소스": return new Info(CondimentForm.Paste, new Color(0.3f, 0.17f, 0.09f));

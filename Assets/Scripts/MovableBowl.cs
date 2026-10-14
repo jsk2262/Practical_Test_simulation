@@ -22,6 +22,9 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     [SerializeField] private bool canHoldWater = false;
     /// <summary>How much of a full fill one measuring-spoon dip takes out.</summary>
     [SerializeField] private float spoonOfWater = 0.1f;
+    [Tooltip("What a full fill holds (mL) - e.g. the measuring cup, 200 mL. 0 = unknown: its water can't be poured out as a measured amount.")]
+    [SerializeField] private float waterCapacityMl;
+    public float WaterMl => waterCapacityMl > 0f ? WaterAmount * waterCapacityMl : 0f;
     public bool CanHoldWater => canHoldWater;
 
     public bool IsFilledWithWater { get; private set; }
@@ -113,19 +116,23 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     /// spoon - e.g. a sauce bowl built up from soy sauce/vinegar/sugar with no
     /// solid ingredient in it at all, distinct from IngredientItem's own
     /// per-ingredient seasoning tracking.</summary>
-    private readonly Dictionary<string, int> appliedSeasonings = new Dictionary<string, int>();
-    public IReadOnlyDictionary<string, int> AppliedSeasonings => appliedSeasonings;
+    /// (in mL - 큰술 1T 15 mL, 작은술 1t 5 mL)
+    private readonly Dictionary<string, float> appliedSeasonings = new Dictionary<string, float>();
+    public IReadOnlyDictionary<string, float> AppliedSeasonings => appliedSeasonings;
 
-    public void AddSeasoning(string seasoningName)
+    public void AddSeasoning(string seasoningName, float ml = ToolItem.TablespoonMl)
     {
-        appliedSeasonings.TryGetValue(seasoningName, out int count);
-        appliedSeasonings[seasoningName] = count + 1;
+        if (!(ml > 0f)) return;
+        appliedSeasonings.TryGetValue(seasoningName, out float had);
+        appliedSeasonings[seasoningName] = had + ml;
         MarkUsed();
         // Into the frying pan/wok it's the dish's sauce - a pool the pieces get
         // coated in; into a pot/pan, what's being cooked there (식용유 + 고춧가루
         // heated: 고추기름); into a bowl, what's kept there (strained oil).
-        if ((GetComponent<FryingPanPlating>() != null || IsCookingVessel || PanSauce.Of(this, false) != null) && seasoningName != Condiments.Water)
-            PanSauce.Of(this, true).Add(seasoningName);
+        // (PanSauce counts in 큰술 - 15 mL each)
+        // (water too, into a pan that doesn't hold water of its own - a sauce's water; a pot's water is its own)
+        if ((GetComponent<FryingPanPlating>() != null || IsCookingVessel || PanSauce.Of(this, false) != null) && (seasoningName != Condiments.Water || !canHoldWater))
+            PanSauce.Of(this, true).Add(seasoningName, ml / ToolItem.TablespoonMl);
     }
 
     /// <summary>The inside of this vessel (world): the middle of its bottom, its
@@ -246,7 +253,10 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     public bool IsPlateOrBowl => isDish || (!HoldsByHandle && GetComponent<WokDragHandler>() == null);
 
     /// <summary>Nothing in it at all - no ingredients, no water.</summary>
-    public bool IsEmpty => occupied.Count == 0 && WaterAmount <= 0f && !HasPortion;
+    public bool IsEmpty => occupied.Count == 0 && WaterAmount <= 0f && !HasPortion && !HasEgg;
+
+    /// <summary>Broken egg in it (EggContents).</summary>
+    public bool HasEgg => EggContents.Of(this, false) is EggContents e && e.HasAny;
 
     /// <summary>Holding part of a 종지 portioned out into it (PortionedCondiment).</summary>
     public bool HasPortion => GetComponent<PortionedCondiment>() is PortionedCondiment pc && !pc.Removed;
@@ -274,8 +284,19 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         // not - a bowl's leftover water just gets poured out first.
         if (CleanupMode.IsOn && IsPlateOrBowl && occupied.Count == 0 && WaterAmount > 0f) SetWaterAmount(0f);
         if (CleanupMode.IsOn && IsPlateOrBowl && occupied.Count == 0 && HasPortion) GetComponent<PortionedCondiment>().Remove();
-        if (!IsEmpty || (!IsDirty && !(IsPlateOrBowl && CleanupMode.IsOn))) return false;
+        // (a pan that's had oil or a sauce in it is dirty too, whatever put it
+        // there; and in clean-up anything can be washed - a pan or pot as well)
+        bool hadSauce = PanSauce.Of(this, false) != null;
+        if (!IsEmpty || (!IsDirty && !hadSauce && !CleanupMode.IsOn)) return false;
 
+        // What's left of a sauce or the oil goes with the washing - recorded if
+        // it was more than a smear (leftovers belong in the food waste, not the sink).
+        if (PanSauce.Of(this, false) is PanSauce left && left.Amount > 0.001f)
+        {
+            float ml = left.Amount * ToolItem.TablespoonMl;
+            if (ml > 5f) ExamDeductions.Add(ExamDeductions.Hygiene, $"{name}: 남은 소스·기름 약 {ml:0}mL를 개수대에 버림");
+            left.Take(left.Amount);
+        }
         IsDirty = false;
         IsWashed = true;
         appliedSeasonings.Clear();
@@ -385,6 +406,10 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             return contentRoot;
         }
     }
+
+    [Header("앙금녹말 (전분 침전)")]
+    [Tooltip("Stirred starch water in this bowl: minutes (game time) for the starch to settle. 5 by default; 10 for a longer wait.")]
+    [SerializeField, Min(0.1f)] private float starchSettleMinutes = 5f;
 
     [Header("Frying oil")]
     /// <summary>The frying pan (Pan_01a): when today's exam has a deep-fried
@@ -602,6 +627,8 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         base.Awake();
         ReconcileExistingContents();
         ReconcileExistingLid();
+        // a pan/wok/pot has its own temperature (예열, 잔열) - VesselHeat
+        if (IsCookingVessel && GetComponent<VesselHeat>() == null) gameObject.AddComponent<VesselHeat>();
     }
 
     void Update()
@@ -619,7 +646,8 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         }
         else
         {
-            boilProgress += Time.deltaTime * FlameRate;
+            boilProgress += SpeedMode.Wait(Time.deltaTime) * FlameRate;
+            if (SpeedMode.On) boilProgress = Mathf.Max(boilProgress, timeToBoil); // (빠른 모드: on the flame, it boils at once)
             if (boilProgress >= timeToBoil) SetBoiling(true);
         }
 
@@ -632,7 +660,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     {
         if (!HasFryingOil) return;
         bool heating = !IsHeld && CurrentBurner != null && CurrentBurner.IsOn;
-        oilHeat = heating ? Mathf.Min(oilHeat + Time.deltaTime * FlameRate, timeToHeatOil * 1.5f)
+        oilHeat = heating ? Mathf.Min(oilHeat + SpeedMode.Wait(Time.deltaTime) * FlameRate, timeToHeatOil * 1.5f)
                           : Mathf.Max(0f, oilHeat - Time.deltaTime * 0.3f);
         // Frying oil hot on the flame spatters the burner's floor (under its grate).
         if (heating && OilHeat01 > 0.5f) BurnerFloorDirt.Soil(CurrentBurner, BurnerFloorDirt.SoilKind.Oil, Time.deltaTime);
@@ -788,16 +816,21 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     /// itself become a normal Carryable again.</summary>
     /// <summary>Whether an empty-handed click right now would pick this vessel
     /// itself up (not refused as a dish outside clean-up, nor taking what's in it).</summary>
-    public bool WouldPickUp => !IsHeld && !(isDish && !DishesMovable) && occupied.Count == 0;
+    public bool WouldPickUp => !IsHeld && !(isDish && !DishMovableNow) && occupied.Count == 0;
+
+    [Tooltip("A dish that may also be moved during the opening ingredient check (not only in 정리). Off for the prepped-ingredients plate.")]
+    [SerializeField] private bool movableDuringBriefing = true;
 
     /// <summary>Plates move in clean-up (정리) - and while the opening ingredient
-    /// check (ExamBriefing) runs, to sort the ingredients into them per dish.</summary>
-    private static bool DishesMovable => CleanupMode.IsOn || ExamBriefing.IsPlaying;
+    /// check (ExamBriefing) runs, to sort the ingredients into them per dish;
+    /// but not the prepped-ingredients plate then (movableDuringBriefing off).</summary>
+    // (a plate with starch portioned into it can be carried too - to the sink to pour the water off)
+    private bool DishMovableNow => CleanupMode.IsOn || (ExamBriefing.IsPlaying && movableDuringBriefing) || HasPortion;
 
     protected override bool OnClickedWhileHandEmpty()
     {
         // Dishes only move in clean-up mode (the 정리 tab) - or during the opening check.
-        if (isDish && !DishesMovable)
+        if (isDish && !DishMovableNow)
         {
             CleanupMode.NotifyBlocked();
             return true;
@@ -808,6 +841,22 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         {
             cloth.Say("면보를 먼저 치우세요");
             return true;
+        }
+        // 버무리기 by hand: the meat in this bowl with its 튀김옷 (or 밑간) - both
+        // hands into the bowl (MeatKneader).
+        if (!IsCookingVessel && MeatKneader.HasMeatToKnead(this))
+        {
+            MeatKneader.Begin(this);
+            return true;
+        }
+        // 깬 달걀: 계란 사용 - which part to pour (picked up once chosen). Beaten
+        // or mixed with something else, it's just picked up (all of it goes).
+        if (occupied.Count == 0 && EggContents.Of(this, false) is EggContents egg && egg.HasAny)
+        {
+            if (egg.Busy) return true;
+            if (egg.IsSeparable) { egg.ShowChooser(); return true; }
+            if (!egg.Beaten && egg.HasWhite != egg.HasYolk) return false; // (only one part left: as it is)
+            if (!egg.Beaten) egg.Say("다른 재료와 섞여서 흰자·노른자를 나눌 수 없어요");
         }
         return occupied.Count > 0;
     }
@@ -831,8 +880,100 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             return;
         }
 
-        // A bowl of strained oil (or other liquid sauce) poured into this one.
-        if (held is MovableBowl sauceBowl && (object)sauceBowl != this && !IsDish && !sauceBowl.IsCookingVessel
+        // 깬 달걀 poured across - the part chosen in 계란 사용 (or all of it).
+        if (held is MovableBowl eggBowl && (object)eggBowl != this && !IsDish
+            && EggContents.Of(eggBowl, false) is EggContents eggFrom && eggFrom.HasAny)
+        {
+            StartCoroutine(PourEggFrom(eggBowl, eggFrom));
+            return;
+        }
+
+        // The empty measuring spoon into the broken egg: 흰자 / 노른자 / 전란 -
+        // one spoonful (1T) of the part picked (beaten or mixed: of the lot).
+        if (held is ToolItem eggSpoon && eggSpoon.Kind == ToolKind.MeasuringSpoon && !eggSpoon.IsSpoonLoaded
+            && EggContents.Of(this, false) is EggContents eggIn && eggIn.HasAny && !eggIn.Busy)
+        {
+            if (eggIn.IsSeparable) eggIn.ShowChooser(part => ScoopEgg(eggSpoon, eggIn, part), eggSpoon.UsingTeaspoon ? "작은술(1t) 뜨기" : "큰술(1T) 뜨기");
+            else ScoopEgg(eggSpoon, eggIn, EggContents.Part.All);
+            return;
+        }
+
+        // 달걀 풀기: chopsticks, a whisk, a spoon or the spatula stirred through it.
+        if (held is ToolItem beater && EggContents.Of(this, false) is EggContents toBeat && toBeat.HasAny && !toBeat.Beaten
+            && (beater.Kind == ToolKind.Chopsticks || beater.Kind == ToolKind.Whisk || beater.Kind == ToolKind.Spoon
+                || beater.Kind == ToolKind.Spatula))
+        {
+            toBeat.TryBeat(beater);
+            return;
+        }
+
+        // A bowl of starch poured into the pan: 전분물 (its starch and water kept
+        // apart), the drained 앙금, or dry powder - all of it, then mixed in by stirring.
+        if (held is MovableBowl starchBowlIn && (object)starchBowlIn != this && IsCookingVessel
+            && starchBowlIn.GetComponent<PortionedCondiment>() is PortionedCondiment toPour && !toPour.Removed)
+        {
+            toPour.TakeAllForPour(out string kind, out float starchMl, out float waterMl);
+            float bowlWater = starchBowlIn.WaterMl;          // (tap water over it, if its size is known)
+            starchBowlIn.SetWaterAmount(0f);
+            PanSauce into = PanSauce.Of(this, true);
+            if (waterMl + bowlWater > 0f) into.Add(Condiments.Water, (waterMl + bowlWater) / ToolItem.TablespoonMl);
+            if (starchMl > 0f) into.Add(kind, starchMl / ToolItem.TablespoonMl);
+            MarkUsed();
+            HandController.Instance?.PlayChopGesture();
+            Debug.Log($"[옮겨 담기] {starchBowlIn.name} → {name}: {kind} {starchMl:0}mL + 물 {waterMl + bowlWater:0}mL");
+            return;
+        }
+
+        // The 앙금녹말 (or the starch) bowl tipped over the meat in a bowl - for
+        // the 튀김옷: all of it onto the meat's batter (its water too, if it
+        // wasn't poured off), to be worked in by hand (MeatKneader).
+        if (held is MovableBowl starchOnMeat && (object)starchOnMeat != this && !IsCookingVessel
+            && starchOnMeat.GetComponent<PortionedCondiment>() is PortionedCondiment toCoat && !toCoat.Removed
+            && BatterTarget() is IngredientItem coatMeat)
+        {
+            toCoat.TakeAllForPour(out string kind, out float starchMl, out float waterMl);
+            float bowlWater = starchOnMeat.WaterMl;
+            starchOnMeat.SetWaterAmount(0f);
+            if (starchMl > 0f) coatMeat.AddFromSpoon(BatterCoating.IsBatterIngredient(kind) ? kind : BatterCoating.DryStarch, starchMl);
+            if (waterMl + bowlWater > 0f) coatMeat.AddFromSpoon(Condiments.Water, waterMl + bowlWater);
+            starchOnMeat.MarkUsed();
+            MarkUsed();
+            HandController.Instance?.PlayChopGesture();
+            Debug.Log($"[튀김옷] {starchOnMeat.name} → {coatMeat.IngredientName}: {kind} {starchMl:0}mL + 물 {waterMl + bowlWater:0}mL");
+            return;
+        }
+
+        // The measuring cup's water poured onto the starch (앙금녹말 만들기): all of it.
+        if (held is MovableBowl starchCup && (object)starchCup != this && starchCup.CanHoldWater && starchCup.WaterAmount > 0.01f
+            && GetComponent<PortionedCondiment>() is PortionedCondiment wetted && wetted.CurrentStage < PortionedCondiment.Stage.Drained)
+        {
+            float ml = starchCup.WaterMl > 0f ? starchCup.WaterMl : ToolItem.TablespoonMl * starchCup.WaterAmount / Mathf.Max(starchCup.spoonOfWater, 1e-4f);
+            starchCup.SetWaterAmount(0f);
+            wetted.AddSpoonOfWater(ml);
+            HandController.Instance?.PlayChopGesture();
+            Debug.Log($"[앙금녹말] {name}: 물 {ml:0}mL 부음");
+            return;
+        }
+
+        // The measuring cup's water poured into a pan (탕수육 소스의 물): all of it,
+        // as mL of 물 in the sauce - only if the cup's size is known.
+        if (held is MovableBowl cup && (object)cup != this && cup.CanHoldWater && cup.WaterAmount > 0.01f
+            && IsCookingVessel && !canHoldWater && cup.PanSauceFree)
+        {
+            if (cup.waterCapacityMl <= 0f)
+            {
+                Debug.LogWarning($"[설정 누락] {cup.name}: 용량(waterCapacityMl)이 없어 물을 계량해 부을 수 없어요");
+                return;
+            }
+            StartCoroutine(PourWaterFrom(cup));
+            return;
+        }
+
+        // A bowl of strained oil (or other liquid sauce) poured into this one - or
+        // the pan's oil/sauce poured straight into a bowl with no cheesecloth on
+        // it: then everything goes in, 고춧가루 and all (not strained).
+        if (held is MovableBowl sauceBowl && (object)sauceBowl != this && !IsDish
+            && (!sauceBowl.IsCookingVessel || !IsCookingVessel)
             && !sauceBowl.HasIngredients && PanSauce.Of(sauceBowl, false) is PanSauce kept && kept.Amount > 0.01f)
         {
             StartCoroutine(PourSauceFrom(sauceBowl, kept));
@@ -905,12 +1046,19 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             && starchSpoon.LoadedSeasoning == PortionedCondiment.Starch)
         {
             PortionedCondiment pc = GetComponent<PortionedCondiment>();
-            if (pc == null && IsPlateOrBowl && IsEmpty)
+            // (into any bowl or plate with nothing else in it - water already in
+            // it is fine: tap water, or spoonfuls of water put in first)
+            if (pc == null && IsPlateOrBowl && occupied.Count == 0 && !HasEgg && PanSauce.Of(this, false) == null)
             {
                 pc = gameObject.AddComponent<PortionedCondiment>();
-                pc.Init(this, PortionedCondiment.Starch);
+                pc.Init(this, PortionedCondiment.Starch, starchSettleMinutes);
+                if (appliedSeasonings.TryGetValue(Condiments.Water, out float spoonWater) && spoonWater > 0f)
+                {
+                    appliedSeasonings.Remove(Condiments.Water);
+                    pc.AddSpoonOfWater(spoonWater);
+                }
             }
-            if (pc != null && pc.AddSpoon(starchSpoon.LoadedSeasoning))
+            if (pc != null && pc.AddSpoon(starchSpoon.LoadedSeasoning, starchSpoon.LoadedMl))
             {
                 starchSpoon.ConsumeSeasoning();
                 StartCoroutine(SpoonDip(starchSpoon));
@@ -919,24 +1067,56 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             }
         }
 
-        // ...then stirred once with the empty spoon (after the water).
+        // ...then stirred once with the empty spoon (after the water) - while
+        // milky; once it has settled the spoon measures (below). Settled but
+        // the water on top not poured off: the spoon comes up with the 앙금 and
+        // its water - a wetter 앙금 (물기 많은 앙금), recorded as such.
         if (held is ToolItem stirSpoon && stirSpoon.Kind == ToolKind.MeasuringSpoon && !stirSpoon.IsSpoonLoaded
-            && GetComponent<PortionedCondiment>() is PortionedCondiment toStir && toStir.TryStir())
+            && GetComponent<PortionedCondiment>() is PortionedCondiment toStir)
+        {
+            // still dry powder (no water yet): the spoon takes some back up
+            if (toStir.CurrentStage == PortionedCondiment.Stage.Powder)
+            {
+                if (stirSpoon.TryLoadUpTo(PortionedCondiment.Starch, toStir.StarchMl))
+                {
+                    toStir.TakeDry(stirSpoon.LoadedMl);
+                    StartCoroutine(SpoonDip(stirSpoon));
+                }
+                return;
+            }
+            if (toStir.CurrentStage == PortionedCondiment.Stage.Settled)
+            {
+                if (stirSpoon.TryLoadUpTo(PortionedCondiment.WetSettledStarch, toStir.UndrainedMl))
+                {
+                    toStir.TakeUndrained(stirSpoon.LoadedMl);
+                    StartCoroutine(SpoonDip(stirSpoon));
+                }
+                return;
+            }
+            if (toStir.TryStir()) return;
+        }
+        // (stirred up again after settling - a spoon, whisk or chopsticks)
+        if (held is ToolItem stirTool && (stirTool.Kind == ToolKind.Spoon || stirTool.Kind == ToolKind.Whisk || stirTool.Kind == ToolKind.Chopsticks
+                                          || stirTool.Kind == ToolKind.Spatula || stirTool.Kind == ToolKind.Ladle)
+            && GetComponent<PortionedCondiment>() is PortionedCondiment restir && restir.TryStir())
             return;
 
-        // ...and once it's 앙금녹말, the empty spoon takes a little of it up.
+        // ...and once it's 앙금녹말 (water poured off), the empty spoon takes
+        // exactly one level spoonful of it - not with less than that left.
         if (held is ToolItem scoopSpoon && scoopSpoon.Kind == ToolKind.MeasuringSpoon && !scoopSpoon.IsSpoonLoaded
             && GetComponent<PortionedCondiment>() is PortionedCondiment settled && settled.CurrentStage == PortionedCondiment.Stage.Drained)
         {
-            scoopSpoon.LoadSeasoning(PortionedCondiment.SettledStarch);
+            if (!scoopSpoon.TryLoadUpTo(PortionedCondiment.SettledStarch, settled.SettledMl)) return;
+            settled.TakeSettled(scoopSpoon.LoadedMl);
             StartCoroutine(SpoonDip(scoopSpoon));
+            Debug.Log($"[계량] {name}: 앙금녹말 {scoopSpoon.LoadedMl:0}mL (사용 {settled.SettledUsedMl:0}mL, 남은 양 {settled.SettledMl:0}mL)");
             return;
         }
 
         // A spoonful of water onto the starch (3 spoons, from the measuring cup).
         if (held is ToolItem waterSpoonIn && waterSpoonIn.Kind == ToolKind.MeasuringSpoon
             && waterSpoonIn.LoadedSeasoning == Condiments.Water
-            && GetComponent<PortionedCondiment>() is PortionedCondiment portion && portion.AddSpoonOfWater())
+            && GetComponent<PortionedCondiment>() is PortionedCondiment portion && portion.AddSpoonOfWater(waterSpoonIn.LoadedMl))
         {
             waterSpoonIn.ConsumeSeasoning();
             StartCoroutine(SpoonDip(waterSpoonIn));
@@ -944,35 +1124,54 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             return;
         }
 
+        // 버무리기: a spatula, chopsticks or a spoon through the meat in this bowl
+        // (one stroke a click) - only once something's been added to coat it.
+        if (held is ToolItem mixer && BatterCoating.IsMixingTool(mixer) && !IsCookingVessel
+            && BatterTarget() is IngredientItem coated && BatterCoating.Of(coated, false) is BatterCoating batter && batter.HasAny)
+        {
+            batter.MixStroke(mixer, this);
+            return;
+        }
+
+        // The loaded spoon tipped in: all of what's on it (its mL) goes in here -
+        // into a bowl with the meat to be coated in it, onto that meat (its
+        // marinade or its 튀김옷 - BatterCoating).
         if (held is ToolItem spoon && spoon.Kind == ToolKind.MeasuringSpoon && spoon.IsSpoonLoaded)
         {
-            AddSeasoning(spoon.LoadedSeasoning);
+            string what = spoon.LoadedSeasoning;
+            float ml = spoon.ConsumeSeasoning();
+            if (!IsCookingVessel && BatterTarget() is IngredientItem meat) meat.AddFromSpoon(what, ml);
+            else AddSeasoning(what, ml);
             StartCoroutine(SpoonDip(spoon));
-            spoon.ConsumeSeasoning();
+            Debug.Log($"[계량] {name}: {what} {ml:0}mL 넣음");
             return;
         }
 
         // An empty measuring spoon dipped into a bowl of strained oil (고추기름)
-        // comes out with one spoonful of it - taken from the bowl, to add to
-        // the cooking with the spoon as any seasoning.
+        // comes out with one level spoonful of it - taken from the bowl, to add
+        // to the cooking as any seasoning (not with less than that left).
         if (held is ToolItem oilSpoon && oilSpoon.Kind == ToolKind.MeasuringSpoon && !oilSpoon.IsSpoonLoaded && !IsCookingVessel
-            && Cheesecloth.On(this) == null && PanSauce.Of(this, false) is PanSauce keptOil && keptOil.LiquidAmount >= 0.5f)
+            && Cheesecloth.On(this) == null && PanSauce.Of(this, false) is PanSauce keptOil && keptOil.LiquidAmount > 0.01f)
         {
             string what = keptOil.LiquidName;
-            keptOil.Take(1f, true);
-            oilSpoon.LoadSeasoning(what);
+            // (PanSauce counts in 큰술, 15 mL each)
+            if (!oilSpoon.TryLoadUpTo(what, keptOil.LiquidAmount * ToolItem.TablespoonMl)) return;
+            keptOil.Take(oilSpoon.LoadedMl / ToolItem.TablespoonMl, true);
             StartCoroutine(SpoonDip(oilSpoon));
-            Debug.Log($"[계량] {name}: {what} 1스푼 (남은 양 {keptOil.LiquidAmount:0.#}스푼)");
+            Debug.Log($"[계량] {name}: {what} {oilSpoon.LoadedMl:0}mL (남은 양 {keptOil.LiquidAmount * ToolItem.TablespoonMl:0.#}mL)");
             return;
         }
 
         // An empty measuring spoon dipped into water (e.g. the measuring cup)
-        // comes out with one spoonful of water - for 겨자 개기 and the like.
+        // comes out with one level spoonful of water - for 겨자 개기 and the like.
+        // (spoonOfWater: how much of the fill one 큰술 is)
         if (held is ToolItem waterSpoon && waterSpoon.Kind == ToolKind.MeasuringSpoon && WaterAmount > 0f)
         {
-            waterSpoon.LoadSeasoning(Condiments.Water);
+            // (its size known - the measuring cup: by mL; else spoonOfWater a 큰술)
+            float mlPerFill = waterCapacityMl > 0f ? waterCapacityMl : ToolItem.TablespoonMl / Mathf.Max(spoonOfWater, 1e-4f);
+            if (!waterSpoon.TryLoadUpTo(Condiments.Water, WaterAmount * mlPerFill)) return;
             StartCoroutine(SpoonDip(waterSpoon));
-            SetWaterAmount(WaterAmount - spoonOfWater);
+            SetWaterAmount(WaterAmount - waterSpoon.LoadedMl / mlPerFill);
             HandController.Instance?.PlayChopGesture();
             return;
         }
@@ -1071,6 +1270,89 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         pouring = false;
     }
 
+    /// <summary>A spoonful (the end in use: 1T 15 mL / 1t 5 mL) of the egg's part taken up in the measuring
+    /// spoon still in hand - added to whatever it's tipped into next, as any
+    /// spoonful of seasoning (밑간한 고기에 흰자 2T: two of these).</summary>
+    private void ScoopEgg(ToolItem spoon, EggContents egg, EggContents.Part part)
+    {
+        if (spoon == null || egg == null || HandCarry.Instance == null || HandCarry.Instance.Current != spoon || spoon.IsSpoonLoaded) return;
+        string what = egg.SpoonName(part);
+        // (a spoonful - or what's left of that part, if less)
+        if (!spoon.TryLoadUpTo(what, egg.AvailableMl(part))) return;
+        float ml = spoon.LoadedMl;
+        egg.TakeMl(part, ml);
+        StartCoroutine(SpoonDip(spoon));
+        string left = egg != null && egg.HasAny ? $"남은 흰자 {egg.WhiteMl:0.#}mL, 노른자 {egg.YolkMl:0.#}mL" : "다 떠냄";
+        Debug.Log($"[계량] {name}: {what} {ml:0}mL ({spoon.SpoonSizeLabel}) ({left})");
+    }
+
+    /// <summary>The meat in this bowl that takes a 튀김옷 (its recipe has a
+    /// batter - RecipeBook), if any.</summary>
+    public IngredientItem BatterTarget()
+    {
+        foreach (Carryable c in occupied.Keys)
+            if (c is IngredientItem ing && RecipeBook.BatterFor(ing.IngredientName) != null) return ing;
+        return null;
+    }
+
+    /// <summary>The bowl of broken egg in hand tipped over this one: only the
+    /// part chosen in 계란 사용 (흰자만 - the yolk held back in the bowl;
+    /// 노른자만 - the white let go first) moves across, the rest stays.</summary>
+    private IEnumerator PourEggFrom(MovableBowl from, EggContents egg)
+    {
+        if (pouring || egg.Busy) yield break;
+        EggContents.Part part = egg.Chosen ?? EggContents.Part.All;
+        if (!egg.Beaten && !egg.Mixed && ((part == EggContents.Part.White && !egg.HasWhite) || (part == EggContents.Part.Yolk && !egg.HasYolk)))
+        {
+            egg.Say(part == EggContents.Part.White ? "흰자가 남아 있지 않아요" : "노른자가 남아 있지 않아요");
+            yield break;
+        }
+        pouring = true;
+        HandCarry hand = HandCarry.Instance;
+        if (hand != null) hand.IsLocked = true;
+        HandController.Instance?.GoTo(BodyCenterWorld() + new Vector3(0.6f, 0.7f, 0f) + new Vector3(0f, 0f, HandController.Instance.transform.position.z - BodyCenterWorld().z), null);
+        yield return new WaitForSeconds(0.3f);
+        // (a careful tip for a part, all the way for the lot)
+        float angle = part == EggContents.Part.All || egg.Beaten || egg.Mixed ? -75f : -55f;
+        for (float t = 0f; t < 0.35f; t += Time.deltaTime) { from.SetPourTilt(Quaternion.AngleAxis(angle * t / 0.35f, Vector3.forward)); yield return null; }
+        yield return new WaitForSeconds(0.3f);
+        string what = egg.Beaten || egg.Mixed ? egg.Label : EggPartChooser.Name(part);
+        egg.Take(part, out float whites, out float yolks, out bool beaten);
+        EggContents.Of(this, true).Put(whites, yolks, beaten);
+        MarkUsed();
+        Debug.Log($"[옮겨 담기] {from.name} → {name}: 달걀 {what} (흰자 {whites:0.#}, 노른자 {yolks:0.#})");
+        yield return new WaitForSeconds(0.2f);
+        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { from.SetPourTilt(Quaternion.AngleAxis(angle * (1f - t / 0.3f), Vector3.forward)); yield return null; }
+        from.SetPourTilt(Quaternion.identity);
+        if (hand != null) hand.IsLocked = false;
+        pouring = false;
+    }
+
+    /// <summary>Holds no sauce of its own (plain water only).</summary>
+    public bool PanSauceFree => PanSauce.Of(this, false) == null || PanSauce.Of(this, false).Amount <= 0.01f;
+
+    /// <summary>The cup tipped over this pan: its water goes in, measured (mL).</summary>
+    private IEnumerator PourWaterFrom(MovableBowl cup)
+    {
+        if (pouring) yield break;
+        pouring = true;
+        HandCarry hand = HandCarry.Instance;
+        if (hand != null) hand.IsLocked = true;
+        HandController.Instance?.GoTo(BodyCenterWorld() + new Vector3(0.6f, 0.7f, 0f) + new Vector3(0f, 0f, HandController.Instance.transform.position.z - BodyCenterWorld().z), null);
+        yield return new WaitForSeconds(0.3f);
+        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { cup.SetPourTilt(Quaternion.AngleAxis(-75f * t / 0.3f, Vector3.forward)); yield return null; }
+        float ml = cup.WaterMl;
+        cup.SetWaterAmount(0f);
+        PanSauce.Of(this, true).Add(Condiments.Water, ml / ToolItem.TablespoonMl);
+        MarkUsed();
+        Debug.Log($"[옮겨 담기] {cup.name} → {name}: 물 {ml:0}mL");
+        yield return new WaitForSeconds(0.3f);
+        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { cup.SetPourTilt(Quaternion.AngleAxis(-75f * (1f - t / 0.3f), Vector3.forward)); yield return null; }
+        cup.SetPourTilt(Quaternion.identity);
+        if (hand != null) hand.IsLocked = false;
+        pouring = false;
+    }
+
     private IEnumerator PourFrom(MovableBowl from)
     {
         if (pouring) yield break;
@@ -1143,6 +1425,15 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         bool any = false;
         foreach (Carryable c in occupied.Keys)
             if (c.GetComponent<FoodPieceGroup>() is FoodPieceGroup g) { g.Stir(); any = true; }
+        // the sauce/oil itself stirred (고춧가루 in oil: slower to catch and burn)
+        if (PanSauce.Of(this, false) is PanSauce sauce && sauce.Amount > 0.01f)
+        {
+            sauce.Stir();
+            any = true;
+            // a drop off the spatula (thin: runs off, thick: hangs and falls slowly)
+            if (HandCarry.Instance?.Current is ToolItem tool && tool.GetComponentInChildren<Renderer>() is Renderer tr)
+                sauce.DripFrom(new Vector3(tr.bounds.center.x, tr.bounds.min.y, tr.bounds.min.z));
+        }
         if (!any) return false;
         if (stirRoutine != null) StopCoroutine(stirRoutine);
         stirRoutine = StartCoroutine(StirGesture());
@@ -1183,8 +1474,9 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         if (item is ToolItem spatula && spatula.Kind == ToolKind.Spatula) return occupied.Count > 0;
         if (item is MovableBowl from && (object)from != this && !IsDish && from.GetComponent<FryingPanPlating>() == null
             && from.HasIngredients && !IsFull) return true; // tipped in here
+        if (item is MovableBowl eggFrom && (object)eggFrom != this && !IsDish && eggFrom.HasEgg) return true; // 달걀 poured in
         if (item is PotLid) return currentLid == null;
-        if (item is ToolItem spoon && spoon.Kind == ToolKind.MeasuringSpoon && (spoon.IsSpoonLoaded || WaterAmount > 0f || HasPortion)) return true;
+        if (item is ToolItem spoon && spoon.Kind == ToolKind.MeasuringSpoon && (spoon.IsSpoonLoaded || WaterAmount > 0f || HasPortion || HasEgg)) return true;
         if (item is SeasoningBottle) return true;
         if (item is ToolItem towel && towel.IsTowelKind) return true;
         return !IsFull && Accepts(item);
@@ -1401,7 +1693,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     }
 
     /// <summary>The dish's own renderer, or - when that's hidden - the model child that shows.</summary>
-    private Renderer VisibleDishRenderer()
+    public Renderer VisibleDishRenderer()
     {
         Renderer dish = GetComponent<Renderer>();
         if (dish != null && dish.enabled) return dish;

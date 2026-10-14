@@ -413,10 +413,13 @@ MonoBehaviour:
   alreadyMinced: 0
   chiliTrim: 1
   sliceStyle: 0
+  spreadMeatStrips: 0
   amountGrams: 0
   worldPerCm: 0.0978
   minTrimCm: 0.2
   diceSlowness: 1.2
+  meatTrimLengthCm: 4
+  meatCutStepMode: 0
 --- !u!23 &44293803
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1215,10 +1218,13 @@ MonoBehaviour:
   alreadyMinced: 0
   chiliTrim: 0
   sliceStyle: 2
+  spreadMeatStrips: 0
   amountGrams: 0
   worldPerCm: 0.0978
   minTrimCm: 0.2
   diceSlowness: 1.2
+  meatTrimLengthCm: 4
+  meatCutStepMode: 0
 --- !u!65 &142872492
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1258,11 +1264,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -4.89
+      value: -4.881
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 4.42
+      value: 4.43
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
       propertyPath: m_LocalRotation.w
@@ -1330,6 +1336,8 @@ MonoBehaviour:
   holdByHandle: 0
   seasoningName: "\uC2DD\uC6A9\uC720"
   bodyTiltAngle: 25
+  stockMl: 500
+  givenGrams: 0
 --- !u!65 &146269956
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1899,6 +1907,7 @@ MonoBehaviour:
   capacity: 10
   canHoldWater: 0
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -1912,11 +1921,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.36, y: 0.36}
   minSeparation: {x: 0.22, y: 0.22}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!4 &186573553 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
@@ -2012,6 +2023,11 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 190371387}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &194159852 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 2717023627176740545, guid: 31585a9de95e50a4490fe2c60386229e, type: 3}
+  m_PrefabInstance: {fileID: 787450641}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &201678680
 GameObject:
   m_ObjectHideFlags: 0
@@ -2107,6 +2123,54 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3386458685345029243, guid: 31585a9de95e50a4490fe2c60386229e, type: 3}
   m_PrefabInstance: {fileID: 787450641}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &212558445
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 194159852}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9868c941150e6b04d914e5a553930ad3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ToolItem
+  handOffset: {x: 0, y: 0, z: -0.55}
+  handHoldOffset: {x: 0, y: 0.35, z: -0.25}
+  holdByHandle: 0
+  tablespoonEndLocal: {x: 0, y: 0, z: -0.42}
+  teaspoonEndLocal: {x: 0, y: 0, z: 0.42}
+  flipHoldSeconds: 0.6
+  flipSeconds: 0.35
+  spoonHomeRadius: 0.7
+  showSpoonLabel: 0
+  kind: 5
+  gripLocalDir: {x: 0, y: -1, z: 0}
+  flipChopUpright: 0
+  chopLift: 0.25
+  chopTiltZ: 25
+  scrapSweepRadius: 0.4
+--- !u!65 &212558446
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 194159852}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.1406784, y: 0.86201, z: 0.2881317}
+  m_Center: {x: 0, y: 0.431005, z: 0}
 --- !u!1001 &215504400
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2322,6 +2386,7 @@ MonoBehaviour:
   capacity: 10
   canHoldWater: 0
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -2335,11 +2400,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.18, y: 0.18}
   minSeparation: {x: 0.11, y: 0.11}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!4 &236198149 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
@@ -2648,7 +2715,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3247581087658072822, guid: 4c31d70b845844c4aaaab5064222a259, type: 3}
       propertyPath: m_LocalScale.y
-      value: 3
+      value: 4
       objectReference: {fileID: 0}
     - target: {fileID: 3247581087658072822, guid: 4c31d70b845844c4aaaab5064222a259, type: 3}
       propertyPath: m_LocalScale.z
@@ -2656,15 +2723,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3247581087658072822, guid: 4c31d70b845844c4aaaab5064222a259, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -8.17
+      value: -8.13
       objectReference: {fileID: 0}
     - target: {fileID: 3247581087658072822, guid: 4c31d70b845844c4aaaab5064222a259, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -5.09
+      value: -6.02
       objectReference: {fileID: 0}
     - target: {fileID: 3247581087658072822, guid: 4c31d70b845844c4aaaab5064222a259, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 6.42
+      value: 7.36
       objectReference: {fileID: 0}
     - target: {fileID: 3247581087658072822, guid: 4c31d70b845844c4aaaab5064222a259, type: 3}
       propertyPath: m_LocalRotation.w
@@ -2696,7 +2763,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3247581087658072822, guid: 4c31d70b845844c4aaaab5064222a259, type: 3}
       propertyPath: m_ConstrainProportionsScale
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -3488,6 +3555,7 @@ MonoBehaviour:
   maxDistance: 100
   dragThreshold: 6
   holdSeconds: 0.4
+  stirPixelsPerStroke: 140
 --- !u!1 &331421514
 GameObject:
   m_ObjectHideFlags: 0
@@ -3607,6 +3675,7 @@ MonoBehaviour:
   capacity: 10
   canHoldWater: 1
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -3620,11 +3689,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.14, y: 0.14}
   minSeparation: {x: 0.09, y: 0.09}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!65 &335917318
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -3883,10 +3954,13 @@ MonoBehaviour:
   alreadyMinced: 0
   chiliTrim: 0
   sliceStyle: 0
+  spreadMeatStrips: 0
   amountGrams: 0
   worldPerCm: 0.0978
   minTrimCm: 0.2
   diceSlowness: 1.2
+  meatTrimLengthCm: 4
+  meatCutStepMode: 0
 --- !u!23 &346684372
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -3996,11 +4070,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -3.85
+      value: -3.789
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 3.86
+      value: 3.81
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalRotation.w
@@ -4074,6 +4148,7 @@ MonoBehaviour:
   capacity: 10
   canHoldWater: 1
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -4087,11 +4162,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.28, y: 0.28}
   minSeparation: {x: 0.17, y: 0.17}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!65 &350598074
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -4923,6 +5000,156 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1001 &412573627
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 1927539385}
+    m_Modifications:
+    - target: {fileID: 100000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_Name
+      value: bowlSize1.5_
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 1.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -3.51
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -3.851
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 3.859
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: -0.9415618
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0.33684042
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.00000013638655
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0.000000055976297
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 320.631
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 100000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 412573631}
+    - targetCorrespondingSourceObject: {fileID: 100000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 412573630}
+  m_SourcePrefab: {fileID: 100100000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+--- !u!4 &412573628 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+  m_PrefabInstance: {fileID: 412573627}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &412573629 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 100000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+  m_PrefabInstance: {fileID: 412573627}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &412573630
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 412573629}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: afe4f00ab6b5d834e8899145bf89eabd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MovableBowl
+  handOffset: {x: 0, y: 0, z: -0.55}
+  handHoldOffset: {x: 0, y: 0.35, z: -0.25}
+  holdByHandle: 0
+  accepts: 1
+  capacity: 10
+  canHoldWater: 1
+  spoonOfWater: 0.1
+  waterCapacityMl: 0
+  timeToBoilNoLid: 300
+  timeToBoilWithLid: 210
+  timeToHeatOil: 420
+  bubbleEffectPrefab: {fileID: 2485276936549234680, guid: a500764f1a0d3654db7718249e73c3d3, type: 3}
+  waterMaterial: {fileID: 0}
+  waterInnerRatio: 0.86
+  fullWaterLevel: 0.5
+  secondsToFill: 3
+  waterLocalOffset: {x: 0, y: 0, z: 0}
+  waterLookSpeed: 0.6
+  idleSlosh: 0.2
+  placementExtents: {x: 0.28, y: 0.28}
+  minSeparation: {x: 0.17, y: 0.17}
+  starchSettleMinutes: 5
+  oilForFrying: 0
+  oilLevel: 0.5
+  oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
+  isDish: 0
+  strainerRest: 0
+  movableDuringBriefing: 1
+--- !u!65 &412573631
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 412573629}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.3935827, y: 0.106321044, z: 0.39647347}
+  m_Center: {x: 0.000000022351742, y: 0.053160522, z: 0.00000008195639}
 --- !u!1 &415931627
 GameObject:
   m_ObjectHideFlags: 0
@@ -5566,10 +5793,13 @@ MonoBehaviour:
   alreadyMinced: 0
   chiliTrim: 0
   sliceStyle: 0
+  spreadMeatStrips: 0
   amountGrams: 0
   worldPerCm: 0.0978
   minTrimCm: 0.2
   diceSlowness: 1.2
+  meatTrimLengthCm: 4
+  meatCutStepMode: 0
 --- !u!23 &487071335
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -5796,6 +6026,8 @@ MonoBehaviour:
   holdByHandle: 0
   seasoningName: "\uAC10\uC790\uC804\uBD84"
   bodyTiltAngle: 25
+  stockMl: 500
+  givenGrams: 0
   fillRadius: 0.14759351
   fillLocalCenter: {x: 0.000000022351742, y: 0.079740785, z: 0.00000008195639}
   fillLocalUp: {x: 0, y: 1, z: 0}
@@ -5945,10 +6177,13 @@ MonoBehaviour:
   alreadyMinced: 0
   chiliTrim: 0
   sliceStyle: 3
+  spreadMeatStrips: 0
   amountGrams: 0
   worldPerCm: 0.0978
   minTrimCm: 0.2
   diceSlowness: 1.2
+  meatTrimLengthCm: 4
+  meatCutStepMode: 0
 --- !u!23 &500012921
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -6028,6 +6263,96 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 0.2822552, z: 0.2822552}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &511128879
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 511128880}
+  - component: {fileID: 511128882}
+  - component: {fileID: 511128881}
+  m_Layer: 0
+  m_Name: Lever
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &511128880
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 511128879}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1590783488}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &511128881
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 511128879}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &511128882
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 511128879}
+  m_Mesh: {fileID: 4300000, guid: e198c4b369c287b4fb1af6b6631f0c0d, type: 2}
 --- !u!1 &512269887
 GameObject:
   m_ObjectHideFlags: 0
@@ -6357,6 +6682,8 @@ MonoBehaviour:
   flameMedium: {fileID: 1820880185}
   flameStrong: {fileID: 2021904242}
   vesselLift: 0.35
+  litRecord: 
+  litRecordCategory: "\uC870\uB9AC\uACFC\uC815"
 --- !u!65 &534755204
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -6847,6 +7174,7 @@ MonoBehaviour:
   capacity: 10
   canHoldWater: 1
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -6860,11 +7188,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.28, y: 0.28}
   minSeparation: {x: 0.17, y: 0.17}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 1
+  movableDuringBriefing: 1
 --- !u!65 &555049421
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -7019,6 +7349,7 @@ MonoBehaviour:
   capacity: 10
   canHoldWater: 0
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -7032,11 +7363,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.36, y: 0.36}
   minSeparation: {x: 0.22, y: 0.22}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!64 &569441734
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -7463,6 +7796,8 @@ MonoBehaviour:
   holdByHandle: 0
   seasoningName: "\uD751\uD6C4\uCD94"
   bodyTiltAngle: 25
+  stockMl: 500
+  givenGrams: 0
 --- !u!65 &589726223
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -7653,6 +7988,7 @@ MonoBehaviour:
   capacity: 6
   canHoldWater: 1
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -7666,11 +8002,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.8, y: 0.3}
   minSeparation: {x: 0.4, y: 0.15}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!65 &597719592
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -7721,6 +8059,7 @@ MonoBehaviour:
   capacity: 10
   canHoldWater: 0
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -7734,11 +8073,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.18, y: 0.18}
   minSeparation: {x: 0.11, y: 0.11}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!64 &600491228
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -7795,6 +8136,7 @@ MonoBehaviour:
   capacity: 10
   canHoldWater: 0
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -7808,11 +8150,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.8, y: 0.3}
   minSeparation: {x: 0.4, y: 0.15}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!64 &621185943
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -7881,6 +8225,157 @@ Transform:
   - {fileID: 621185941}
   m_Father: {fileID: 2037192393}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &629893078
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 1927539385}
+    m_Modifications:
+    - target: {fileID: 100000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      propertyPath: m_Name
+      value: plateSize0.5_
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -1.27
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -4.893
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 4.5795
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: -0.9415618
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0.33684042
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.00000013638655
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0.000000055976294
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 320.631
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 100000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 629893082}
+    - targetCorrespondingSourceObject: {fileID: 100000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 629893081}
+  m_SourcePrefab: {fileID: 100100000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+--- !u!4 &629893079 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+  m_PrefabInstance: {fileID: 629893078}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &629893080 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 100000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+  m_PrefabInstance: {fileID: 629893078}
+  m_PrefabAsset: {fileID: 0}
+--- !u!64 &629893081
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 629893080}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 1
+  m_CookingOptions: 30
+  m_Mesh: {fileID: -4850532726680341992, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+--- !u!114 &629893082
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 629893080}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: afe4f00ab6b5d834e8899145bf89eabd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MovableBowl
+  handOffset: {x: 0, y: 0, z: -0.55}
+  handHoldOffset: {x: 0, y: 0.35, z: -0.25}
+  holdByHandle: 0
+  accepts: 1
+  capacity: 10
+  canHoldWater: 0
+  spoonOfWater: 0.1
+  waterCapacityMl: 0
+  timeToBoilNoLid: 300
+  timeToBoilWithLid: 210
+  timeToHeatOil: 420
+  bubbleEffectPrefab: {fileID: 0}
+  waterMaterial: {fileID: 0}
+  waterInnerRatio: 0.86
+  fullWaterLevel: 0.5
+  secondsToFill: 3
+  waterLocalOffset: {x: 0, y: 0, z: 0}
+  waterLookSpeed: 0.6
+  idleSlosh: 0.2
+  placementExtents: {x: 0.18, y: 0.18}
+  minSeparation: {x: 0.11, y: 0.11}
+  starchSettleMinutes: 5
+  oilForFrying: 0
+  oilLevel: 0.5
+  oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
+  isDish: 1
+  strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!1 &630343357
 GameObject:
   m_ObjectHideFlags: 0
@@ -7937,6 +8432,7 @@ MonoBehaviour:
   capacity: 10
   canHoldWater: 0
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -7950,11 +8446,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.38, y: 0.11}
   minSeparation: {x: 0.26, y: 0.18}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!23 &630343360
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -8530,6 +9028,8 @@ MonoBehaviour:
   holdByHandle: 0
   seasoningName: "\uAC04\uC7A5"
   bodyTiltAngle: 25
+  stockMl: 500
+  givenGrams: 0
 --- !u!65 &657923756
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -8735,11 +9235,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -3.9029999
+      value: -3.929
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 3.907
+      value: 3.876
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalRotation.w
@@ -9355,6 +9855,134 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 1255053967005034563, guid: 2ee7574cb1211da4ba89d1838327b5c4, type: 3}
   m_PrefabInstance: {fileID: 777262267}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &778515429
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 778515430}
+  - component: {fileID: 778515434}
+  - component: {fileID: 778515433}
+  - component: {fileID: 778515432}
+  - component: {fileID: 778515431}
+  m_Layer: 0
+  m_Name: SubmitButton
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &778515430
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 778515429}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 9.63, y: -4.28, z: -0.010000059}
+  m_LocalScale: {x: 4, y: 1.5, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1826338798}
+  m_Father: {fileID: 1865786201}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &778515431
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 778515429}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 96e646e189e254f40a0b372f1bd114ef, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SubmitButton
+  label: {fileID: 1826338799}
+  back: {fileID: 778515433}
+--- !u!65 &778515432
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 778515429}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 0.2}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!23 &778515433
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 778515429}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: cdf7463aceee006418a238e2d773e575, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &778515434
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 778515429}
+  m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1001 &782892564
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -9544,7 +10172,13 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 2717023627176740545, guid: 31585a9de95e50a4490fe2c60386229e, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 212558446}
+    - targetCorrespondingSourceObject: {fileID: 2717023627176740545, guid: 31585a9de95e50a4490fe2c60386229e, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 212558445}
   m_SourcePrefab: {fileID: 100100000, guid: 31585a9de95e50a4490fe2c60386229e, type: 3}
 --- !u!1001 &790545963
 PrefabInstance:
@@ -9818,6 +10452,8 @@ MonoBehaviour:
   handOffset: {x: 0, y: 0, z: -0.55}
   accepts: 1
   anchor: {fileID: 129208619}
+  placeSpacing: 0.15
+  placeSearchStep: 0.06
   placementExtents: {x: 1.1, y: 0.75}
 --- !u!114 &793206754
 MonoBehaviour:
@@ -9878,6 +10514,9 @@ MonoBehaviour:
   rinseSeconds: 1.5
   scrubSeconds: 2.4
   drySeconds: 1.6
+  floorY: -6
+  floorZ: 1.3
+  maxKnifeDropRecords: 3
 --- !u!1 &799384732
 GameObject:
   m_ObjectHideFlags: 0
@@ -9940,6 +10579,7 @@ MonoBehaviour:
   capacity: 14
   canHoldWater: 0
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -9953,11 +10593,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.92, y: 0.6}
   minSeparation: {x: 0.32, y: 0.2}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  movableDuringBriefing: 0
 --- !u!23 &799384735
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -10292,6 +10934,8 @@ MonoBehaviour:
   holdByHandle: 0
   seasoningName: "\uC2DD\uCD08"
   bodyTiltAngle: 25
+  stockMl: 500
+  givenGrams: 0
 --- !u!65 &815199343
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -10337,6 +10981,7 @@ MonoBehaviour:
   capacity: 6
   canHoldWater: 0
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -10350,11 +10995,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.8, y: 0.3}
   minSeparation: {x: 0.4, y: 0.15}
+  starchSettleMinutes: 5
   oilForFrying: 1
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!65 &821572701
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -10461,10 +11108,13 @@ MonoBehaviour:
   alreadyMinced: 1
   chiliTrim: 0
   sliceStyle: 0
-  amountGrams: 0
+  spreadMeatStrips: 0
+  amountGrams: 50
   worldPerCm: 0.0978
   minTrimCm: 0.2
   diceSlowness: 2
+  meatTrimLengthCm: 4
+  meatCutStepMode: 0
 --- !u!23 &831288902
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -10545,6 +11195,9 @@ MonoBehaviour:
   overcookFadeSeconds: 12
   doneColor: {r: 0, g: 0, b: 0, a: 0}
   overcookedColor: {r: 0.42, g: 0.33, b: 0.12, a: 1}
+  panCookedColor: {r: 0, g: 0, b: 0, a: 0}
+  searColor: {r: 0, g: 0, b: 0, a: 0}
+  charColor: {r: 0, g: 0, b: 0, a: 0}
   floatsWhenDone: 0
 --- !u!65 &831288906
 BoxCollider:
@@ -10943,6 +11596,12 @@ MonoBehaviour:
   handOffset: {x: 0, y: 0, z: -0.55}
   handHoldOffset: {x: 0, y: 0.35, z: -0.25}
   holdByHandle: 0
+  tablespoonEndLocal: {x: 0, y: 0, z: -0.42}
+  teaspoonEndLocal: {x: 0, y: 0, z: 0.42}
+  flipHoldSeconds: 0.6
+  flipSeconds: 0.35
+  spoonHomeRadius: 0.7
+  showSpoonLabel: 0
   kind: 4
   gripLocalDir: {x: 0, y: -1, z: 0}
   flipChopUpright: 0
@@ -10997,7 +11656,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 077469821410a7442afcb156428ae222, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0.66
+      value: 2.44
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 077469821410a7442afcb156428ae222, type: 3}
       propertyPath: m_LocalPosition.y
@@ -11303,6 +11962,8 @@ MonoBehaviour:
   holdByHandle: 0
   seasoningName: "\uC124\uD0D5"
   bodyTiltAngle: 25
+  stockMl: 500
+  givenGrams: 0
 --- !u!65 &880598250
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -11501,6 +12162,8 @@ MonoBehaviour:
   holdByHandle: 0
   seasoningName: "\uC18C\uAE08"
   bodyTiltAngle: 25
+  stockMl: 500
+  givenGrams: 0
 --- !u!65 &914089502
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -11702,10 +12365,13 @@ MonoBehaviour:
   alreadyMinced: 0
   chiliTrim: 0
   sliceStyle: 1
+  spreadMeatStrips: 0
   amountGrams: 0
   worldPerCm: 0.0978
   minTrimCm: 0.2
   diceSlowness: 1.2
+  meatTrimLengthCm: 4
+  meatCutStepMode: 0
 --- !u!23 &946831478
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -12513,6 +13179,12 @@ MonoBehaviour:
   handOffset: {x: 0, y: 0, z: -0.55}
   handHoldOffset: {x: 0, y: 0.35, z: -0.25}
   holdByHandle: 0
+  tablespoonEndLocal: {x: 0, y: 0, z: -0.42}
+  teaspoonEndLocal: {x: 0, y: 0, z: 0.42}
+  flipHoldSeconds: 0.6
+  flipSeconds: 0.35
+  spoonHomeRadius: 0.7
+  showSpoonLabel: 0
   kind: 5
   gripLocalDir: {x: 0, y: -1, z: 0}
   flipChopUpright: 0
@@ -12750,6 +13422,8 @@ MonoBehaviour:
   holdByHandle: 0
   seasoningName: "\uB450\uBC18\uC7A5"
   bodyTiltAngle: 25
+  stockMl: 500
+  givenGrams: 0
   fillRadius: 0.14759351
   fillLocalCenter: {x: 0.000000022351742, y: 0.079740785, z: 0.00000008195639}
   fillLocalUp: {x: 0, y: 1, z: 0}
@@ -13670,7 +14344,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 0}
+  - {fileID: 2100000, guid: 01430793862396541835d30a6625fda9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -13701,7 +14375,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1100621182}
-  m_Mesh: {fileID: 0}
+  m_Mesh: {fileID: 4300000, guid: 05abddc8055297144ba057236dff7734, type: 2}
 --- !u!65 &1100621186
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -13721,8 +14395,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.42, y: 0.06, z: 0.34}
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Size: {x: 0.43664998, y: 0.050000004, z: 0.3441}
+  m_Center: {x: 0.0036750063, y: 9.313226e-10, z: 0.002050005}
 --- !u!4 &1100621187
 Transform:
   m_ObjectHideFlags: 0
@@ -13736,7 +14410,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 2097487934}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1116615955
 GameObject:
@@ -13943,6 +14617,8 @@ MonoBehaviour:
   holdByHandle: 0
   seasoningName: "\uBC31\uD6C4\uCD94"
   bodyTiltAngle: 25
+  stockMl: 500
+  givenGrams: 0
 --- !u!65 &1132840626
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -14041,7 +14717,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 1.156, y: 1.8350708, z: 5.9279995}
-  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_LocalScale: {x: 0.3912, y: 0.5, z: 0.5}
   m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 628764779}
@@ -14058,7 +14734,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 44a5b15c408dbdc4b82460be8f1bf10c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CookableItem
-  process: 3
+  process: 4
   burner: {fileID: 1520197024}
   wok: {fileID: 0}
   timeToCooked: 6
@@ -14069,6 +14745,9 @@ MonoBehaviour:
   overcookFadeSeconds: 12
   doneColor: {r: 0, g: 0, b: 0, a: 0}
   overcookedColor: {r: 0.42, g: 0.33, b: 0.12, a: 1}
+  panCookedColor: {r: 0, g: 0, b: 0, a: 0}
+  searColor: {r: 0, g: 0, b: 0, a: 0}
+  charColor: {r: 0, g: 0, b: 0, a: 0}
   floatsWhenDone: 0
 --- !u!114 &1144338912
 MonoBehaviour:
@@ -14099,10 +14778,13 @@ MonoBehaviour:
   alreadyMinced: 0
   chiliTrim: 0
   sliceStyle: 4
-  amountGrams: 0
+  spreadMeatStrips: 0
+  amountGrams: 200
   worldPerCm: 0.0978
   minTrimCm: 0.2
   diceSlowness: 2
+  meatTrimLengthCm: 4
+  meatCutStepMode: 0
 --- !u!23 &1144338913
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -14160,7 +14842,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1144338909}
-  m_Mesh: {fileID: 4300000, guid: 52d08f03c9a90c64faefcf7a8db7c320, type: 2}
+  m_Mesh: {fileID: 4300000, guid: 1400233a874cac34d941d3aabd3bffd7, type: 2}
 --- !u!65 &1144338916
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -14180,8 +14862,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1, y: 0.5666775, z: 0.6069137}
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Size: {x: 1, y: 0.9746188, z: 1.0240722}
+  m_Center: {x: 0, y: -0.0007905215, z: -0.0009072423}
 --- !u!1 &1160345793
 GameObject:
   m_ObjectHideFlags: 0
@@ -15020,7 +15702,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 0}
+  - {fileID: 2100000, guid: 01430793862396541835d30a6625fda9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -15051,7 +15733,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1303671185}
-  m_Mesh: {fileID: 0}
+  m_Mesh: {fileID: 4300000, guid: 05abddc8055297144ba057236dff7734, type: 2}
 --- !u!65 &1303671189
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -15071,8 +15753,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.42, y: 0.06, z: 0.34}
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Size: {x: 0.43664998, y: 0.050000004, z: 0.3441}
+  m_Center: {x: 0.0036750063, y: 9.313226e-10, z: 0.002050005}
 --- !u!4 &1303671190
 Transform:
   m_ObjectHideFlags: 0
@@ -15086,7 +15768,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 2097487934}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1304061339
 GameObject:
@@ -15261,6 +15943,12 @@ MonoBehaviour:
   handOffset: {x: 0, y: 0, z: -0.55}
   handHoldOffset: {x: 0, y: 0.35, z: -0.25}
   holdByHandle: 0
+  tablespoonEndLocal: {x: 0, y: 0, z: -0.42}
+  teaspoonEndLocal: {x: 0, y: 0, z: 0.42}
+  flipHoldSeconds: 0.6
+  flipSeconds: 0.35
+  spoonHomeRadius: 0.7
+  showSpoonLabel: 0
   kind: 15
   gripLocalDir: {x: 0, y: -1, z: 0}
   flipChopUpright: 0
@@ -15317,6 +16005,7 @@ MonoBehaviour:
   capacity: 6
   canHoldWater: 0
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -15330,11 +16019,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.8, y: 0.3}
   minSeparation: {x: 0.4, y: 0.15}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!65 &1309451717
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -15504,11 +16195,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -4.922
+      value: -4.918
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 4.552
+      value: 4.549
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
       propertyPath: m_LocalRotation.w
@@ -15599,6 +16290,7 @@ MonoBehaviour:
   capacity: 10
   canHoldWater: 0
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -15612,11 +16304,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.18, y: 0.18}
   minSeparation: {x: 0.11, y: 0.11}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!4 &1317680243 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
@@ -15874,6 +16568,8 @@ MonoBehaviour:
   holdByHandle: 0
   seasoningName: "\uACE0\uCDA7\uAC00\uB8E8"
   bodyTiltAngle: 25
+  stockMl: 500
+  givenGrams: 0
   fillRadius: 0.14759351
   fillLocalCenter: {x: 0.000000022351742, y: 0.079740785, z: 0.00000008195639}
   fillLocalUp: {x: 0, y: 1, z: 0}
@@ -16768,6 +17464,7 @@ MonoBehaviour:
   capacity: 10
   canHoldWater: 1
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -16781,11 +17478,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.14, y: 0.14}
   minSeparation: {x: 0.09, y: 0.09}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!65 &1410127210
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -16889,6 +17588,7 @@ MonoBehaviour:
   capacity: 10
   canHoldWater: 0
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -16902,11 +17602,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.36, y: 0.36}
   minSeparation: {x: 0.22, y: 0.22}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!4 &1426974306 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
@@ -17127,6 +17829,7 @@ Transform:
   - {fileID: 2080458524}
   - {fileID: 1581463456}
   - {fileID: 1255737221}
+  - {fileID: 1590783488}
   m_Father: {fileID: 2037192393}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1441685859
@@ -17554,6 +18257,8 @@ MonoBehaviour:
   holdByHandle: 0
   seasoningName: "\uCF00\uCCA9"
   bodyTiltAngle: 25
+  stockMl: 500
+  givenGrams: 0
   fillRadius: 0.14759351
   fillLocalCenter: {x: 0.000000022351742, y: 0.079740785, z: 0.00000008195639}
   fillLocalUp: {x: 0, y: 1, z: 0}
@@ -17699,6 +18404,7 @@ MonoBehaviour:
   capacity: 10
   canHoldWater: 1
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -17712,11 +18418,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.14, y: 0.14}
   minSeparation: {x: 0.09, y: 0.09}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!65 &1480482416
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -17788,6 +18496,12 @@ MonoBehaviour:
   handOffset: {x: 0, y: 0, z: -0.55}
   handHoldOffset: {x: 0, y: 0.35, z: -0.25}
   holdByHandle: 0
+  tablespoonEndLocal: {x: 0, y: 0, z: -0.42}
+  teaspoonEndLocal: {x: 0, y: 0, z: 0.42}
+  flipHoldSeconds: 0.6
+  flipSeconds: 0.35
+  spoonHomeRadius: 0.7
+  showSpoonLabel: 0
   kind: 14
   gripLocalDir: {x: 0, y: -1, z: 0}
   flipChopUpright: 0
@@ -18031,6 +18745,8 @@ MonoBehaviour:
   flameMedium: {fileID: 782892565}
   flameStrong: {fileID: 777262268}
   vesselLift: 0.35
+  litRecord: "\uC704\uCABD(1\uBC88) \uD654\uAD6C\uC5D0 \uBD88\uC744 \uCF2C"
+  litRecordCategory: "\uC870\uB9AC\uACFC\uC815"
 --- !u!65 &1520197025
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -18050,7 +18766,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 0.12}
+  m_Size: {x: 2.25, y: 2.25, z: 0.12}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1520394309
 GameObject:
@@ -18188,6 +18904,59 @@ Transform:
   - {fileID: 1920335344}
   m_Father: {fileID: 1160345794}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1532289624 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 2148145769259374642, guid: 4e905cf8a0d2d2e4da418f4ff6e5c614, type: 3}
+  m_PrefabInstance: {fileID: 2099672243}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1532289627
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1532289624}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9868c941150e6b04d914e5a553930ad3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ToolItem
+  handOffset: {x: 0, y: 0, z: -0.55}
+  handHoldOffset: {x: 0, y: 0.35, z: -0.25}
+  holdByHandle: 0
+  tablespoonEndLocal: {x: 0, y: 0, z: -0.42}
+  teaspoonEndLocal: {x: 0, y: 0, z: 0.42}
+  flipHoldSeconds: 0.6
+  flipSeconds: 0.35
+  spoonHomeRadius: 0.7
+  showSpoonLabel: 0
+  kind: 5
+  gripLocalDir: {x: 0, y: -1, z: 0}
+  flipChopUpright: 0
+  chopLift: 0.25
+  chopTiltZ: 25
+  scrapSweepRadius: 0.4
+--- !u!65 &1532289628
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1532289624}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.1406784, y: 0.86201, z: 0.2881317}
+  m_Center: {x: 0, y: 0.431005, z: 0}
 --- !u!1 &1543674310
 GameObject:
   m_ObjectHideFlags: 0
@@ -18385,6 +19154,8 @@ MonoBehaviour:
   holdByHandle: 0
   seasoningName: "\uCCAD\uC8FC"
   bodyTiltAngle: 25
+  stockMl: 500
+  givenGrams: 0
 --- !u!65 &1573644750
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -18493,6 +19264,138 @@ Transform:
   - {fileID: 489572540}
   m_Father: {fileID: 1434854094}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1590783487
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1590783488}
+  - component: {fileID: 1590783492}
+  - component: {fileID: 1590783491}
+  - component: {fileID: 1590783490}
+  - component: {fileID: 1590783489}
+  m_Layer: 0
+  m_Name: StoveHandle_1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1590783488
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1590783487}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.009605354, y: 0.91602445, z: 0.40099522, w: 0.0031382388}
+  m_LocalPosition: {x: 6.5976806, y: 0.8439774, z: 4.0326834}
+  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 511128880}
+  m_Father: {fileID: 1438658940}
+  m_LocalEulerAnglesHint: {x: -132.728, y: -1.1359863, z: 181.699}
+--- !u!114 &1590783489
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1590783487}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22d615ca823c78b40b7f644ad7efb926, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StoveKnob
+  burner: {fileID: 1520197024}
+  turnSeconds: 0.2
+  lever: {fileID: 511128880}
+  shaftLocal: {x: 0, y: 0, z: 1}
+  pivotLocal: {x: -0.0002131015, y: 0.006457597, z: 0.00009548664}
+  handOffset: {x: 0, y: 0, z: -0.55}
+--- !u!65 &1590783490
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1590783487}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.4359245, y: 1.4675705, z: 1.4998353}
+  m_Center: {x: -0.0002131015, y: 0.006457597, z: 0.00009548664}
+--- !u!23 &1590783491
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1590783487}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1590783492
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1590783487}
+  m_Mesh: {fileID: 4300000, guid: e8b195814292bae409eb2e0191095c55, type: 2}
 --- !u!1001 &1591947453
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -18515,7 +19418,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -0.76
+      value: -0.773
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalPosition.y
@@ -18723,6 +19626,110 @@ MeshRenderer:
   m_RendererPriority: 0
   m_Materials:
   - {fileID: -651300882768677501, guid: 87d0dfb12848eb64d86b3cfbd1a791e7, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &1633418934
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1633418935}
+  - component: {fileID: 1633418937}
+  - component: {fileID: 1633418936}
+  m_Layer: 0
+  m_Name: Label
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1633418935
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1633418934}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: -0.05}
+  m_LocalScale: {x: 0.25, y: 1.2499998, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1735382949}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!102 &1633418936
+TextMesh:
+  serializedVersion: 3
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1633418934}
+  m_Text: "\uBE60\uB978 \uBAA8\uB4DC OFF"
+  m_OffsetZ: 0
+  m_CharacterSize: 0.07200002
+  m_LineSpacing: 1
+  m_Anchor: 4
+  m_Alignment: 1
+  m_TabSize: 4
+  m_FontSize: 60
+  m_FontStyle: 0
+  m_RichText: 1
+  m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Color:
+    serializedVersion: 2
+    rgba: 4294967295
+--- !u!23 &1633418937
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1633418934}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10100, guid: 0000000000000000e000000000000000, type: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -19124,10 +20131,13 @@ MonoBehaviour:
   alreadyMinced: 0
   chiliTrim: 0
   sliceStyle: 0
+  spreadMeatStrips: 0
   amountGrams: 0
   worldPerCm: 0.0978
   minTrimCm: 0.2
   diceSlowness: 1.2
+  meatTrimLengthCm: 4
+  meatCutStepMode: 0
 --- !u!23 &1685849052
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -19374,6 +20384,7 @@ MonoBehaviour:
   capacity: 6
   canHoldWater: 1
   spoonOfWater: 0.1
+  waterCapacityMl: 200
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -19387,11 +20398,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.8, y: 0.3}
   minSeparation: {x: 0.4, y: 0.15}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!65 &1698839846
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -19499,10 +20512,13 @@ MonoBehaviour:
   alreadyMinced: 0
   chiliTrim: 0
   sliceStyle: 0
+  spreadMeatStrips: 0
   amountGrams: 150
   worldPerCm: 0.0978
   minTrimCm: 0.2
   diceSlowness: 2
+  meatTrimLengthCm: 4
+  meatCutStepMode: 0
 --- !u!23 &1707098222
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -19604,6 +20620,9 @@ MonoBehaviour:
   overcookFadeSeconds: 12
   doneColor: {r: 0.98, g: 0.96, b: 0.9, a: 1}
   overcookedColor: {r: 0.86, g: 0.84, b: 0.78, a: 1}
+  panCookedColor: {r: 0, g: 0, b: 0, a: 0}
+  searColor: {r: 0, g: 0, b: 0, a: 0}
+  charColor: {r: 0, g: 0, b: 0, a: 0}
   floatsWhenDone: 1
 --- !u!1 &1712166210
 GameObject:
@@ -19786,6 +20805,7 @@ GameObject:
   - component: {fileID: 1716209914}
   - component: {fileID: 1716209913}
   - component: {fileID: 1716209912}
+  - component: {fileID: 1716209917}
   m_Layer: 0
   m_Name: Ingredient_Egg
   m_TagString: Untagged
@@ -19831,6 +20851,9 @@ MonoBehaviour:
   overcookFadeSeconds: 12
   doneColor: {r: 0, g: 0, b: 0, a: 0}
   overcookedColor: {r: 0.42, g: 0.33, b: 0.12, a: 1}
+  panCookedColor: {r: 0, g: 0, b: 0, a: 0}
+  searColor: {r: 0, g: 0, b: 0, a: 0}
+  charColor: {r: 0, g: 0, b: 0, a: 0}
   floatsWhenDone: 0
 --- !u!114 &1716209913
 MonoBehaviour:
@@ -19861,10 +20884,13 @@ MonoBehaviour:
   alreadyMinced: 0
   chiliTrim: 0
   sliceStyle: 0
+  spreadMeatStrips: 0
   amountGrams: 0
   worldPerCm: 0.0978
   minTrimCm: 0.2
   diceSlowness: 1.2
+  meatTrimLengthCm: 4
+  meatCutStepMode: 0
 --- !u!65 &1716209914
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -19943,6 +20969,20 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1716209910}
   m_Mesh: {fileID: 4300000, guid: f9accf6256b527a46959777dc0326b28, type: 2}
+--- !u!114 &1716209917
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1716209910}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 98af293f9e92dea4c9600af8c0ba3450, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EggCracker
+  yolkColor: {r: 1, g: 0.68, b: 0.12, a: 1}
+  whiteColor: {r: 0.98, g: 0.96, b: 0.88, a: 1}
 --- !u!1 &1723122555 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 100000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
@@ -19967,6 +21007,7 @@ MonoBehaviour:
   capacity: 10
   canHoldWater: 0
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -19980,11 +21021,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.27, y: 0.27}
   minSeparation: {x: 0.16, y: 0.16}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!64 &1723122564
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -20094,6 +21137,134 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 2037600607}
   m_SourcePrefab: {fileID: 100100000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
+--- !u!1 &1735382948
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1735382949}
+  - component: {fileID: 1735382953}
+  - component: {fileID: 1735382952}
+  - component: {fileID: 1735382951}
+  - component: {fileID: 1735382950}
+  m_Layer: 0
+  m_Name: SpeedModeButton
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1735382949
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1735382948}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 9.67, y: 6.53, z: -0.010000059}
+  m_LocalScale: {x: 4, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1633418935}
+  m_Father: {fileID: 1865786201}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1735382950
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1735382948}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 76039fbb61f6cbd4ab278eb8b49ec2dd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpeedModeButton
+  label: {fileID: 1633418936}
+  back: {fileID: 1735382952}
+--- !u!65 &1735382951
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1735382948}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 0.2}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!23 &1735382952
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1735382948}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: dcaa5c08ce04ac949882ce7cd26aaa33, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1735382953
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1735382948}
+  m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &1744029294
 GameObject:
   m_ObjectHideFlags: 0
@@ -20541,6 +21712,8 @@ MonoBehaviour:
   holdByHandle: 0
   seasoningName: "\uAD74\uC18C\uC2A4"
   bodyTiltAngle: 25
+  stockMl: 500
+  givenGrams: 0
   fillRadius: 0.14759351
   fillLocalCenter: {x: 0.000000022351742, y: 0.079740785, z: 0.00000008195639}
   fillLocalUp: {x: 0, y: 1, z: 0}
@@ -20761,6 +21934,8 @@ MonoBehaviour:
   holdByHandle: 0
   seasoningName: "\uACA8\uC790"
   bodyTiltAngle: 25
+  stockMl: 500
+  givenGrams: 0
   fillRadius: 0.14759351
   fillLocalCenter: {x: 0.000000022351742, y: 0.079740785, z: 0.00000008195639}
   fillLocalUp: {x: 0, y: 1, z: 0}
@@ -21269,6 +22444,9 @@ MonoBehaviour:
   overcookFadeSeconds: 12
   doneColor: {r: 0, g: 0, b: 0, a: 0}
   overcookedColor: {r: 0.42, g: 0.33, b: 0.12, a: 1}
+  panCookedColor: {r: 0, g: 0, b: 0, a: 0}
+  searColor: {r: 0, g: 0, b: 0, a: 0}
+  charColor: {r: 0, g: 0, b: 0, a: 0}
   floatsWhenDone: 0
 --- !u!114 &1825894895
 MonoBehaviour:
@@ -21299,10 +22477,13 @@ MonoBehaviour:
   alreadyMinced: 0
   chiliTrim: 0
   sliceStyle: 0
+  spreadMeatStrips: 0
   amountGrams: 0
   worldPerCm: 0.0978
   minTrimCm: 0.2
   diceSlowness: 2
+  meatTrimLengthCm: 4
+  meatCutStepMode: 0
 --- !u!23 &1825894896
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -21382,6 +22563,110 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1825894892}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1826338797
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1826338798}
+  - component: {fileID: 1826338800}
+  - component: {fileID: 1826338799}
+  m_Layer: 0
+  m_Name: Label
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1826338798
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1826338797}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: -0.05}
+  m_LocalScale: {x: 0.25, y: 0.99999976, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 778515430}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!102 &1826338799
+TextMesh:
+  serializedVersion: 3
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1826338797}
+  m_Text: "\uC81C  \uCD9C"
+  m_OffsetZ: 0
+  m_CharacterSize: 0.090000026
+  m_LineSpacing: 1
+  m_Anchor: 4
+  m_Alignment: 1
+  m_TabSize: 4
+  m_FontSize: 60
+  m_FontStyle: 0
+  m_RichText: 1
+  m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Color:
+    serializedVersion: 2
+    rgba: 4294967295
+--- !u!23 &1826338800
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1826338797}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10100, guid: 0000000000000000e000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!1 &1864572731
 GameObject:
   m_ObjectHideFlags: 0
@@ -21455,6 +22740,8 @@ Transform:
   - {fileID: 303203198}
   - {fileID: 950159500}
   - {fileID: 1880896718}
+  - {fileID: 778515430}
+  - {fileID: 1735382949}
   m_Father: {fileID: 2037192393}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1873945799
@@ -21819,10 +23106,13 @@ MonoBehaviour:
   alreadyMinced: 0
   chiliTrim: 0
   sliceStyle: 0
+  spreadMeatStrips: 0
   amountGrams: 0
   worldPerCm: 0.0978
   minTrimCm: 0.2
   diceSlowness: 2
+  meatTrimLengthCm: 4
+  meatCutStepMode: 0
 --- !u!23 &1889413068
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -22087,6 +23377,12 @@ MonoBehaviour:
   handOffset: {x: 0, y: 0, z: -0.55}
   handHoldOffset: {x: 0.495, y: 0.485, z: -0.24999999}
   holdByHandle: 0
+  tablespoonEndLocal: {x: 0, y: 0, z: -0.42}
+  teaspoonEndLocal: {x: 0, y: 0, z: 0.42}
+  flipHoldSeconds: 0.6
+  flipSeconds: 0.35
+  spoonHomeRadius: 0.7
+  showSpoonLabel: 0
   kind: 0
   gripLocalDir: {x: 0, y: -1, z: 0}
   flipChopUpright: 0
@@ -22147,6 +23443,12 @@ MonoBehaviour:
   handOffset: {x: 0, y: 0, z: -0.55}
   handHoldOffset: {x: 0, y: 0.35, z: -0.25}
   holdByHandle: 0
+  tablespoonEndLocal: {x: 0, y: 0, z: -0.42}
+  teaspoonEndLocal: {x: 0, y: 0, z: 0.42}
+  flipHoldSeconds: 0.6
+  flipSeconds: 0.35
+  spoonHomeRadius: 0.7
+  showSpoonLabel: 0
   kind: 16
   gripLocalDir: {x: 0, y: -1, z: 0}
   flipChopUpright: 0
@@ -22329,6 +23631,7 @@ Transform:
   - {fileID: 335917321}
   - {fileID: 555049424}
   - {fileID: 350598071}
+  - {fileID: 412573628}
   - {fileID: 1723122567}
   - {fileID: 569441737}
   - {fileID: 1426974306}
@@ -22337,6 +23640,7 @@ Transform:
   - {fileID: 600491231}
   - {fileID: 236198149}
   - {fileID: 1317680243}
+  - {fileID: 629893079}
   - {fileID: 1077170574}
   - {fileID: 306477303}
   - {fileID: 799384733}
@@ -22489,6 +23793,8 @@ MonoBehaviour:
   holdByHandle: 0
   seasoningName: "\uCD98\uC7A5"
   bodyTiltAngle: 25
+  stockMl: 500
+  givenGrams: 0
   fillRadius: 0.14759351
   fillLocalCenter: {x: 0.000000022351742, y: 0.079740785, z: 0.00000008195639}
   fillLocalUp: {x: 0, y: 1, z: 0}
@@ -23059,6 +24365,7 @@ MonoBehaviour:
   capacity: 10
   canHoldWater: 0
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -23072,11 +24379,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.36, y: 0.36}
   minSeparation: {x: 0.22, y: 0.22}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!4 &1990129705 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
@@ -23382,10 +24691,13 @@ MonoBehaviour:
   alreadyMinced: 0
   chiliTrim: 0
   sliceStyle: 3
+  spreadMeatStrips: 0
   amountGrams: 0
   worldPerCm: 0.0978
   minTrimCm: 0.2
   diceSlowness: 1.2
+  meatTrimLengthCm: 4
+  meatCutStepMode: 0
 --- !u!23 &2026281814
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -23827,6 +25139,7 @@ MonoBehaviour:
   capacity: 10
   canHoldWater: 0
   spoonOfWater: 0.1
+  waterCapacityMl: 0
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
@@ -23840,11 +25153,13 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.8, y: 0.3}
   minSeparation: {x: 0.4, y: 0.15}
+  starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  movableDuringBriefing: 1
 --- !u!64 &2037600608
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -23926,6 +25241,9 @@ MonoBehaviour:
   overcookFadeSeconds: 12
   doneColor: {r: 0, g: 0, b: 0, a: 0}
   overcookedColor: {r: 0.42, g: 0.33, b: 0.12, a: 1}
+  panCookedColor: {r: 0, g: 0, b: 0, a: 0}
+  searColor: {r: 0, g: 0, b: 0, a: 0}
+  charColor: {r: 0, g: 0, b: 0, a: 0}
   floatsWhenDone: 0
 --- !u!114 &2049755733
 MonoBehaviour:
@@ -23956,10 +25274,13 @@ MonoBehaviour:
   alreadyMinced: 0
   chiliTrim: 0
   sliceStyle: 0
+  spreadMeatStrips: 0
   amountGrams: 0
   worldPerCm: 0.0978
   minTrimCm: 0.2
   diceSlowness: 1.2
+  meatTrimLengthCm: 4
+  meatCutStepMode: 0
 --- !u!23 &2049755734
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -24140,6 +25461,8 @@ MonoBehaviour:
   holdByHandle: 0
   seasoningName: "\uCC38\uAE30\uB984"
   bodyTiltAngle: 25
+  stockMl: 500
+  givenGrams: 0
 --- !u!65 &2049785514
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -24390,10 +25713,13 @@ MonoBehaviour:
   alreadyMinced: 0
   chiliTrim: 0
   sliceStyle: 0
+  spreadMeatStrips: 0
   amountGrams: 0
   worldPerCm: 0.0978
   minTrimCm: 0.2
   diceSlowness: 1.2
+  meatTrimLengthCm: 4
+  meatCutStepMode: 0
 --- !u!23 &2088319040
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -24474,6 +25800,9 @@ MonoBehaviour:
   overcookFadeSeconds: 12
   doneColor: {r: 0.12, g: 0.42, b: 0.07, a: 1}
   overcookedColor: {r: 0.42, g: 0.33, b: 0.12, a: 1}
+  panCookedColor: {r: 0, g: 0, b: 0, a: 0}
+  searColor: {r: 0, g: 0, b: 0, a: 0}
+  charColor: {r: 0, g: 0, b: 0, a: 0}
   floatsWhenDone: 0
 --- !u!65 &2088319044
 BoxCollider:
@@ -24770,6 +26099,8 @@ Transform:
   - {fileID: 647615247}
   - {fileID: 283303701}
   - {fileID: 1673479354}
+  - {fileID: 1100621187}
+  - {fileID: 1303671190}
   m_Father: {fileID: 2037192393}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &2099672243
@@ -24835,7 +26166,13 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 2148145769259374642, guid: 4e905cf8a0d2d2e4da418f4ff6e5c614, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1532289628}
+    - targetCorrespondingSourceObject: {fileID: 2148145769259374642, guid: 4e905cf8a0d2d2e4da418f4ff6e5c614, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1532289627}
   m_SourcePrefab: {fileID: 100100000, guid: 4e905cf8a0d2d2e4da418f4ff6e5c614, type: 3}
 --- !u!1 &2115605742
 GameObject:
@@ -27952,6 +29289,12 @@ MonoBehaviour:
   handOffset: {x: 0, y: 0, z: -0.55}
   handHoldOffset: {x: 0, y: 0.35, z: -0.25}
   holdByHandle: 0
+  tablespoonEndLocal: {x: 0, y: 0, z: -0.42}
+  teaspoonEndLocal: {x: 0, y: 0, z: 0.42}
+  flipHoldSeconds: 0.6
+  flipSeconds: 0.35
+  spoonHomeRadius: 0.7
+  showSpoonLabel: 0
   kind: 0
   gripLocalDir: {x: 0, y: -1, z: 0}
   flipChopUpright: 0
@@ -32734,7 +34077,7 @@ Transform:
   m_GameObject: {fileID: 5869379606072349428}
   serializedVersion: 2
   m_LocalRotation: {x: -0.9793566, y: -0, z: -0, w: -0.20214029}
-  m_LocalPosition: {x: 2.392, y: 4.126, z: 4.397}
+  m_LocalPosition: {x: 0.63, y: 4.126, z: 4.397}
   m_LocalScale: {x: 4.2, y: 4.2, z: 4.2}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -34068,6 +35411,12 @@ MonoBehaviour:
   handOffset: {x: 0, y: 0, z: -0.55}
   handHoldOffset: {x: 0, y: 0.35, z: -0.25}
   holdByHandle: 0
+  tablespoonEndLocal: {x: 0, y: 0, z: -0.42}
+  teaspoonEndLocal: {x: 0, y: 0, z: 0.42}
+  flipHoldSeconds: 0.6
+  flipSeconds: 0.35
+  spoonHomeRadius: 0.7
+  showSpoonLabel: 0
   kind: 0
   gripLocalDir: {x: 0, y: -1, z: 0}
   flipChopUpright: 0
@@ -35233,6 +36582,12 @@ MonoBehaviour:
   handOffset: {x: 0, y: 0, z: -0.55}
   handHoldOffset: {x: 0, y: 0.35, z: -0.25}
   holdByHandle: 0
+  tablespoonEndLocal: {x: 0, y: 0, z: -0.42}
+  teaspoonEndLocal: {x: 0, y: 0, z: 0.42}
+  flipHoldSeconds: 0.6
+  flipSeconds: 0.35
+  spoonHomeRadius: 0.7
+  showSpoonLabel: 0
   kind: 0
   gripLocalDir: {x: 0, y: -1, z: 0}
   flipChopUpright: 0
@@ -35432,5 +36787,3 @@ SceneRoots:
   - {fileID: 410087041}
   - {fileID: 832575519}
   - {fileID: 2037192393}
-  - {fileID: 1100621187}
-  - {fileID: 1303671190}

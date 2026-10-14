@@ -162,9 +162,43 @@ public class HandController : MonoBehaviour
     private bool chopAimMeasured;
     private Quaternion chopAimLocal = Quaternion.identity;
 
+    private float kneadCurl = -1f;
+
+    /// <summary>The hand in the bowl kneading (MeatKneader): turned so its
+    /// fingers point along fingerDir (thumb side toward thumbSide), its middle
+    /// knuckle at knuckleWorld, the fingers curled by curl - off its rest spot
+    /// like the other gestures, so letting go puts it straight back.</summary>
+    public void SetKneadPose(Vector3 knuckleWorld, Vector3 fingerDir, Vector3 thumbSide, float curl)
+    {
+        kneadCurl = Mathf.Clamp01(curl);
+        transform.position = restPosition;
+        transform.rotation = restRotation;
+        rockRotation = Quaternion.identity;
+        if (poser != null && poser.TryGetAimRotation(fingerDir, thumbSide, out Quaternion aim))
+            rockRotation = Quaternion.Inverse(restRotation) * aim * restRotation;
+        transform.rotation = restRotation * rockRotation;
+        Vector3 knuckle = poser != null ? poser.KnucklePosition : transform.position;
+        rockOffset = knuckleWorld - knuckle;
+        transform.position = restPosition + rockOffset;
+    }
+
+    /// <summary>Back from kneading: rest pose, its own curl again.</summary>
+    public void EndKneadPose()
+    {
+        kneadCurl = -1f;
+        rockOffset = Vector3.zero;
+        rockRotation = Quaternion.identity;
+    }
+
     private void UpdateGrabPose()
     {
         if (poser == null) return;
+        if (kneadCurl >= 0f)
+        {
+            poser.SetPoseMode(GleechiHandPoser.PoseMode.Carry);
+            poser.SetCurl(kneadCurl);
+            return;
+        }
 
         bool holding = HandCarry.Instance != null && HandCarry.Instance.Current != null;
         curlT = Mathf.MoveTowards(curlT, holding ? 1f : 0f, curlSpeed * Time.deltaTime);
@@ -200,6 +234,9 @@ public class HandController : MonoBehaviour
 
     /// <summary>Where the hand rests (before any chop/gesture offset).</summary>
     public Vector3 RestPosition => restPosition;
+
+    /// <summary>Still on its way to where it was last sent (GoTo/SlideTo).</summary>
+    public bool IsMoving => moving;
 
     /// <summary>Slides the hand's rest spot over, no arrival action and the
     /// off-hand left where it is - the knife moving along the board from one

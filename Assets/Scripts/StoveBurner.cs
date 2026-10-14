@@ -81,9 +81,28 @@ public class StoveBurner : Interactable, ISlotContainer
     /// click which only ever flips whatever the current state happens to be.</summary>
     public void SetOn(bool on)
     {
+        if (on && !IsOn) RecordLit();
         IsOn = on;
         UpdateVisual();
     }
+
+    [Header("이 화구를 켜면 기록 (최종 평가 - 조리 중엔 표시 안 함)")]
+    [Tooltip("Left empty: lighting it isn't recorded. Its rule (points, 감점/실격) is in ExamScoring: record.(category).(this).")]
+    [SerializeField] private string litRecord = "";
+    [SerializeField] private string litRecordCategory = ExamDeductions.Process;
+
+    /// <summary>Burners lit this session whose lighting is recorded (DishEvaluation's 실격 check reads it).</summary>
+    public static readonly System.Collections.Generic.HashSet<string> RecordedLit = new System.Collections.Generic.HashSet<string>();
+
+    private void RecordLit()
+    {
+        if (string.IsNullOrEmpty(litRecord)) return;
+        RecordedLit.Add(name);
+        ExamDeductions.Add(litRecordCategory, litRecord); // (once - however often it's lit)
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetForPlay() => RecordedLit.Clear();
 
     /// <summary>Switches how high the flame is set - independent of on/off, same
     /// as a real stove knob's position stays put whether the burner is lit or

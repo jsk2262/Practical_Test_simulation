@@ -87,6 +87,8 @@ public class IngredientItem : Carryable
     /// spoon (see ChiliTrimRoutine).</summary>
     [SerializeField] private bool chiliTrim;
     [SerializeField] private SliceStyle sliceStyle;
+    [Tooltip("고기 채썰기: the strips spread out flat in rows after cutting (off: left standing where they were cut).")]
+    [SerializeField] private bool spreadMeatStrips = false;
 
     /// <summary>The portion's weight in grams (0 = not known) - split over the
     /// pieces and scraps it's cut into (두부 150 g).</summary>
@@ -113,12 +115,126 @@ public class IngredientItem : Carryable
     /// paper towel blot - before cutting there's nothing to blot yet.</summary>
     private bool NeedsBloodDrain => needsBloodDrain && CurrentState == State.Cut && !BloodDrained;
 
-    private readonly Dictionary<string, int> appliedSeasonings = new Dictionary<string, int>();
-    public IReadOnlyDictionary<string, int> AppliedSeasonings => appliedSeasonings;
+    private readonly Dictionary<string, float> appliedSeasonings = new Dictionary<string, float>(); // (mL)
+    public IReadOnlyDictionary<string, float> AppliedSeasonings => appliedSeasonings;
+
+    /// <summary>The portion as handed out (g), before any trimming - what a
+    /// recipe's base meat amount is compared with (CookingRecipe.MeatBasis).</summary>
+    public float GivenGrams { get; private set; }
+
+    /// <summary>Where it is: the bowl/pan it sits in (null if loose or in hand).</summary>
+    public MovableBowl Container => InBowl;
+
+    /// <summary>A measuring spoonful tipped onto it (or into the bowl it's in):
+    /// a 튀김옷 ingredient (앙금녹말, 흰자 ...) goes into its BatterCoating,
+    /// anything else is its marinade (밑간).</summary>
+    public void AddFromSpoon(string what, float ml)
+    {
+        if (!(ml > 0f)) return;
+        if (BatterCoating.IsBatterIngredient(what) && RecipeBook.BatterFor(ingredientName) != null)
+            BatterCoating.Of(this, true).Add(what, ml);
+        else AddSeasoning(what, ml);
+    }
+
+    // ---- 한 점 (one piece taken on its own) ----
+
+    /// <summary>One cut piece taken off on its own - a new ingredient of just
+    /// that piece (to drop into the oil one at a time, say): its weight, its
+    /// cooking and browning, and its share of the marinade, the batter and the
+    /// sauce on the pieces go with it - moved, not copied (the totals stay the
+    /// same). Null if it's the last piece (then the whole is taken as it is).</summary>
+    public IngredientItem SplitOffPiece(FoodPiece piece)
+    {
+        FoodPieceGroup group = GetComponent<FoodPieceGroup>();
+        if (group == null || piece == null || !group.Pieces.Contains(piece) || group.Count < 2) return null;
+        Transform holder = piece.transform.parent;
+        int index = piece.transform.GetSiblingIndex();
+        float share = amountGrams > 0f ? Mathf.Clamp01(piece.Grams / amountGrams) : 1f / group.Count;
+
+        GameObject go = Instantiate(gameObject, transform.position, transform.rotation, transform.parent);
+        go.name = name.TrimEnd() + " (한 점)";
+        IngredientItem clone = go.GetComponent<IngredientItem>();
+        // only that piece in the copy
+        Transform cHolder = holder == transform ? go.transform : go.transform.Find(holder.name);
+        FoodPiece keep = cHolder != null && index < cHolder.childCount ? cHolder.GetChild(index).GetComponent<FoodPiece>() : null;
+        foreach (FoodPiece fp in go.GetComponentsInChildren<FoodPiece>(true))
+            if (fp != keep) DestroyImmediate(fp.gameObject);
+        if (keep == null) { Destroy(go); return null; }
+        foreach (Transform t in new List<Transform>(keep.GetComponentsInChildren<Transform>(true)))
+            if (t != keep.transform && t.name.StartsWith("Batter")) DestroyImmediate(t.gameObject); // (its coat is drawn again)
+        keep.CopyStateFrom(piece);
+        // held by it: the piece at the middle of what's held, and only it clicked on
+        keep.transform.position = go.transform.position;
+        if (go.GetComponent<BoxCollider>() is BoxCollider box && keep.GetComponent<Renderer>() is Renderer kr)
+        {
+            Bounds b = kr.bounds;
+            Vector3 s = go.transform.InverseTransformVector(b.size);
+            box.center = go.transform.InverseTransformPoint(b.center);
+            box.size = new Vector3(Mathf.Abs(s.x), Mathf.Abs(s.y), Mathf.Abs(s.z));
+        }
+        FoodPieceGroup cGroup = go.GetComponent<FoodPieceGroup>();
+        cGroup.Add(keep);
+
+        // the ingredient's own state
+        clone.CurrentState = CurrentState; clone.AppliedCut = AppliedCut; clone.AppliedSpec = AppliedSpec;
+        clone.CurrentSoakState = CurrentSoakState; clone.BloodDrained = BloodDrained; clone.IsTowelDrained = IsTowelDrained;
+        clone.WasWashed = WasWashed; clone.IsTrimmed = IsTrimmed;
+        clone.MarinadeMix = MarinadeMix;
+        clone.amountGrams = piece.Grams;
+        amountGrams = Mathf.Max(0f, amountGrams - piece.Grams);
+        clone.GivenGrams = GivenGrams * share;            // (the portion's share - all of them still add up to what was given)
+        GivenGrams -= clone.GivenGrams;
+        foreach (string k in new List<string>(appliedSeasonings.Keys))
+        {
+            float take = appliedSeasonings[k] * share;
+            appliedSeasonings[k] -= take;
+            clone.appliedSeasonings[k] = take;
+        }
+        if (GetComponent<CookableItem>() is CookableItem ck && go.GetComponent<CookableItem>() is CookableItem cck) cck.CopyFrom(ck);
+        group.GiveCoatShareTo(cGroup, share);
+        if (go.GetComponent<BatterCoating>() is BatterCoating copied) DestroyImmediate(copied); // (its data isn't copied - its share is moved below)
+        if (BatterCoating.Of(this, false) is BatterCoating batter) batter.GiveShareTo(BatterCoating.Of(clone, true), share);
+
+        group.Pieces.Remove(piece);
+        Destroy(piece.gameObject);
+        Debug.Log($"[{ingredientName}] 한 점 떼어냄 ({clone.amountGrams:0.#}g) - 남은 {group.Count}조각 {amountGrams:0.#}g");
+        return clone;
+    }
+
+    // ---- 밑간 주무르기 ----
+
+    /// <summary>How evenly the marinade is worked into it (0..1) - new seasoning
+    /// put on isn't, until it's kneaded in (MeatKneader).</summary>
+    public float MarinadeMix { get; private set; } = 1f;
+    public bool HasMarinade => appliedSeasonings.Count > 0;
+
+    /// <summary>One squeeze of the kneading with the marinade on it: worked in a
+    /// little more, and the pieces a little glossy with it (only a light coat -
+    /// not cooked-looking).</summary>
+    public void KneadMarinade(int strokesToMix = 6)
+    {
+        if (!HasMarinade) return;
+        MarinadeMix = Mathf.Min(1f, MarinadeMix + 1f / Mathf.Max(1, strokesToMix));
+        Color c = Color.black;
+        float w = 0f;
+        foreach (var kv in appliedSeasonings)
+        {
+            Condiments.Info info = Condiments.Get(kv.Key);
+            if (info.form != CondimentForm.Liquid) continue;
+            c += info.color * kv.Value;
+            w += kv.Value;
+        }
+        if (w <= 0f || !(GetComponent<FoodPieceGroup>() is FoodPieceGroup g)) return;
+        Color tint = c / w;
+        tint.a = 1f;
+        foreach (FoodPiece p in g.Pieces)
+            if (p != null && p.Coat < 0.25f) p.AddCoat(0.05f, tint, 0.25f);
+    }
 
     protected override void Awake()
     {
         base.Awake();
+        GivenGrams = amountGrams;
         rend = GetComponent<Renderer>();
         rend.material = new Material(rend.sharedMaterial);
         sharedMesh = GetComponent<MeshFilter>().sharedMesh;
@@ -227,6 +343,16 @@ public class IngredientItem : Carryable
 
     protected override bool OnClickedWhileHandEmpty()
     {
+        // 버무리기 by hand: the meat with its 튀김옷 (or a 밑간 not worked in yet) in
+        // a bowl, not on the heat - both hands into the bowl (MeatKneader; held
+        // down, they knead). One piece is taken by pressing and holding on it.
+        if (InBowl is MovableBowl mixBowl && !mixBowl.IsCookingVessel && Category == IngredientCategory.Meat
+            && ((BatterCoating.Of(this, false) is BatterCoating batter && batter.HasAny) || (HasMarinade && MarinadeMix < 1f)))
+        {
+            MeatKneader.Begin(mixBowl);
+            return true;
+        }
+
         // Soaked, tear-only ingredients (e.g. wood ear mushroom) skip the knife entirely.
         if (isSoakable && CurrentSoakState == SoakState.Soaked && CurrentState != State.Cut)
         {
@@ -258,10 +384,12 @@ public class IngredientItem : Carryable
         return false;
     }
 
-    private void AddSeasoning(string seasoningName)
+    private void AddSeasoning(string seasoningName, float ml)
     {
-        appliedSeasonings.TryGetValue(seasoningName, out int count);
-        appliedSeasonings[seasoningName] = count + 1;
+        appliedSeasonings.TryGetValue(seasoningName, out float had);
+        appliedSeasonings[seasoningName] = had + ml;
+        MarinadeMix = 0f; // (new seasoning on it - not worked in until it's kneaded)
+        Debug.Log($"[{ingredientName}] {seasoningName} {ml:0.#}mL (누적 {had + ml:0.#}mL)");
         StopCoroutine(nameof(ChopPulse));
         StartCoroutine(nameof(ChopPulse));
     }
@@ -308,6 +436,14 @@ public class IngredientItem : Carryable
         }
 
         // The spatula on a piece in the pan stirs the pan.
+        // 버무리기: the meat coated in its bowl (not on the heat), one stroke a click.
+        if (held is ToolItem mixer && BatterCoating.IsMixingTool(mixer) && InBowl is MovableBowl mixBowl && !mixBowl.IsCookingVessel
+            && BatterCoating.Of(this, false) is BatterCoating batter && batter.HasAny)
+        {
+            batter.MixStroke(mixer, mixBowl);
+            return;
+        }
+
         if (held is ToolItem spatula && spatula.Kind == ToolKind.Spatula && InBowl is MovableBowl stirred)
         {
             stirred.StirWithSpatula();
@@ -319,20 +455,31 @@ public class IngredientItem : Carryable
         if (held is ToolItem panSpoon && panSpoon.Kind == ToolKind.MeasuringSpoon && panSpoon.IsSpoonLoaded
             && InBowl is MovableBowl pan && pan.GetComponent<FryingPanPlating>() != null)
         {
-            pan.AddSeasoning(panSpoon.LoadedSeasoning);
-            panSpoon.ConsumeSeasoning();
+            string sauceName = panSpoon.LoadedSeasoning;
+            pan.AddSeasoning(sauceName, panSpoon.ConsumeSeasoning());
             return;
         }
         if (held is ToolItem spoon && spoon.Kind == ToolKind.MeasuringSpoon && spoon.IsSpoonLoaded)
         {
-            AddSeasoning(spoon.LoadedSeasoning);
-            spoon.ConsumeSeasoning();
+            string seasoning = spoon.LoadedSeasoning;
+            AddFromSpoon(seasoning, spoon.ConsumeSeasoning()); // (all of what's on it, in mL)
             return;
         }
 
         if (held is ToolItem towel && towel.Kind == ToolKind.PaperTowel && NeedsBloodDrain)
         {
             DrainBlood();
+            return;
+        }
+
+        // Several on the board: the knife's first click on one that isn't the
+        // work target only makes it the target (outlined) - not also a cut, a
+        // scoop or the knife set down; the next click works on it.
+        if (held is ToolItem picker && picker.Kind == ToolKind.Knife && IsOnCuttingBoard
+            && CuttingBoardController.Instance is CuttingBoardController workBoard
+            && (object)workBoard.Current != this && workBoard.Items.Count >= 2)
+        {
+            workBoard.Select(this);
             return;
         }
 
@@ -436,6 +583,10 @@ public class IngredientItem : Carryable
     public void PerformTrim()
     {
         if (!CanTrim || isCutting || !IsOnCuttingBoard) return;
+        if (!HasRoomToCut(false)) return;
+        CuttingBoardController.Instance.Select(this);
+        // 고기 (채썰기용): 다듬기 is cutting the ends off to the strips' length (4 cm).
+        if (sliceStyle == SliceStyle.MeatStrips) { StartCoroutine(WhileLocked(MeatTrimRoutine())); return; }
         StartCoroutine(WhileLocked(chiliTrim ? ChiliTrimRoutine() : TrimRoutine()));
     }
 
@@ -481,6 +632,11 @@ public class IngredientItem : Carryable
     public void PerformCut(CutMethod method, CutSpec spec)
     {
         if (CurrentState == State.Cut || isCutting) return;
+        bool fans = (UsesStyledSlice(method) && sliceStyle != SliceStyle.MeatStrips)
+                    || (crescentSlices && (method == CutMethod.Slice || method == CutMethod.Julienne || method == CutMethod.Other));
+        bool spreads = !fans && !UsesStyledSlice(method) && !(blockDice && method == CutMethod.Cube) && !alreadyMinced;
+        if (!HasRoomToCut(false, fans ? 0.5f : 0f, spreads ? 0.2f : 0f)) return;
+        if (IsOnCuttingBoard) CuttingBoardController.Instance.Select(this);
         StartCoroutine(WhileLocked(CutRoutine(method, spec)));
     }
 
@@ -505,7 +661,9 @@ public class IngredientItem : Carryable
     {
         HandCarry hand = HandCarry.Instance;
         if (hand != null) hand.IsLocked = true;
-        yield return StartCoroutine(routine);
+        SpeedMode.BeginAnimation(); // (빠른 모드: the cutting plays fast - even if something else unlocks the hand)
+        try { yield return StartCoroutine(routine); }
+        finally { SpeedMode.EndAnimation(); }
         if (hand != null) hand.IsLocked = false;
     }
 
@@ -547,7 +705,16 @@ public class IngredientItem : Carryable
 
         if (UsesStyledSlice(method))
         {
+            cutAborted = false;
             yield return StartCoroutine(StyledSliceRoutine(method, spec));
+            if (cutAborted)
+            {
+                // (couldn't be done - too short for the spec: left as it was)
+                cutAborted = false;
+                isCutting = false;
+                SupportHandController.Instance?.Hide();
+                yield break;
+            }
             CurrentState = State.Cut;
             rend.enabled = false;
             isCutting = false;
@@ -748,7 +915,7 @@ public class IngredientItem : Carryable
         if (CuttingBoardController.Instance is CuttingBoardController board0 && IsOnCuttingBoard)
         {
             Bounds vb = VisibleBounds;
-            Vector3 pull = FitShift(board0.VisibleTopRect(), new Bounds(vb.center, vb.size + new Vector3(0.3f, 0.4f, 0f)));
+            Vector3 pull = RoomShift(board0.VisibleTopRect(), new Bounds(vb.center, vb.size + new Vector3(0.3f, 0.4f, 0f)));
             if (pull != Vector3.zero)
             {
                 yield return SlideBy(pull, 0.2f);
@@ -879,7 +1046,7 @@ public class IngredientItem : Carryable
         // Slid back onto the board if they hang over.
         if (CuttingBoardController.Instance is CuttingBoardController board && IsOnCuttingBoard)
         {
-            Vector3 shift = FitShift(board.VisibleTopRect(), VisibleBounds);
+            Vector3 shift = RoomShift(board.VisibleTopRect(), VisibleBounds);
             if (shift != Vector3.zero) yield return SlideBy(shift, 0.25f);
         }
         Debug.Log($"{ingredientName}: 사각썰기 완료 ({n}조각)");
@@ -930,7 +1097,7 @@ public class IngredientItem : Carryable
         float fanRoom = meatRow ? 0.2f : 0.45f;
         if (CuttingBoardController.Instance is CuttingBoardController board0 && IsOnCuttingBoard)
         {
-            Vector3 pull = FitShift(board0.VisibleTopRect(), new Bounds(center + new Vector3(meatRow ? 0f : fanRoom * 0.5f, 0.05f, 0f),
+            Vector3 pull = RoomShift(board0.VisibleTopRect(), new Bounds(center + new Vector3(meatRow ? 0f : fanRoom * 0.5f, 0.05f, 0f),
                 new Vector3(job.L + fanRoom + 0.3f, job.d * 2f + 0.3f, 0f)));
             if (pull != Vector3.zero)
             {
@@ -973,8 +1140,13 @@ public class IngredientItem : Carryable
                 yield return LeekPrep(job, handBase, handCtl, knife);
                 break;
             case SliceStyle.MeatStrips:
+                // (finishes its own pieces - their own meshes, colliders and
+                // amounts; none of the slice-stack handling below)
                 yield return MeatStripsPrep(job, spec, handBase, handCtl, knife);
-                break;
+                handCtl?.SlideTo(handBase, 0.15f);
+                if (knife != null) knife.ChopHoldSeconds = knifeHoldBefore;
+                Destroy(job.rig.gameObject);
+                yield break;
         }
 
         if (job.cutX != null) yield return SliceStackFromRight(job, handBase, handCtl, knife);
@@ -1242,106 +1414,620 @@ public class IngredientItem : Carryable
         public Vector3 size;
     }
 
-    /// <summary>고기 채썰기, as it's done - the meat lying as it is, at its own
-    /// size, length along the board: ① the knife drawn along it at the top
-    /// (back) edge, the fat there cut off (비계), then at the bottom (front) edge
-    /// (자투리) - what's left as deep as the stick's length; ② 포 뜨기 - the knife
-    /// flat, drawn through sideways twice, the other hand flat on top - three
-    /// sheets, laid out one behind the other; ③ the knife coming down every 1 cm
-    /// across all three: 5 x 3 = 15 sticks. Slower than the other cuts - meat
-    /// takes its time.</summary>
+    // ---- 고기 채썰기 (4×1×1 cm): real cuts through the model ----
+    //
+    // Board frame (the cutting rig): X across the board = the strips' width,
+    // Y up off the board = their thickness, Z front-back = their length.
+    // The model itself is cut (MeshSlicer): every part keeps the meat's own
+    // surfaces and texture, and the cuts' faces get the cut-face material.
+
+    [Header("고기 채썰기")]
+    [Tooltip("다듬기 for meat: the ends cut off so it's this long (Z, cm) - the strips' length.")]
+    [SerializeField] private float meatTrimLengthCm = 4f;
+    /// <summary>The ends already cut to length (by 다듬기) - the cut doesn't do it again.</summary>
+    private bool meatEndsTrimmed;
+    private bool cutAborted;
+    private const float SizeTolerance = 0.15f; // (of a spec size: what still counts as that size)
+
+    private sealed class MeatChunk
+    {
+        public SliceMesh mesh;
+        public GameObject go;
+    }
+
+    private sealed class MeatHolder { public MeatChunk block; }
+
+    /// <summary>고기 채썰기, as it's done (first figure): ① the front and back ends cut
+    /// off so it's the spec's length along Z (4 cm; skipped if 다듬기 did it);
+    /// ② 포 뜨기 - the left hand pressing it down, the knife laid flat (parallel
+    /// to the board) drawn in from the right to the left at 1 cm and 2 cm off
+    /// the board: 3 sheets of 1 cm, left lying on one another; ③ the knife up
+    /// again, down through all three at every 1 cm across X: strips 4 × 1 × 1 cm
+    /// (5 cm wide, 3 thick → 15). Sizes off the spec by more than 15 % aren't
+    /// forced: a thicker top / wider edge is cut off and kept apart (a scrap /
+    /// a leftover strip). Each strip its own object: its mesh, a collider, its
+    /// share of the amount (FoodPiece), moving on its own in a pan.</summary>
     private IEnumerator MeatStripsPrep(SliceJob job, CutSpec spec, Vector3 handBase, HandController handCtl, ToolItem knife)
     {
         float slowBefore = diceSlowness;
         diceSlowness *= 1.3f; // (every chop and pass below)
+        Transform rig = job.rig;
+        var chunks = new List<MeatChunk>();
         try
         {
-            Vector3 ms = sharedMesh != null ? sharedMesh.bounds.size : Vector3.one;
-            Vector3 ls = transform.lossyScale;
-            float[] dims = { Mathf.Abs(ms.x * ls.x), Mathf.Abs(ms.y * ls.y), Mathf.Abs(ms.z * ls.z) };
-            System.Array.Sort(dims);
-            float L = dims[2], W = dims[1], H = dims[0]; // its own size: along, across (depth), height
-            float thick = (spec.thicknessCm > 0f ? spec.thicknessCm : 1f) * worldPerCm;
-            float wide = (spec.widthCm > 0f ? spec.widthCm : 1f) * worldPerCm;
-            int sheets = Mathf.Clamp(Mathf.RoundToInt(H / thick), 2, 4);   // 포: 3 (two passes)
-            int columns = Mathf.Clamp(Mathf.RoundToInt(L / wide), 3, 6);  // 1 cm apart: 5
-            float trim = W * 0.12f, sheetH = H / sheets;
+            float wpc = worldPerCm;
+            // A strip is long one way and thin the other two: the longest size
+            // given is its length, whichever box it was written in (가로 4 ·
+            // 세로 1 · 두께 1 is the same 4 cm strip - read as a 4 cm width it
+            // cut the meat into a few thick slabs, still in one lump).
+            if (spec.widthCm > spec.lengthCm) spec = new CutSpec(spec.lengthCm, spec.widthCm, spec.thicknessCm);
+            if (spec.thicknessCm > spec.lengthCm) spec = new CutSpec(spec.widthCm, spec.thicknessCm, spec.lengthCm);
+            float lengthW = (spec.lengthCm > 0f ? spec.lengthCm : meatTrimLengthCm) * wpc;  // Z
+            float wideW = (spec.widthCm > 0f ? spec.widthCm : 1f) * wpc;                     // X
+            float thickW = (spec.thicknessCm > 0f ? spec.thicknessCm : 1f) * wpc;            // Y
             float slow = diceSlowness;
-            Transform rig = job.rig;
-
-            Material meat = SolidMaterial(new Color(0.85f, 0.5f, 0.48f), 0.5f);
-            Material fat = SolidMaterial(new Color(0.96f, 0.92f, 0.86f), 0.55f);
-            rend.enabled = false;
-            // the meat as it lay - the fat along its top (back) edge
-            float Wc = W - 2f * trim;
-            var boxes = new List<MeatBox> { MakeMeatBox(rig, new Vector3(0f, H * 0.5f, 0f), new Vector3(L, H, Wc), meat) };
-            Transform fatT = Block(rig, "Fat", new Vector3(0f, H * 0.5f, (W - trim) * 0.5f), new Vector3(L, H, trim), fat).transform;
-            Transform edgeT = Block(rig, "Edge", new Vector3(0f, H * 0.5f, -(W - trim) * 0.5f), new Vector3(L, H, trim), meat).transform;
             Renderer knifeR = knife != null ? knife.GetComponentInChildren<Renderer>() : null;
-            if (knife != null) { knife.LayFlatInHand(); knife.ChopHoldSeconds = 4f * slow; }
-            yield return null; // (along it from this frame)
+            Material[] mats = MeatMaterials();
 
-            // ① along the top edge: the fat off; along the bottom edge: a strip off.
-            yield return KnifeAlongPass(rig, L, new Vector3(0f, H * 0.5f, Wc * 0.5f), handCtl, knifeR, slow);
-            yield return SlideAway(fatT, new Vector3(0f, 0f, 0.2f), 0.4f * slow);
-            DropScrap("비계", fat.color, amountGrams * trim / W);
-            yield return KnifeAlongPass(rig, L, new Vector3(0f, H * 0.5f, -Wc * 0.5f), handCtl, knifeR, slow);
-            yield return SlideAway(edgeT, new Vector3(0f, 0f, -0.2f), 0.4f * slow);
-            DropScrap("자투리", meat.color, amountGrams * trim / W);
+            var start = new MeatChunk { mesh = SliceMesh.From(GetComponent<MeshFilter>(), rig) };
+            float gramsPerVolume = amountGrams / Mathf.Max(start.mesh.Volume, 1e-6f);
+            ShowChunk(start, rig, mats);
+            rend.enabled = false;
+            chunks.Add(start);
 
-            // ② 포 뜨기: the knife flat at each sheet's height, top first; the top
-            //    sheet laid in front of it, the next behind.
-            float[] laidZ = { -(Wc + 0.04f), Wc + 0.04f, -2f * (Wc + 0.04f) };
-            int laidN = 0;
-            var laid = new List<MeatBox>();
-            for (int s = sheets - 1; s >= 1; s--)
+            // ① the ends, to length
+            if (!meatEndsTrimmed)
             {
-                float y = sheetH * s;
-                yield return KnifeAlongPass(rig, L, new Vector3(0f, y, 0f), handCtl, knifeR, slow);
-                SplitMeatY(boxes, y, rig, meat);
-                MeatBox sheet = boxes.Find(b => b.t.localPosition.y > y);
-                if (sheet == null) continue;
-                boxes.Remove(sheet);
-                Vector3 p0 = sheet.t.localPosition, p1 = new Vector3(0f, sheetH * 0.5f, laidZ[Mathf.Min(laidN++, laidZ.Length - 1)]);
-                for (float e = 0f, dur = 0.45f * slow; e < dur; e += Time.deltaTime)
+                var held = new MeatHolder { block = start };
+                yield return MeatEnds(rig, held, lengthW, gramsPerVolume, mats, handBase, handCtl, knife, knifeR, slow);
+                if (held.block == null)
                 {
-                    float k = Mathf.SmoothStep(0f, 1f, e / dur);
-                    sheet.t.localPosition = Vector3.Lerp(p0, p1, k) + Vector3.up * Mathf.Sin(k * Mathf.PI) * 0.06f;
-                    SupportHandController.Instance?.ShowNear(sheet.t.position + Carryable.CounterUp * 0.05f);
+                    // too short: told so, nothing cut
+                    foreach (MeatChunk c in chunks) if (c.go != null) Destroy(c.go);
+                    rend.enabled = true;
+                    cutAborted = true;
+                    yield break;
+                }
+                chunks.Clear();
+                chunks.Add(held.block);
+            }
+
+            // ② 포 뜨기: knife flat, right to left, at each sheet's top; the left hand on the meat
+            Bounds b = chunks[0].mesh.Bounds;
+            float H = b.size.y;
+            int sheets = Mathf.Max(1, Mathf.FloorToInt((H + SizeTolerance * thickW) / thickW));
+            var cuts = new List<float>();
+            if (H - sheets * thickW > SizeTolerance * thickW) cuts.Add(b.min.y + sheets * thickW); // a thicker top: off first, kept apart
+            for (int k = sheets - 1; k >= 1; k--) cuts.Add(b.min.y + k * thickW);
+            // (the size it should be by now: 4 × 4 × 3 cm for 1 × 1 × 4 strips -
+            // not stretched to fit: a model off that is said, it's a setting to fix)
+            CheckMeatSize(b, wideW, thickW, lengthW);
+
+            // [준비] the knife out to the right of the meat, turned flat (blade
+            // left, toward the meat's right side); the left hand flat on top.
+            float bladeRefX = rig.position.x;
+            if (cuts.Count > 0)
+            {
+                yield return StepGate("② 칼을 고기 오른쪽으로 빼기");
+                handCtl?.SlideTo(handBase + Vector3.right * (b.extents.x + 0.45f), 0.3f * slow);
+                yield return new WaitForSeconds(0.3f * slow);
+                yield return StepGate("② 칼을 눕히기 · 왼손 바닥으로 누르기");
+                if (knife != null) yield return knife.TurnFlatBladeLeft(0.35f * slow);
+                PalmOnTop(rig.TransformPoint(new Vector3(b.center.x - b.extents.x * 0.3f, b.max.y, b.center.z)));
+            }
+            float topLeftover = cuts.Count > 0 && H - sheets * thickW > SizeTolerance * thickW ? cuts[0] : float.NaN;
+            int pass = 0;
+            foreach (float y in cuts)
+            {
+                // lined up at the cut's height outside the meat, drawn through right
+                // to left - the sheet parts as the blade comes out the far side -
+                // and taken back out to the right at the same height
+                yield return StepGate($"② {++pass}번째 포뜨기 (밑면에서 {(y - b.min.y) / wpc:0.#}cm)");
+                yield return KnifeFlatFromRight(rig, b, y, handCtl, knifeR, slow);
+                SplitChunks(chunks, 1, y, rig, mats);
+                yield return KnifeFlatWithdraw(rig, b, y, handCtl, knifeR, slow);
+                if (!float.IsNaN(topLeftover) && Mathf.Approximately(y, topLeftover))
+                {
+                    MeatChunk top = chunks.Find(c => c.mesh.Bounds.min.y >= y - 1e-4f);
+                    if (top != null)
+                    {
+                        chunks.Remove(top);
+                        float topGrams = Mathf.Min(gramsPerVolume * top.mesh.Volume, amountGrams);
+                        yield return SlideChunkAway(top, rig, new Vector3(0f, 0.05f, -0.3f), 0.4f * slow);
+                        DropScrap("자투리", OwnColor, topGrams);
+                        amountGrams -= topGrams;
+                    }
+                }
+            }
+            // ③ [준비] the left hand lets go; the knife, out on the right, turned
+            //    back and brought up upright (blade down, its flat side across
+            //    the board, the cut line front-back); the left hand's fingers
+            //    curled, holding the meat left of the cut.
+            yield return StepGate("③ 왼손 떼기 · 칼 세우기");
+            SupportHandController.Instance?.Hide();
+            b = UnionBounds(chunks);
+            handCtl?.SlideTo(handBase + Vector3.right * (b.extents.x + 0.45f) + Vector3.up * 0.2f, 0.25f * slow);
+            if (knife != null && knife.HoldTurn != Quaternion.identity) yield return knife.UnturnFlat(0.25f * slow);
+            knife?.RaiseUpright(0.3f * slow);
+            yield return new WaitForSeconds(0.35f * slow);
+            float W = b.size.x;
+            int columns = Mathf.Max(1, Mathf.FloorToInt((W + SizeTolerance * wideW) / wideW));
+            // from the right end in, 1 cm at a time (the knife moving left)
+            var lines = new List<float>();
+            for (int k = 1; k < columns; k++) lines.Add(b.max.x - k * wideW);
+            bool leftoverStrip = W - columns * wideW > SizeTolerance * wideW;
+            if (leftoverStrip) lines.Add(b.max.x - columns * wideW);
+            int chop = 0;
+            foreach (float x in lines)
+            {
+                yield return StepGate($"③ {++chop}번째 수직 썰기 (오른쪽 끝에서 {(b.max.x - x) / wpc:0.#}cm)");
+                SupportHandController.Instance?.ShowNear(rig.TransformPoint(new Vector3(Mathf.Max(b.min.x + wideW * 0.5f, x - wideW * 1.6f), b.max.y, b.center.z)));
+                float cutX = x;
+                yield return VerticalCut(bladeRefX, handBase, rig.TransformPoint(new Vector3(cutX, b.max.y, b.center.z)).x, handCtl, knife, slow,
+                    () => SplitChunks(chunks, 0, cutX, rig, mats));
+            }
+            yield return StepGate("③ 칼 들기 · 왼손 떼기");
+            SupportHandController.Instance?.Hide();
+
+            // the strips: each its own piece, a hair apart, each with its share
+            FoodPieceGroup group = GetComponent<FoodPieceGroup>();
+            if (group == null) group = gameObject.AddComponent<FoodPieceGroup>();
+            Transform holder = PieceHolder.For(transform);
+            chunks.Sort((p, q) =>
+            {
+                Bounds bp = p.mesh.Bounds, bq = q.mesh.Bounds;
+                int c = bp.center.x.CompareTo(bq.center.x);
+                return c != 0 ? c : bp.center.y.CompareTo(bq.center.y);
+            });
+            int n = 0, rest = 0;
+            float piecesGrams = 0f;
+            // what's left after the scraps, shared out by volume - all of it, exactly
+            float piecesVolume = 0f;
+            foreach (MeatChunk c in chunks) piecesVolume += c.mesh.Volume;
+            gramsPerVolume = amountGrams / Mathf.Max(piecesVolume, 1e-9f);
+            foreach (MeatChunk c in chunks)
+            {
+                Bounds cb = c.mesh.Bounds;
+                int col = Mathf.Clamp(Mathf.FloorToInt((cb.center.x - b.min.x) / wideW), 0, columns);
+                c.go.transform.localPosition += Vector3.right * (0.004f * col); // (just apart along the cuts)
+                c.go.name = $"Piece_{n++}";
+                bool leftover = leftoverStrip && col >= columns;
+                if (leftover) rest++;
+                BoxCollider box = c.go.AddComponent<BoxCollider>();
+                box.center = Vector3.zero;
+                box.size = cb.size;
+                float grams = gramsPerVolume * c.mesh.Volume;
+                piecesGrams += grams;
+                FoodPiece fp = c.go.AddComponent<FoodPiece>();
+                fp.Init(this, grams, 0f, cb.size);
+                c.go.AddComponent<CutResultPiece>().Init(ingredientName, AppliedCut,
+                    new CutSpec(cb.size.x / wpc, cb.size.z / wpc, cb.size.y / wpc));
+                group.Add(fp);
+                c.go.transform.SetParent(holder, true);
+            }
+            // the original's box no longer covers anything: the pieces' own do
+            if (GetComponent<Collider>() is Collider own) own.enabled = false;
+            amountGrams = piecesGrams;
+            job.cutX = null;
+
+            // Left where they were cut, as on the board (the 채 standing side by
+            // side) - or, with spreadMeatStrips, spread out flat in rows.
+            if (spreadMeatStrips)
+            {
+                float step = wideW + 0.4f * wpc, rowStep = b.size.z + 0.6f * wpc;
+                int perRow = Mathf.Max(1, Mathf.FloorToInt(14f * wpc / step));
+                int count = chunks.Count, rowsNeeded = Mathf.CeilToInt(count / (float)perRow);
+                var moves = new List<(Transform t, Vector3 from, Vector3 to)>();
+                for (int i = 0; i < count; i++)
+                {
+                    Renderer r = chunks[i].go.GetComponent<Renderer>();
+                    if (r == null) continue;
+                    int row = i / perRow, inRow = Mathf.Min(perRow, count - row * perRow);
+                    Vector3 now = rig.InverseTransformPoint(r.bounds.center);
+                    float h = chunks[i].mesh.Bounds.size.y;
+                    Vector3 local = new Vector3(b.center.x + ((i % perRow) - (inRow - 1) * 0.5f) * step,
+                                                b.min.y + h * 0.5f,
+                                                now.z + (row - (rowsNeeded - 1) * 0.5f) * rowStep);
+                    Vector3 delta = rig.TransformPoint(local) - r.bounds.center;
+                    Transform tr = chunks[i].go.transform;
+                    moves.Add((tr, tr.position, tr.position + delta));
+                }
+                for (float t = 0f; t < 0.35f * slow; t += Time.deltaTime)
+                {
+                    float k = Mathf.SmoothStep(0f, 1f, t / (0.35f * slow));
+                    foreach (var m in moves) if (m.t != null) m.t.position = Vector3.Lerp(m.from, m.to, k);
                     yield return null;
                 }
-                sheet.t.localPosition = p1;
-                laid.Add(sheet);
+                foreach (var m in moves) if (m.t != null) m.t.position = m.to;
             }
-            laid.AddRange(boxes); // the bottom sheet, where it lay
-            boxes = laid;
-
-            // ③ The knife up; down every 1 cm, across all the sheets at once.
-            handCtl?.SlideTo(handBase, 0.25f * slow);
-            if (knife != null && handCtl != null) { knife.PlayChopMotion(); yield return new WaitForSeconds(0.08f); }
-            float step = L / columns, moved = 0f; // (what's right of each cut moves over a hair - so do the cuts still to come)
-            for (int i = 1; i < columns; i++)
-            {
-                float at = -L * 0.5f + step * i + moved;
-                SupportHandController.Instance?.ShowNear(rig.TransformPoint(new Vector3(at - step * 1.5f, sheetH, 0f)));
-                yield return DiceChop(rig, handBase, at, handCtl, knife);
-                SplitMeatX(boxes, at, rig, meat);
-                foreach (MeatBox b in boxes)
-                    if (b.t.localPosition.x > at) b.t.localPosition += Vector3.right * 0.006f;
-                moved += 0.006f;
-            }
-
-            int n = 0;
-            foreach (MeatBox b in boxes)
-            {
-                b.t.name = $"Piece_{n++}";
-                b.t.GetComponent<Renderer>().sharedMaterial = new Material(meat);
-                job.stack.Add(b.t);
-            }
-            job.cutX = null; // cut where they lie
-            Debug.Log($"[고기 채썰기] 위아래 손질, 포 {sheets}장 x {columns}줄 = 채 {n}개 ({Wc / worldPerCm:0.#} x {step / worldPerCm:0.#} x {sheetH / worldPerCm:0.#} cm)");
+            Debug.Log($"[고기 채썰기] 길이 {(b.size.z / wpc):0.#}cm × 폭 {(W / wpc):0.#}cm × 두께 {(H / wpc):0.#}cm → 판 {sheets}장 × {columns}줄 = {n - rest}조각" +
+                      $"{(rest > 0 ? $" + 나머지 {rest}조각" : "")} ({wideW / wpc:0.#} × {thickW / wpc:0.#} × {b.size.z / wpc:0.#} cm), 조각 합 {piecesGrams:0.#}g");
         }
-        finally { diceSlowness = slowBefore; }
+        finally
+        {
+            diceSlowness = slowBefore;
+        }
+    }
+
+    /// <summary>다듬기 for meat: step ① on its own - the ends cut off so it's
+    /// meatTrimLengthCm long (Z); the meat stays one piece, shorter, its cut
+    /// faces showing (the model's mesh replaced with the cut one).</summary>
+    private IEnumerator MeatTrimRoutine()
+    {
+        isCutting = true;
+        HandController handCtl = HandController.Instance;
+        ToolItem knife = HandCarry.Instance?.Current as ToolItem;
+        Vector3 handBase = handCtl != null ? handCtl.RestPosition : Vector3.zero;
+        var rig = new GameObject("TrimRig").transform;
+        rig.SetParent(PieceHolder.For(transform), false);
+        rig.SetPositionAndRotation(VisibleBounds.center, BoardFrame());
+        float knifeHoldBefore = knife != null ? knife.ChopHoldSeconds : 0f;
+        if (knife != null && handCtl != null)
+        {
+            knife.PlayChopMotion();
+            yield return new WaitForSeconds(0.08f);
+            if (BladeXAt(knife, rig.position.y, out float bladeX)) handBase.x += rig.position.x - bladeX;
+        }
+        Material[] mats = MeatMaterials();
+        var start = new MeatChunk { mesh = SliceMesh.From(GetComponent<MeshFilter>(), rig) };
+        float gramsPerVolume = amountGrams / Mathf.Max(start.mesh.Volume, 1e-6f);
+        ShowChunk(start, rig, mats);
+        rend.enabled = false;
+        var held = new MeatHolder { block = start };
+        yield return MeatEnds(rig, held, meatTrimLengthCm * worldPerCm, gramsPerVolume, mats, handBase, handCtl, knife,
+            knife != null ? knife.GetComponentInChildren<Renderer>() : null, diceSlowness);
+        if (held.block != null)
+        {
+            // the shorter block becomes the model (in its own space), cut faces and all
+            MeatChunk kept = held.block;
+            Mesh local = new Mesh { name = sharedMesh != null ? sharedMesh.name + "_다듬음" : "Meat_Trimmed" };
+            var lv = new List<Vector3>();
+            var ln = new List<Vector3>();
+            for (int i = 0; i < kept.mesh.v.Count; i++)
+            {
+                lv.Add(transform.InverseTransformPoint(rig.TransformPoint(kept.mesh.v[i])));
+                ln.Add(transform.InverseTransformDirection(rig.TransformDirection(kept.mesh.n[i])).normalized);
+            }
+            local.SetVertices(lv);
+            local.SetNormals(ln);
+            local.SetUVs(0, kept.mesh.uv);
+            local.subMeshCount = kept.mesh.sub.Count;
+            for (int s = 0; s < kept.mesh.sub.Count; s++) local.SetTriangles(kept.mesh.sub[s], s);
+            local.RecalculateBounds();
+            GetComponent<MeshFilter>().sharedMesh = local;
+            sharedMesh = local;
+            rend.sharedMaterials = mats;
+            if (GetComponent<Collider>() is BoxCollider box) { box.center = local.bounds.center; box.size = local.bounds.size; }
+            Destroy(kept.go);
+            meatEndsTrimmed = true;
+            IsTrimmed = true;
+            Debug.Log($"{ingredientName}: 다듬기 완료 - 앞뒤 끝 잘라 길이 {meatTrimLengthCm:0.#}cm (남은 양 {amountGrams:0.#}g)");
+        }
+        rend.enabled = true;
+        Destroy(rig.gameObject);
+        handCtl?.SlideTo(handBase, 0.15f);
+        if (knife != null) knife.ChopHoldSeconds = knifeHoldBefore;
+        SupportHandController.Instance?.Hide();
+        isCutting = false;
+    }
+
+    /// <summary>Step ①: the front and back ends (Z) cut off evenly so what's left
+    /// is lengthW long - each end a scrap of its own (food waste), with its share
+    /// of the amount. Too short for it: said so, and held.block comes back null.</summary>
+    private IEnumerator MeatEnds(Transform rig, MeatHolder held, float lengthW, float gramsPerVolume, Material[] mats,
+        Vector3 handBase, HandController handCtl, ToolItem knife, Renderer knifeR, float slow)
+    {
+        Bounds b = held.block.mesh.Bounds;
+        float L = b.size.z;
+        if (L + 0.05f * worldPerCm < lengthW)
+        {
+            Notice($"고기 길이가 {L / worldPerCm:0.0}cm라 {lengthW / worldPerCm:0.#}cm로 다듬을 수 없어요 ({(lengthW - L) / worldPerCm:0.0}cm 부족)");
+            held.block = null;
+            yield break;
+        }
+        float end = (L - lengthW) * 0.5f;
+        if (end < 0.05f * worldPerCm) yield break; // already that long
+        float bladeRefX = rig.position.x; // (where handBase puts the upright blade - before the meat is turned)
+        if (knife != null) knife.ChopHoldSeconds = 4f * slow;
+
+        // No room to turn it a quarter round (others close by on the board): it
+        // isn't turned - it keeps lying as it is, and the ends come off with the
+        // knife drawn along them instead.
+        Vector3 bc = rig.TransformPoint(b.center);
+        float turnSide = Mathf.Max(b.size.x, b.size.z) * 1.05f;
+        bool canTurn = !(CuttingBoardController.Instance is CuttingBoardController board) || board.Items.Count < 2
+                       || board.IsClear(new Rect(bc.x - turnSide * 0.5f, bc.y - turnSide * 0.5f, turnSide, turnSide), this, 0f);
+        if (!canTurn)
+        {
+            Debug.Log("[고기 다듬기] 돌릴 공간이 없어 돌리지 않고 양 끝을 자름");
+            if (knife != null) knife.LayFlatInHand();
+            yield return null;
+            var along = new List<MeatChunk> { held.block };
+            foreach (float sign in new[] { 1f, -1f })
+            {
+                float z = sign > 0f ? b.max.z - end : b.min.z + end;
+                SupportHandController.Instance?.ShowNear(rig.TransformPoint(new Vector3(b.center.x - b.extents.x * 0.4f, b.max.y, b.center.z)));
+                yield return KnifeAlongPass(rig, b.size.x, new Vector3(b.center.x, b.center.y, z), handCtl, knifeR, slow);
+                SplitChunks(along, 2, z, rig, mats);
+                MeatChunk cut = along.Find(c => sign > 0f ? c.mesh.Bounds.min.z >= z - 1e-4f : c.mesh.Bounds.max.z <= z + 1e-4f);
+                if (cut == null) continue;
+                along.Remove(cut);
+                float g = gramsPerVolume * cut.mesh.Volume;
+                yield return SlideChunkAway(cut, rig, new Vector3(0f, 0.03f, sign * 0.3f), 0.4f * slow);
+                DropScrap("자투리", OwnColor, g);
+                amountGrams = Mathf.Max(0f, amountGrams - g);
+            }
+            SupportHandController.Instance?.Hide();
+            handCtl?.SlideTo(handBase, 0.2f * slow);
+            held.block = along.Count > 0 ? along[0] : null;
+            meatEndsTrimmed = true;
+            yield break;
+        }
+
+        // 1-2) The knife up and out of the way; the left hand takes the meat by
+        //      its middle and turns it a quarter round, flat on the board (its
+        //      bottom stays down) - its length (Z) now across the board (X).
+        yield return StepGate("① 칼 들어 올리기");
+        handCtl?.SlideTo(handBase + Vector3.right * (b.extents.x + 0.35f) + Vector3.up * 0.25f, 0.3f * slow);
+        knife?.RaiseUpright(0.3f * slow);
+        yield return new WaitForSeconds(0.35f * slow);
+        yield return StepGate("① 고기를 수평으로 90도 돌리기");
+        yield return TurnMeat(rig, b, 90f, 0.6f * slow);
+
+        // 5-10) Each end: the knife upright over the cut line, down through it,
+        //       back up above the meat; the left hand on the middle, away from the cut.
+        var chunks = new List<MeatChunk> { held.block };
+        var ends = new List<MeatChunk>();
+        foreach (float sign in new[] { 1f, -1f }) // the back end (now on the right), then the front one
+        {
+            float z = sign > 0f ? b.max.z - end : b.min.z + end;
+            yield return StepGate(sign > 0f ? "① 첫 번째 끝 자르기" : "① 반대쪽 끝 자르기");
+            SupportHandController.Instance?.ShowNear(rig.TransformPoint(new Vector3(b.center.x, b.max.y, b.center.z - sign * b.extents.z * 0.35f)));
+            Vector3 line = rig.TransformPoint(new Vector3(b.center.x, b.max.y, z));
+            yield return VerticalCut(bladeRefX, handBase, line.x, handCtl, knife, slow, () =>
+            {
+                SplitChunks(chunks, 2, z, rig, mats);
+                MeatChunk cut = chunks.Find(c => sign > 0f ? c.mesh.Bounds.min.z >= z - 1e-4f : c.mesh.Bounds.max.z <= z + 1e-4f);
+                if (cut != null) { chunks.Remove(cut); ends.Add(cut); }
+            });
+        }
+
+        // 11) The knife up and out of the way (to the right, above); the two end
+        //     pieces taken off the body - scraps.
+        yield return StepGate("① 칼 빼고 자투리 떼어내기");
+        handCtl?.SlideTo(handBase + Vector3.right * (b.extents.z + 0.35f) + Vector3.up * 0.25f, 0.3f * slow);
+        yield return new WaitForSeconds(0.3f * slow);
+        foreach (MeatChunk cut in ends)
+        {
+            float grams = gramsPerVolume * cut.mesh.Volume;
+            float side = cut.mesh.Bounds.center.z > b.center.z ? 1f : -1f;
+            yield return SlideChunkAway(cut, rig, new Vector3(0f, 0.03f, side * 0.3f), 0.35f * slow);
+            DropScrap("자투리", OwnColor, grams);
+            amountGrams = Mathf.Max(0f, amountGrams - grams);
+        }
+
+        // 12) Turned back the quarter round: the 4 cm now front-back (Z), and
+        //     it isn't turned again from here.
+        yield return StepGate("① 고기를 원래 방향으로 돌려놓기");
+        SupportHandController.Instance?.ShowNear(rig.TransformPoint(b.center + Vector3.up * b.extents.y));
+        yield return TurnMeat(rig, b, -90f, 0.6f * slow);
+        SupportHandController.Instance?.Hide();
+        held.block = chunks.Count > 0 ? chunks[0] : null;
+        meatEndsTrimmed = true;
+        Debug.Log($"[고기 다듬기] 고기를 돌려 양 끝 각 {end / worldPerCm:0.0}cm 잘라 길이 {(held.block != null ? held.block.mesh.Bounds.size.z / worldPerCm : 0f):0.0}cm");
+    }
+
+    // ---- 고기 썰기: poses and cuts ----
+
+    [Tooltip("고기 썰기를 한 단계씩: each pose stops until N is pressed (to check the poses).")]
+    [SerializeField] private bool meatCutStepMode;
+
+    /// <summary>Each step of the meat cut, named in the console; in step mode
+    /// it waits here until N is pressed.</summary>
+    private IEnumerator StepGate(string step)
+    {
+        Debug.Log($"[고기 썰기 단계] {step}");
+        if (!meatCutStepMode) yield break;
+        var kb = UnityEngine.InputSystem.Keyboard.current;
+        yield return null;
+        while (kb != null && !kb.nKey.wasPressedThisFrame) yield return null;
+    }
+
+    /// <summary>The meat turned flat on the board by degrees (about the board's
+    /// up through its middle - not tipped over), the left hand holding it by its
+    /// middle as it goes. The knife is out of it meanwhile.</summary>
+    private IEnumerator TurnMeat(Transform rig, Bounds b, float degrees, float seconds)
+    {
+        Vector3 pivot = rig.TransformPoint(b.center);
+        Vector3 up = Carryable.CounterUp;
+        Quaternion r0 = rig.rotation;
+        Vector3 p0 = rig.position;
+        for (float e = 0f; e < seconds; e += Time.deltaTime)
+        {
+            Quaternion turn = Quaternion.AngleAxis(degrees * Mathf.SmoothStep(0f, 1f, e / seconds), up);
+            rig.SetPositionAndRotation(pivot + turn * (p0 - pivot), turn * r0);
+            SupportHandController.Instance?.ShowNear(rig.TransformPoint(b.center + Vector3.up * b.extents.y));
+            yield return null;
+        }
+        Quaternion end = Quaternion.AngleAxis(degrees, up);
+        rig.SetPositionAndRotation(pivot + end * (p0 - pivot), end * r0);
+    }
+
+    /// <summary>One cut straight down (the knife upright): moved over the line
+    /// (world x) above the meat, down through it to the board - the pieces part
+    /// right there (atBottom) - and back up above it before it goes anywhere else.</summary>
+    private IEnumerator VerticalCut(float bladeRefX, Vector3 handBase, float lineX, HandController handCtl, ToolItem knife, float slow, System.Action atBottom)
+    {
+        handCtl?.SlideTo(handBase + Vector3.right * (lineX - bladeRefX), 0.3f * slow);
+        yield return new WaitForSeconds(0.4f * slow);       // (over the line, up)
+        handCtl?.PlayChopGesture();
+        knife?.PlayChopMotion();                              // (down...)
+        yield return new WaitForSeconds(0.12f);
+        atBottom?.Invoke();                                   // (...through to the board)
+        if (IsOnCuttingBoard) CookingMess.Chop(OwnColor);
+        yield return new WaitForSeconds(0.35f * slow);      // (and up again)
+    }
+
+    /// <summary>The left hand flat on top of the meat, palm down (포 뜨기): the
+    /// fingers along it, not round its side where the knife comes in.</summary>
+    private static void PalmOnTop(Vector3 topPoint)
+    {
+        SupportHandController s = SupportHandController.Instance;
+        if (s == null) return;
+        Vector3 up = Carryable.CounterUp;
+        Vector3 fingers = Vector3.ProjectOnPlane(new Vector3(0.35f, 1f, 0f), up).normalized;
+        Vector3 thumb = Quaternion.AngleAxis(90f, up) * fingers;
+        s.BeginHolding(fingers, thumb, 0.08f);
+        s.HoldKnucklesAt(topPoint + up * 0.03f);
+    }
+
+    /// <summary>The knife lying flat (parallel to the board), its leading end
+    /// brought in from the right side of the meat at height y (rig) and drawn
+    /// through to the left and out - steered every frame by where the blade
+    /// actually is; the left hand flat on top of the meat meanwhile.</summary>
+    private IEnumerator KnifeFlatFromRight(Transform rig, Bounds b, float y, HandController handCtl, Renderer knifeR, float slow)
+    {
+        float right = rig.TransformPoint(new Vector3(b.max.x, y, b.center.z)).x;
+        float left = rig.TransformPoint(new Vector3(b.min.x, y, b.center.z)).x;
+        Vector3 cutAt = rig.TransformPoint(new Vector3(b.center.x, y, b.center.z));
+        Vector3 press = rig.TransformPoint(new Vector3(b.center.x - b.extents.x * 0.35f, b.max.y, b.center.z));
+        for (float e = 0f, dur = 1.4f * slow; e < dur; e += Time.deltaTime)
+        {
+            // the first part lines it up beside the meat's right side; then a sawing pass leftward
+            float k = Mathf.Clamp01((e / dur - 0.25f) / 0.75f);
+            float lead = Mathf.Lerp(right + 0.04f, left - 0.08f, k) + Mathf.Sin(k * Mathf.PI * 6f) * 0.025f;
+            if (handCtl != null && knifeR != null)
+            {
+                Vector3 err = new Vector3(lead - knifeR.bounds.min.x, cutAt.y - knifeR.bounds.center.y, 0f);
+                handCtl.SlideTo(handCtl.RestPosition + err, 0.03f);
+            }
+            PalmOnTop(press); // (the left hand stays flat on top - it doesn't go down with the knife)
+            yield return null;
+        }
+    }
+
+    /// <summary>After a flat pass: the knife drawn back out to the right at the
+    /// same height, all of the blade clear of the meat before it moves on.</summary>
+    private IEnumerator KnifeFlatWithdraw(Transform rig, Bounds b, float y, HandController handCtl, Renderer knifeR, float slow)
+    {
+        float right = rig.TransformPoint(new Vector3(b.max.x, y, b.center.z)).x;
+        Vector3 cutAt = rig.TransformPoint(new Vector3(b.center.x, y, b.center.z));
+        Vector3 press = rig.TransformPoint(new Vector3(b.center.x - b.extents.x * 0.35f, b.max.y, b.center.z));
+        float from = knifeR != null ? knifeR.bounds.min.x : right;
+        for (float e = 0f, dur = 0.6f * slow; e < dur; e += Time.deltaTime)
+        {
+            float lead = Mathf.Lerp(from, right + 0.06f, Mathf.SmoothStep(0f, 1f, e / dur));
+            if (handCtl != null && knifeR != null)
+            {
+                Vector3 err = new Vector3(lead - knifeR.bounds.min.x, cutAt.y - knifeR.bounds.center.y, 0f);
+                handCtl.SlideTo(handCtl.RestPosition + err, 0.03f);
+            }
+            PalmOnTop(press);
+            yield return null;
+        }
+    }
+
+    /// <summary>What the strips are cut from should already be whole sizes of
+    /// them (4 × 4 × 3 cm for 1 × 1 × 4): if the model isn't, it's said - a
+    /// setting to fix - and cut as it is (never stretched to fit).</summary>
+    private void CheckMeatSize(Bounds b, float wideW, float thickW, float lengthW)
+    {
+        float wpc = worldPerCm;
+        float Off(float size, float unit) { float n = Mathf.Max(1f, Mathf.Round(size / unit)); return Mathf.Abs(size - n * unit) / unit; }
+        bool lenOff = Mathf.Abs(b.size.z - lengthW) > SizeTolerance * lengthW;
+        bool widthOff = Off(b.size.x, wideW) > SizeTolerance;
+        bool heightOff = Off(b.size.y, thickW) > SizeTolerance;
+        string size = $"가로(X) {b.size.x / wpc:0.##} × 세로(Z) {b.size.z / wpc:0.##} × 높이(Y) {b.size.y / wpc:0.##} cm";
+        if (lenOff || widthOff || heightOff)
+            Debug.LogWarning($"[고기 규격 확인] 다듬은 고기가 {size} - 채({wideW / wpc:0.#}×{thickW / wpc:0.#}×{lengthW / wpc:0.#}cm)로 나누어떨어지지 않음" +
+                             $"{(widthOff ? " · 가로" : "")}{(heightOff ? " · 높이" : "")}{(lenOff ? " · 길이" : "")} - 모델/설정 확인 필요 (늘리지 않고 그대로 자름)");
+        else Debug.Log($"[고기 규격 확인] 다듬은 고기 {size}");
+    }
+
+    /// <summary>Every chunk the plane (axis, at) runs through, cut in two there.</summary>
+    private void SplitChunks(List<MeatChunk> chunks, int axis, float at, Transform rig, Material[] mats)
+    {
+        foreach (MeatChunk c in chunks.ToArray())
+        {
+            Bounds cb = c.mesh.Bounds;
+            if (at <= cb.min[axis] + 1e-4f || at >= cb.max[axis] - 1e-4f) continue;
+            c.mesh.Split(axis, at, out SliceMesh below, out SliceMesh above);
+            if (below == null || above == null) continue;
+            chunks.Remove(c);
+            Destroy(c.go);
+            foreach (SliceMesh part in new[] { below, above })
+            {
+                var nc = new MeatChunk { mesh = part };
+                ShowChunk(nc, rig, mats);
+                chunks.Add(nc);
+            }
+        }
+    }
+
+    /// <summary>A chunk shown: its own object, pivot at its middle, in the rig.</summary>
+    private void ShowChunk(MeatChunk c, Transform rig, Material[] mats)
+    {
+        Bounds cb = c.mesh.Bounds;
+        c.go = new GameObject("MeatPart");
+        c.go.transform.SetParent(rig, false);
+        c.go.transform.localPosition = cb.center;
+        c.go.AddComponent<MeshFilter>().sharedMesh = c.mesh.ToMesh(cb.center, "MeatPart");
+        c.go.AddComponent<MeshRenderer>().sharedMaterials = mats;
+    }
+
+    private IEnumerator SlideChunkAway(MeatChunk c, Transform rig, Vector3 by, float seconds)
+    {
+        Vector3 p0 = c.go.transform.localPosition;
+        for (float e = 0f; e < seconds; e += Time.deltaTime)
+        {
+            if (c.go == null) yield break;
+            c.go.transform.localPosition = p0 + by * Mathf.SmoothStep(0f, 1f, e / seconds);
+            yield return null;
+        }
+        if (c.go != null) Destroy(c.go);
+    }
+
+    private static Bounds UnionBounds(List<MeatChunk> chunks)
+    {
+        Bounds b = chunks[0].mesh.Bounds;
+        foreach (MeatChunk c in chunks) b.Encapsulate(c.mesh.Bounds);
+        return b;
+    }
+
+    /// <summary>The model's own materials, and one more for the faces the cuts
+    /// make (the meat's cut-surface material - its texture laid flat on them).</summary>
+    private Material[] MeatMaterials()
+    {
+        Material[] own = rend.sharedMaterials;
+        var all = new Material[own.Length + 1];
+        for (int i = 0; i < own.Length; i++) all[i] = own[i];
+        all[own.Length] = own.Length > 0 && own[0] != null ? own[0] : new Material(Shader.Find("Universal Render Pipeline/Lit")) { color = new Color(0.85f, 0.5f, 0.48f) };
+        return all;
+    }
+
+    /// <summary>The frame the meat is cut in - the board's: X across it, Y up off
+    /// it (the counter's up), Z front-back - whatever way the meat itself is
+    /// turned. (The models lie on the tilted board already tilted with it.)</summary>
+    private static Quaternion BoardFrame()
+    {
+        Vector3 up = Carryable.CounterUp;
+        Vector3 boardX = Vector3.ProjectOnPlane(Vector3.right, up).normalized;
+        return Quaternion.LookRotation(Vector3.Cross(boardX, up).normalized, up);
+    }
+
+    /// <summary>A short note over the ingredient (why something can't be done).</summary>
+    private void Notice(string text)
+    {
+        Debug.Log($"[{ingredientName}] {text}");
+        var go = new GameObject("IngredientNote");
+        go.transform.position = VisibleBounds.center + new Vector3(0f, 0.7f, -1.5f);
+        TextMesh tm = go.AddComponent<TextMesh>();
+        tm.text = text;
+        tm.fontSize = 36;
+        tm.characterSize = 0.07f;
+        tm.anchor = TextAnchor.MiddleCenter;
+        tm.color = new Color(0.75f, 0.15f, 0.1f);
+        Destroy(go, 3f);
     }
 
     /// <summary>The knife lying along the meat (its length along the board),
@@ -1557,7 +2243,7 @@ public class IngredientItem : Carryable
         Vector3 center = VisibleBounds.center;
         if (CuttingBoardController.Instance is CuttingBoardController board0 && IsOnCuttingBoard)
         {
-            Vector3 pull = FitShift(board0.VisibleTopRect(), new Bounds(center, new Vector3(L + 0.2f, L * 0.75f + 0.2f, 0f)));
+            Vector3 pull = RoomShift(board0.VisibleTopRect(), new Bounds(center, new Vector3(L + 0.2f, L * 0.75f + 0.2f, 0f)));
             if (pull != Vector3.zero)
             {
                 yield return SlideBy(pull, 0.2f);
@@ -1751,7 +2437,7 @@ public class IngredientItem : Carryable
         Vector3 center = VisibleBounds.center;
         if (CuttingBoardController.Instance is CuttingBoardController board0 && IsOnCuttingBoard)
         {
-            Vector3 pull = FitShift(board0.VisibleTopRect(), new Bounds(center + new Vector3(fanStep * n * 0.5f, 0f, 0f),
+            Vector3 pull = RoomShift(board0.VisibleTopRect(), new Bounds(center + new Vector3(fanStep * n * 0.5f, 0f, 0f),
                 new Vector3(2f * R + fanStep * n + 0.3f, 1.6f * R, 0f)));
             if (pull != Vector3.zero)
             {
@@ -2186,6 +2872,38 @@ public class IngredientItem : Carryable
     /// <summary>How far to move something with these (world) bounds to get it
     /// inside the board's top - along the tilted counter, keeping its height
     /// above it.</summary>
+    private Vector3 RoomShift(Rect top, Bounds all)
+    {
+        // (with others on the board: only if it doesn't push this one into them -
+        // those already there are never moved; otherwise it's cut where it lies)
+        Vector3 s = FitShift(top, all);
+        if (s == Vector3.zero || !(CuttingBoardController.Instance is CuttingBoardController board) || board.Items.Count < 2) return s;
+        Bounds vb = VisibleBounds;
+        return board.IsClear(new Rect(vb.min.x + s.x, vb.min.y + s.y, vb.size.x, vb.size.y), this, 0.05f) ? s : Vector3.zero;
+    }
+
+    /// <summary>Room round it for the knife's work (and, for the meat, for
+    /// turning it a quarter round) - with others on the board, the knife
+    /// mustn't go through them. Not enough: the cut doesn't start (the board
+    /// outlines it red a moment; nothing's said).</summary>
+    private bool HasRoomToCut(bool turning, float fanRight = 0f, float spread = 0f)
+    {
+        if (!(CuttingBoardController.Instance is CuttingBoardController board) || !IsOnCuttingBoard || board.Items.Count < 2) return true;
+        Bounds vb = VisibleBounds;
+        float side = Mathf.Max(vb.size.x, vb.size.y);
+        // (with the slices' fan to the right, or the cut pieces' spread round it, as this cut lays them out)
+        Rect work = new Rect(vb.min.x - 0.12f - spread, vb.min.y - 0.03f - spread * 0.5f, vb.size.x + 0.24f + 2f * spread + fanRight, vb.size.y + 0.06f + spread);
+        bool ok = board.IsClear(work, this, 0f);
+        if (ok && turning)
+            ok = board.IsClear(new Rect(vb.center.x - side * 0.5f, vb.center.y - side * 0.5f, side, side), this, 0f);
+        if (!ok)
+        {
+            Debug.Log($"[도마] {ingredientName}: 주변 재료와 가까워 칼질할 공간이 없음 - 시작 안 함");
+            board.FlashBlocked(this);
+        }
+        return ok;
+    }
+
     private static Vector3 FitShift(Rect top, Bounds all)
     {
         const float margin = 0.05f;

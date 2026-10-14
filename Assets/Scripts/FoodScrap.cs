@@ -72,10 +72,13 @@ public static class WasteRules
     public static bool HasFoodToDump(Carryable held)
     {
         if (held == null) return false;
+        if (GeneralTrashCan.IsEggShell(held)) return false; // (general waste, not food)
         if (IsFood(held)) return true;
         if (held is MovableBowl bowl)
         {
             if (bowl.HasPortion) return true;
+            if (bowl.HasEgg) return true;
+            if (PanSauce.Of(bowl, false) is PanSauce sauce && sauce.Amount > 0.01f) return true;
             foreach (Carryable c in bowl.Contents) if (IsFood(c)) return true;
             return false;
         }

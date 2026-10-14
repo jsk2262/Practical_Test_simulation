@@ -25,6 +25,23 @@ public class FoodPiece : MonoBehaviour
     public Color CoatColor { get; private set; } = Color.white;
     public float CoatViscosity { get; private set; }
 
+    /// <summary>How broken up it is (0 whole .. 1 crumbled) - a soft piece (두부)
+    /// knocked about by stirring. Shown by it wearing down (look only: its
+    /// grams don't change).</summary>
+    public float Damage { get; private set; }
+    private Vector3 wholeScale = new Vector3(-1f, 0f, 0f);
+
+    public void AddDamage(float amount)
+    {
+        if (amount <= 0f || Damage >= 1f) return;
+        if (wholeScale.x < 0f) wholeScale = transform.localScale;
+        float was = Damage;
+        Damage = Mathf.Min(1f, Damage + amount);
+        // worn smaller and a little flattened as it breaks
+        transform.localScale = Vector3.Scale(wholeScale, new Vector3(1f - 0.2f * Damage, 1f - 0.35f * Damage, 1f - 0.2f * Damage));
+        if (was < 0.5f && Damage >= 0.5f) Debug.Log($"[{SourceName}] 조각이 부서지기 시작함 (손상 {Damage:0.00})");
+    }
+
     /// <summary>About half its size (world) - how close it comes to walls and other pieces.</summary>
     public float Radius { get; private set; } = 0.05f;
 
@@ -49,7 +66,38 @@ public class FoodPiece : MonoBehaviour
         seed = Random.Range(0f, 100f);
     }
 
-    public void SetSize(Vector3 worldSize) => Radius = (worldSize.x + worldSize.y + worldSize.z) / 6f;
+    public void SetSize(Vector3 worldSize)
+    {
+        Radius = (worldSize.x + worldSize.y + worldSize.z) / 6f;
+        HalfSize = worldSize * 0.5f;
+    }
+
+    /// <summary>Half its size along its own axes (world) - a long strip reaches
+    /// further toward a wall one way than the other.</summary>
+    public Vector3 HalfSize { get; private set; }
+
+    /// <summary>How far it reaches from its middle along dir (in the container's
+    /// frame, as turned by simRot) - at least its Radius.</summary>
+    internal float ReachAlong(Vector3 dir)
+    {
+        if (HalfSize == Vector3.zero) return Radius;
+        float e = Mathf.Abs(Vector3.Dot(simRot * Vector3.right, dir)) * HalfSize.x
+                + Mathf.Abs(Vector3.Dot(simRot * Vector3.up, dir)) * HalfSize.y
+                + Mathf.Abs(Vector3.Dot(simRot * Vector3.forward, dir)) * HalfSize.z;
+        return Mathf.Max(e, Radius);
+    }
+
+    /// <summary>Takes over another piece's whole state (its copy, split off into
+    /// its own ingredient - IngredientItem.SplitOffPiece).</summary>
+    public void CopyStateFrom(FoodPiece o)
+    {
+        SourceName = o.SourceName; Category = o.Category; WasWashed = o.WasWashed; Grams = o.Grams;
+        Cook = o.Cook; Coat = o.Coat; CoatColor = o.CoatColor; CoatViscosity = o.CoatViscosity;
+        HalfSize = o.HalfSize;
+        Radius = o.Radius; Sear = o.Sear; Char = o.Char; PanCooked = o.PanCooked; Temp = o.Temp;
+        Damage = o.Damage; SearBrown = o.SearBrown; CharBlack = o.CharBlack;
+        seed = o.seed;
+    }
 
     /// <summary>More sauce on it (amount is how much of the bare part takes it).</summary>
     public void AddCoat(float amount, Color color, float viscosity)
@@ -70,11 +118,28 @@ public class FoodPiece : MonoBehaviour
         Coat = Mathf.Max(floor, Coat - (1f - CoatViscosity) * 0.03f * dt);
     }
 
-    /// <summary>Shows its own cooked color with its sauce over it.</summary>
+    /// <summary>Browned where it lay on the hot pan (0..1), and charred (0..1) -
+    /// in a dry pan or oil (FoodPieceGroup). Neither is ever undone.</summary>
+    public float Sear { get; set; }
+    public float Char { get; set; }
+    /// <summary>Has been cooked in a pan/wok (its colour is worked out from its
+    /// cooking, not the blanching colour).</summary>
+    public bool PanCooked { get; set; }
+    /// <summary>Its own temperature (°C) - apart from the pan's (FoodPieceGroup).</summary>
+    public float Temp { get; set; } = 20f;
+
+    /// <summary>This ingredient's browned / charred colours (CookableItem.PanLook - set by its group).</summary>
+    public Color SearBrown { get; set; } = new Color(0.62f, 0.38f, 0.18f);
+    public Color CharBlack { get; set; } = new Color(0.13f, 0.09f, 0.07f);
+
+    /// <summary>Shows its own cooked color - browned and charred where it is -
+    /// with its sauce over it.</summary>
     public void Show(Color cooked)
     {
         if (rend == null) rend = GetComponent<Renderer>();
         if (rend == null) return;
+        cooked = Color.Lerp(cooked, SearBrown, Sear * 0.8f);
+        cooked = Color.Lerp(cooked, CharBlack, Char);
         Color c = Color.Lerp(cooked, CoatColor, Coat * 0.85f);
         float s = Mathf.Lerp(0.2f, 0.85f, Coat * Mathf.Lerp(0.35f, 1f, CoatViscosity));
         if (Mathf.Abs(s - shownSmooth) < 0.005f && Approximately(c, shownColor)) return;
@@ -125,8 +190,27 @@ public class FoodPieceGroup : MonoBehaviour
     [SerializeField] private float stirImpulse = 0.8f;
     [Tooltip("Sauce taken on per stir by a piece touching it (times how much sauce there is).")]
     [SerializeField] private float coatPerStir = 0.14f;
+    [Tooltip("How much a soft piece (두부) breaks up per spatula stroke (look tuning).")]
+    [SerializeField] private float softDamagePerStir = 0.035f;
     [Tooltip("Sauce taken on while sliding through it, per unit of speed per second.")]
     [SerializeField] private float coatPerMove = 0.3f;
+
+    [Header("Pan cooking (a dry pan, a wok, oil) - look tuning, not measured")]
+    [Tooltip("x: the piece's temperature °C → y: cooking per second (1 = one second's worth of TimeToCooked at a good frying heat).")]
+    [SerializeField] private AnimationCurve cookRateByTemp = new AnimationCurve(
+        new Keyframe(45f, 0f), new Keyframe(80f, 0.35f), new Keyframe(110f, 0.7f), new Keyframe(160f, 1.1f), new Keyframe(220f, 1.5f));
+    [Tooltip("x: °C where it lies on the pan → y: browning per second (only without a watery sauce round it).")]
+    [SerializeField] private AnimationCurve searRateByTemp = new AnimationCurve(
+        new Keyframe(140f, 0f), new Keyframe(170f, 0.03f), new Keyframe(200f, 0.07f), new Keyframe(240f, 0.12f));
+    [Tooltip("x: °C where it lies on the pan → y: charring per second.")]
+    [SerializeField] private AnimationCurve charRateByTemp = new AnimationCurve(
+        new Keyframe(215f, 0f), new Keyframe(240f, 0.012f), new Keyframe(280f, 0.04f), new Keyframe(330f, 0.09f));
+    [Tooltip("A piece on top of the others gets this much of the pan's heat (above room temperature).")]
+    [SerializeField] private float offFloorHeat = 0.35f;
+    [Tooltip("Seconds-scale for a piece's own temperature to follow its surroundings: this + per world unit of its radius (a 1 cm cube ≈ 5 s, a 3 cm one ≈ 13 s).")]
+    [SerializeField] private float pieceTauBase = 2f, pieceTauPerRadius = 70f;
+    [Tooltip("Cooked colour of meat (pork goes pale; brown comes from browning, not cooking).")]
+    [SerializeField] private Color cookedMeatColor = new Color(0.86f, 0.78f, 0.7f);
 
     [Header("General")]
     [SerializeField] private float gravity = 3f;
@@ -134,6 +218,21 @@ public class FoodPieceGroup : MonoBehaviour
     [SerializeField] private float inertia = 0.2f;
 
     public readonly List<FoodPiece> Pieces = new List<FoodPiece>();
+
+    /// <summary>The sauce on the pieces (taken from the pan's sauce as they pick
+    /// it up) - the real amount, held once here for the whole ingredient; each
+    /// piece's Coat is only how it looks. Pan sauce + this = all of it.</summary>
+    private readonly SaucePortion coatSauce = new SaucePortion();
+    public float CoatSauceMl => coatSauce.Amount * 15f;
+
+    /// <summary>A share of the sauce on the pieces moved to another ingredient's
+    /// (a piece split off with its coat) - moved, not copied.</summary>
+    public void GiveCoatShareTo(FoodPieceGroup other, float share)
+    {
+        if (other == null || coatSauce.Amount <= 0f) return;
+        other.coatSauce.Add(coatSauce.Take(coatSauce.Amount * Mathf.Clamp01(share)));
+    }
+    public IReadOnlyDictionary<string, float> CoatSauceParts => coatSauce.parts;
 
     private IngredientItem ingredient;
     private CookableItem cookable;
@@ -198,7 +297,76 @@ public class FoodPieceGroup : MonoBehaviour
         if (simBowl != null) Step(Mathf.Min(Time.deltaTime, 0.05f));
 
         foreach (FoodPiece p in Pieces)
-            p.Show(cookable != null ? cookable.ColorAt(p.Cook) : Color.white);
+            p.Show(p.PanCooked ? PanColor(p) : cookable != null ? cookable.ColorAt(p.Cook) : Color.white);
+    }
+
+    /// <summary>In a pan/wok/oil (not in water): there's a pan's heat to cook by.</summary>
+    public bool InDryHeat => simBowl != null && simBowl.IsCookingVessel && !inside.liquid;
+    public bool InLiquid => simBowl != null && inside.liquid;
+
+    public float AverageChar
+    {
+        get { float s = 0f; foreach (FoodPiece p in Pieces) if (p != null) s += p.Char; return Pieces.Count > 0 ? s / Pieces.Count : 0f; }
+    }
+
+    /// <summary>The colour cooking in a pan gives it (before browning): meat
+    /// goes pale, a vegetable a little deeper, tofu stays as it is (it browns).</summary>
+    private Color PanColor(FoodPiece p)
+    {
+        Color raw = cookable != null ? cookable.ColorAt(0f) : Color.white;
+        float k = Mathf.Clamp01(p.Cook / Mathf.Max(cookable != null ? cookable.TimeToCooked : 6f, 0.01f));
+        Color done = cookedMeatColor;
+        if (cookable != null)
+        {
+            cookable.PanLook(raw, out done, out Color sear, out Color burnt);
+            p.SearBrown = sear;
+            p.CharBlack = burnt;
+        }
+        return Color.Lerp(raw, done, k);
+    }
+
+    /// <summary>Each piece heated by where it is: lying on the hot pan, the
+    /// pan's own heat (browning, and charring if it's left there); up on top of
+    /// the others, much less; in a watery sauce, no hotter than it boils;
+    /// in the frying oil, the oil's. Stirring and shaking move them about,
+    /// so they cook evenly - left still, the bottom ones brown, then burn.</summary>
+    private void CookInPan(float dt)
+    {
+        PanSauce sauce = simBowl.GetComponent<PanSauce>();
+        bool watery = sauce != null && sauce.IsWatery && sauce.Amount > 0.5f;
+        float pan, room = 20f;
+        bool oil = simBowl.HasFryingOil;
+        if (oil) pan = Mathf.Lerp(room, 175f, simBowl.OilHeat01);
+        else if (VesselHeat.Of(simBowl) is VesselHeat vh) { pan = vh.PanTemp; room = vh.RoomTemp; }
+        else return;
+        foreach (FoodPiece p in Pieces)
+        {
+            bool onFloor = p.simPos.y <= p.Radius * 1.25f;
+            float t = oil ? pan                                   // in the oil: all round
+                    : onFloor ? pan : room + (pan - room) * offFloorHeat;
+            if (watery) t = Mathf.Min(t, onFloor ? 105f : 100f);  // (in the sauce: as hot as it boils)
+            // The piece's own temperature follows what's around it - a big piece
+            // slower than a small one; it cooks by its own temperature, browns
+            // and chars by its surface (between its own and what it lies on).
+            p.Temp += (t - p.Temp) * Mathf.Clamp01(dt / PieceTau(p));
+            float surface = Mathf.Lerp(p.Temp, t, 0.7f);
+            p.Cook += dt * Mathf.Max(0f, cookRateByTemp.Evaluate(p.Temp));
+            if (p.Cook > 0f) p.PanCooked = true;
+            if (!watery && (onFloor || oil))
+            {
+                p.Sear = Mathf.Min(1f, p.Sear + dt * Mathf.Max(0f, searRateByTemp.Evaluate(surface)));
+                if (!oil && !SpeedMode.On) p.Char = Mathf.Min(1f, p.Char + dt * Mathf.Max(0f, charRateByTemp.Evaluate(surface)));
+            }
+        }
+    }
+
+    /// <summary>Seconds-scale for a piece to take on the heat around it: bigger, slower.</summary>
+    private float PieceTau(FoodPiece p) => pieceTauBase + pieceTauPerRadius * p.Radius;
+
+    /// <summary>Out of the heat (a plate, a bowl): the pieces cool toward the room.</summary>
+    private void CoolOff(float dt)
+    {
+        foreach (FoodPiece p in Pieces) p.Temp += (20f - p.Temp) * Mathf.Clamp01(dt / 120f);
     }
 
     // ---- loose, inside a container ----
@@ -216,6 +384,13 @@ public class FoodPieceGroup : MonoBehaviour
     private void EnterContainer()
     {
         inside = simBowl.GetInterior();
+        // into a hot pan: cold food takes some of its heat
+        if (VesselHeat.Of(simBowl) is VesselHeat vh)
+        {
+            float g = 0f, t = 0f;
+            foreach (FoodPiece p in Pieces) { g += Mathf.Max(p.Grams, 1f); t += p.Temp * Mathf.Max(p.Grams, 1f); }
+            if (g > 0f) vh.AddColdMass(g, t / g);
+        }
         Quaternion frame = Frame(out _, out _);
         Quaternion inv = Quaternion.Inverse(frame);
         foreach (FoodPiece p in Pieces)
@@ -246,7 +421,10 @@ public class FoodPieceGroup : MonoBehaviour
         else lastCenterVel = Vector3.zero;
         lastCenter = inside.floorCenter;
         haveLast = true;
-        Vector3 shove = Vector3.ClampMagnitude(inv * (-accel * inertia), 6f);
+        // (only while it's carried or shaken - a bowl set down or moved in one go
+        // doesn't fling everything in it about)
+        Vector3 shove = simBowl.IsHeld || simBowl.GetComponent<WokDragHandler>() != null
+            ? Vector3.ClampMagnitude(inv * (-accel * inertia), 6f) : Vector3.zero;
 
         // "Down" is into the counter (the scene's counter is tilted to the camera);
         // a container tilted off it lets the pieces slide.
@@ -291,7 +469,7 @@ public class FoodPieceGroup : MonoBehaviour
                 p.simVel += a * h;
                 p.simVel *= Mathf.Exp(-drag * h);
                 p.simPos += p.simVel * h;
-                p.simSpin *= Mathf.Exp(-(inside.liquid ? 2f : 7f) * h);
+                p.simSpin *= Mathf.Exp(-(inside.liquid ? 4f : 8f) * h);
                 if (p.simSpin.sqrMagnitude > 1e-6f)
                     p.simRot = Quaternion.AngleAxis(p.simSpin.magnitude * h * Mathf.Rad2Deg, p.simSpin.normalized) * p.simRot;
                 // A cube settles back onto a face (keeping which way it's turned).
@@ -299,22 +477,33 @@ public class FoodPieceGroup : MonoBehaviour
                 if (fwd.sqrMagnitude > 1e-4f)
                     p.simRot = Quaternion.Slerp(p.simRot, Quaternion.LookRotation(fwd, Vector3.up), (inside.liquid ? 1.5f : 8f) * h);
                 Contain(p);
+                // nearly still and nothing moving it: at rest (no endless slow drifting or turning)
+                if (!simBowl.IsHeld && !BeingWorked && p.simVel.sqrMagnitude < 0.0004f && p.simSpin.sqrMagnitude < 0.04f && inside.boil < 0.05f)
+                {
+                    p.simVel = Vector3.zero;
+                    p.simSpin = Vector3.zero;
+                }
             }
             Separate();
         }
 
+        if (InDryHeat) CookInPan(SpeedMode.Wait(dt));
+        else if (!inside.liquid) CoolOff(dt);
+
         // Sliding through the sauce in a pan picks it up (where it touches - unevenly).
+        // Thickened with starch, it clings more and stays on, glossy.
         if (sauce != null && sauceAvail > 0f && !inside.liquid)
         {
             float used = 0f;
+            float cling = Mathf.Max(sauce.Viscosity, sauce.Thickness);
             foreach (FoodPiece p in Pieces)
             {
                 if (p.simPos.y > p.Radius * 1.6f) continue;
-                float take = coatPerMove * p.simVel.magnitude * dt * sauceAvail;
-                p.AddCoat(take, sauce.Color, sauce.Viscosity);
+                float take = coatPerMove * p.simVel.magnitude * dt * sauceAvail * Mathf.Lerp(0.6f, 1.6f, cling);
+                p.AddCoat(take, sauce.Color, cling);
                 used += take;
             }
-            sauce.Consume(used * 0.15f);
+            coatSauce.Add(sauce.Take(used * 0.15f)); // (moved onto the pieces - not lost, not counted twice)
         }
         foreach (FoodPiece p in Pieces) if (sauce == null || sauceAvail <= 0f) p.DripCoat(dt);
 
@@ -339,14 +528,16 @@ public class FoodPieceGroup : MonoBehaviour
             p.simPos.y = r;
             if (p.simVel.y < 0f) p.simVel.y *= -0.1f;
         }
-        float top = Mathf.Max(inside.rim - r, r);
+        // (a crowded bowl heaps up a little over its rim - held down in one layer
+        // they had no room, kept shoving each other and went round and round)
+        float top = Mathf.Max(inside.rim - r, r) + r * 3f;
         if (p.simPos.y > top)
         {
             p.simPos.y = top;
             if (p.simVel.y > 0f) p.simVel.y = 0f;
         }
         Vector2 flat = new Vector2(p.simPos.x, p.simPos.z);
-        float wall = Mathf.Max(inside.radius - r, 0.01f);
+        float wall = Mathf.Max(inside.radius - (flat.sqrMagnitude > 1e-6f ? p.ReachAlong(new Vector3(flat.x, 0f, flat.y).normalized) : r), 0.01f);
         if (flat.magnitude > wall)
         {
             Vector2 n = flat.normalized;
@@ -388,6 +579,15 @@ public class FoodPieceGroup : MonoBehaviour
                     a.simVel += imp;
                     b.simVel -= imp;
                 }
+                // pieces pressed together rub: drifting slowly, they slow each other
+                // down (no endless sliding round) - stirred or shaken, they fly on
+                if (!BeingWorked && a.simVel.sqrMagnitude < 0.0225f && b.simVel.sqrMagnitude < 0.0225f)
+                {
+                    a.simVel *= 0.9f;
+                    b.simVel *= 0.9f;
+                    a.simSpin *= 0.9f;
+                    b.simSpin *= 0.9f;
+                }
             }
         }
         foreach (FoodPiece p in Pieces) Contain(p);
@@ -409,17 +609,54 @@ public class FoodPieceGroup : MonoBehaviour
             p.simVel += tangent * stirImpulse * Random.Range(0.5f, 1.2f)
                       + new Vector3(Random.Range(-0.3f, 0.3f), Random.Range(0.4f, 1f), Random.Range(-0.3f, 0.3f)) * stirImpulse;
             p.simSpin += Random.onUnitSphere * Random.Range(4f, 10f);
+            // a soft piece (두부) wears with every stroke - more once it's hot and soft
+            if (p.SourceName == "두부")
+                p.AddDamage(softDamagePerStir * Random.Range(0.6f, 1.4f) * (p.Cook > 0f ? 1.3f : 1f));
             if (avail > 0f)
             {
                 // the ones at the bottom, in the sauce, get most; the rest a little
                 float touch = p.simPos.y <= p.Radius * 1.6f ? 1f : 0.3f;
                 float take = coatPerStir * avail * touch * Random.Range(0.4f, 1f);
-                p.AddCoat(take, sauce.Color, sauce.Viscosity);
+                p.AddCoat(take * Mathf.Lerp(0.6f, 1.6f, Mathf.Max(sauce.Viscosity, sauce.Thickness)), sauce.Color, Mathf.Max(sauce.Viscosity, sauce.Thickness));
                 used += take;
             }
         }
-        sauce?.Consume(used * 0.15f);
+        if (sauce != null) coatSauce.Add(sauce.Take(used * 0.15f));
     }
+
+    /// <summary>One moment of a hand working the meat in the bowl (MeatKneader):
+    /// the pieces near the hand are drawn in toward where it closes, pushed up
+    /// over each other and turned, each its own way; with lift, carried up with
+    /// the hand and turned over, to tumble back when it lets go. Nudged hard
+    /// enough to see, never flung - the bowl's walls still hold them.</summary>
+    public void KneadAt(Vector3 handWorld, Vector3 towardWorld, float reach, float strength, float lift = 0f)
+    {
+        if (simBowl == null) return;
+        workedUntil = Time.time + 0.5f;
+        Quaternion inv = Quaternion.Inverse(Frame(out _, out _));
+        Vector3 hand = inv * (handWorld - inside.floorCenter);
+        Vector3 to = inv * (towardWorld - inside.floorCenter);
+        foreach (FoodPiece p in Pieces)
+        {
+            Vector3 d = p.simPos - hand; d.y = 0f;
+            float near = 1f - d.magnitude / Mathf.Max(reach, 0.01f);
+            if (near <= 0f) continue;
+            Vector3 pull = to - p.simPos; pull.y = 0f;
+            Vector3 v = Vector3.ClampMagnitude(pull * 4f, 1f) * (strength * near);
+            // (squeezed up over the others / lifted with the hand - but never above the
+            // hand itself: it's in the hand, not riding on top of it)
+            float roof = hand.y - p.Radius;
+            if (p.simPos.y < roof) v.y += (0.6f + 1.4f * lift) * strength * near * Random.Range(0.5f, 1f);
+            else v.y = Mathf.Min(v.y, -0.3f * strength * near);
+            p.simVel = Vector3.ClampMagnitude(p.simVel + v, 1.2f);
+            p.simSpin += Random.onUnitSphere * ((8f + 10f * lift) * strength * near);
+        }
+    }
+
+    /// <summary>Being worked by hand right now (kneaded): left moving - not
+    /// slowed by rubbing or put to rest.</summary>
+    public bool BeingWorked => Time.time < workedUntil;
+    private float workedUntil;
 
     // ---- together ----
 
@@ -467,6 +704,17 @@ public class SaucePortion
     /// <summary>Per solid: how much of its colour and taste is in the liquid (0..1).</summary>
     public readonly Dictionary<string, float> infusion = new Dictionary<string, float>();
     public float heat;
+    /// <summary>How burnt the liquid is (0..1) - a solid fried in it too long
+    /// (고춧가루). It stays with the liquid wherever it goes, strained or not.</summary>
+    public float burn;
+    /// <summary>How much of its starch has thickened (0..1), and its clumps (0..1) - go with it.</summary>
+    public float gel, lumps;
+    /// <summary>Its temperature (°C) - heat (0..1) follows it (100 °C = 1, where water boils).</summary>
+    public float temp = 20f;
+    /// <summary>Water boiled off from it on the way (mL) - its share goes with it.</summary>
+    public float evaporatedMl;
+    /// <summary>What happened to it (e.g. why it clumped) - for the final evaluation.</summary>
+    public readonly HashSet<string> notes = new HashSet<string>();
 
     public float Amount { get { float a = 0f; foreach (float v in parts.Values) a += v; return a; } }
     public float LiquidAmount => Sum(false);
@@ -485,11 +733,14 @@ public class SaucePortion
     /// in proportion; what's taken keeps the heat and the infusion.</summary>
     public SaucePortion Take(float spoons, bool liquidOnly = false)
     {
-        var p = new SaucePortion { heat = heat };
+        var p = new SaucePortion { heat = heat, burn = burn, gel = gel, lumps = lumps, temp = temp };
         foreach (var kv in infusion) p.infusion[kv.Key] = kv.Value;
+        p.notes.UnionWith(notes);
         float pool = liquidOnly ? LiquidAmount : Amount;
         if (spoons <= 0f || pool <= 0f) return p;
         float k = Mathf.Min(1f, spoons / pool);
+        p.evaporatedMl = evaporatedMl * k;
+        evaporatedMl -= p.evaporatedMl;
         foreach (string key in new List<string>(parts.Keys))
         {
             if (liquidOnly && IsSolid(key)) continue;
@@ -508,6 +759,12 @@ public class SaucePortion
         if (p == null || p.Amount <= 0f) return;
         float a = Amount, b = p.Amount, la = LiquidAmount, lb = p.LiquidAmount;
         heat = a + b > 0f ? (heat * a + p.heat * b) / (a + b) : p.heat;
+        burn = la + lb > 0f ? (burn * la + p.burn * lb) / (la + lb) : Mathf.Max(burn, p.burn);
+        gel = a + b > 0f ? (gel * a + p.gel * b) / (a + b) : p.gel;
+        temp = a + b > 0f ? (temp * a + p.temp * b) / (a + b) : p.temp;
+        lumps = a + b > 0f ? (lumps * a + p.lumps * b) / (a + b) : p.lumps;
+        evaporatedMl += p.evaporatedMl;
+        notes.UnionWith(p.notes);
         var keys = new HashSet<string>(infusion.Keys);
         keys.UnionWith(p.infusion.Keys);
         foreach (string s in keys)
@@ -526,7 +783,8 @@ public class SaucePortion
     /// <summary>Just the solids of it, taken out (what a cloth keeps back).</summary>
     public SaucePortion TakeSolids()
     {
-        var p = new SaucePortion { heat = heat };
+        var p = new SaucePortion { heat = heat, burn = burn, gel = gel, lumps = lumps, temp = temp };
+        p.notes.UnionWith(notes);
         foreach (string key in new List<string>(parts.Keys))
             if (IsSolid(key)) { p.parts[key] = parts[key]; parts.Remove(key); }
         return p;
@@ -540,13 +798,28 @@ public class SaucePortion
     {
         get
         {
+            // Water is clear: it doesn't tint the sauce (its blue is only its
+            // own look in a bowl) - it thins the colour of what's in it toward
+            // a pale broth.
             Color c = Color.black;
-            float w = 0f;
+            float w = 0f, water = 0f;
             foreach (var kv in parts)
-                if (!IsSolid(kv.Key)) { c += Condiments.Get(kv.Key).color * kv.Value; w += kv.Value; }
-            Color liquid = w > 0f ? c / w : new Color(0.95f, 0.82f, 0.35f);
+            {
+                if (IsSolid(kv.Key)) continue;
+                if (kv.Key == Condiments.Water) { water += kv.Value; continue; }
+                c += Condiments.Get(kv.Key).color * kv.Value; w += kv.Value;
+            }
+            Color pale = new Color(0.93f, 0.9f, 0.84f);
+            Color liquid = w > 0f ? c / w : water > 0f ? pale : new Color(0.95f, 0.82f, 0.35f);
+            if (w > 0f && water > 0f)
+            {
+                // diluted: strongly coloured liquids (soy) still show through a lot of water
+                float share = water / (water + w);
+                liquid = Color.Lerp(liquid, pale, share * 0.75f);
+            }
             foreach (var kv in infusion)
                 liquid = Color.Lerp(liquid, Condiments.Get(kv.Key).color * 0.95f, kv.Value * 0.85f);
+            liquid = Color.Lerp(liquid, new Color(0.2f, 0.09f, 0.04f), burn * 0.8f); // burnt: dark
             liquid.a = 1f;
             return liquid;
         }
@@ -558,7 +831,7 @@ public class SaucePortion
     {
         get
         {
-            if (InfusionOf("고춧가루") >= 0.3f && parts.ContainsKey("식용유")) return "고추기름";
+            if (InfusionOf("고춧가루") >= 0.3f && parts.ContainsKey("식용유")) return burn >= 0.5f ? "탄 고추기름" : "고추기름";
             string best = null;
             float most = 0f;
             foreach (var kv in parts) if (!IsSolid(kv.Key) && kv.Value > most) { most = kv.Value; best = kv.Key; }
@@ -595,15 +868,67 @@ public class PanSauce : MonoBehaviour
     public Color LiquidColor => sauce.LiquidColor;
     public string LiquidName => sauce.LiquidName;
 
-    [Tooltip("Seconds on a strong flame from cold to full heat.")]
-    [SerializeField] private float heatSeconds = 30f;
-    [Tooltip("Seconds, hot, for a solid's colour and taste to go fully into the oil.")]
-    [SerializeField] private float infuseSeconds = 20f;
+    // ---- 온도 · 추출 · 탐 (a game model tuned by eye toward the test targets
+    // - cold wok, 30 mL oil, 1T 고춧가루: 약불 1~3분, 중불 30~90초, 강불 15~45초
+    // to colour, then overheating if it's kept on - not measured cooking data) ----
+
+    [Tooltip("Seconds-scale for what's in the pan to follow the pan's temperature: this + per mL below (30 mL oil ≈ 6 s, 1 L ≈ 2 min).")]
+    [SerializeField] private float contentTauBase = 2f;
+    [SerializeField] private float contentTauPerMl = 0.13f;
+    [Tooltip("Seconds-scale of what's in it losing heat to the air.")]
+    [SerializeField] private float contentLossTau = 240f;
+    [Tooltip("x: oil temperature °C → y: share of a solid's colour/taste drawn out per second.")]
+    [SerializeField] private AnimationCurve extractionPerSecondByTemp = new AnimationCurve(
+        new Keyframe(60f, 0f), new Keyframe(90f, 0.012f), new Keyframe(120f, 0.035f), new Keyframe(150f, 0.065f), new Keyframe(180f, 0.1f), new Keyframe(220f, 0.13f));
+    [Tooltip("x: the solid's own temperature °C (the oil's, plus the pan's bottom heat where it lies unstirred) → y: burnt per second.")]
+    [SerializeField] private AnimationCurve burnPerSecondByTemp = new AnimationCurve(
+        new Keyframe(185f, 0f), new Keyframe(205f, 0.006f), new Keyframe(225f, 0.018f), new Keyframe(250f, 0.04f), new Keyframe(280f, 0.09f), new Keyframe(330f, 0.22f));
+    [Tooltip("How much of the pan's bottom heat reaches a solid lying still (1) / being stirred.")]
+    [SerializeField] private float bottomContactStill = 1f, bottomContactStirred = 0.3f;
+    [Tooltip("Extra °C at a solid stuck to the hot bottom unstirred (local hot spot).")]
+    [SerializeField] private float stuckHotSpot = 15f;
+    [Tooltip("Seconds-scale for the solid itself to take on that temperature.")]
+    [SerializeField] private float solidTau = 4f;
+    private float solidTemp = 20f;
+    [SerializeField] private float smokeAboveBurnRate = 0.02f;
+
+    /// <summary>What's in the pan (°C) - its own, apart from the pan's.</summary>
+    public float Temperature => sauce.temp;
+    public float PanTemperature => VesselHeat.Of(bowl) is VesselHeat vh ? vh.PanTemp : sauce.temp;
+    /// <summary>Burnt per second right now (0 when it isn't catching).</summary>
+    public float BurnRate { get; private set; }
+
+    private float stirUntil;
+    private bool chiliBatch;   // (this pan's 고추기름 counted as a batch - ChiliOilLog)
+    private float unstirred;
+
+    /// <summary>How burnt (0..1) - stays with it, strained or not.</summary>
+    public float Burn => sauce.burn;
+
+    /// <summary>Stirred (the spatula): what's frying in it catches more slowly for a moment.</summary>
+    public void Stir()
+    {
+        stirUntil = Time.time + 1.5f;
+        pendingStarch = 0f;                       // (the starch just added: stirred through in time)
+        if (Lumps > 0f) Lumps = Mathf.Max(0f, Lumps - 0.04f); // a few clumps broken up
+        MixProgress = Mathf.Min(1f, MixProgress + mixPerStir);
+    }
+
+    [Tooltip("How far one stir mixes what was just added through (0..1).")]
+    [SerializeField] private float mixPerStir = 0.25f;
+
+    /// <summary>How evenly what's in it is mixed (0..1): something new added (a
+    /// sauce, 전분물) isn't, until it's stirred - or boiled a good while. The
+    /// starch thickens only as far as it's mixed through.</summary>
+    public float MixProgress { get; private set; } = 1f;
 
     private MovableBowl bowl;
     private GameObject pool;
     private float poolRadius = -1f;
     private Color poolColor;
+    private int poolLumps;
+    private bool poolThick;
+    private int poolBurnStep = -1;
 
     public static PanSauce Of(MovableBowl bowl, bool create)
     {
@@ -626,11 +951,83 @@ public class PanSauce : MonoBehaviour
     public void Add(string seasoning, float spoons = 1f)
     {
         Normalize();
+        // what goes in is at room temperature: it cools what's there by its share
+        if (Amount + spoons > 0f) sauce.temp = (sauce.temp * Amount + 20f * spoons) / (Amount + spoons);
+        // the new part isn't mixed in yet
+        if (Amount + spoons > 0f) MixProgress *= Amount / (Amount + spoons);
         sauce.parts.TryGetValue(seasoning, out float had);
         sauce.parts[seasoning] = had + spoons;
         Amount += spoons;
+        // Starch into a hot sauce: dry powder straight in clumps; 앙금녹말 has to
+        // be stirred through at once (within lumpWindowSeconds) or it clumps.
+        if (IsStarch(seasoning) && sauce.heat >= 0.5f)
+        {
+            StarchAddedHot++;
+            if (seasoning == DryStarch) AddLumps(0.6f * spoons / Mathf.Max(StarchSpoons, 0.01f), "마른 전분을 뜨거운 소스에 바로 넣음");
+            else { pendingStarch += spoons; pendingSince = Time.time; }
+        }
         Recompute();
-        Debug.Log($"[소스] {bowl.name}: {seasoning} +{spoons:0.#} (총 {Amount:0.#}스푼, 점성 {Viscosity:0.00})");
+        Debug.Log($"[소스] {bowl.name}: {seasoning} +{spoons * 15f:0}mL (총 {Amount * 15f:0}mL, 점성 {Viscosity:0.00})");
+    }
+
+    // ---- 농도 · 뭉침 · 졸이기 (recorded for the final evaluation; looks only, not physics) ----
+
+    [Tooltip("Seconds, hot, for the starch in it to thicken the sauce fully.")]
+    [SerializeField] private float gelSeconds = 20f;
+    [Tooltip("Starch added hot must be stirred within this many seconds, or it clumps.")]
+    [SerializeField] private float lumpWindowSeconds = 2.5f;
+    [Tooltip("Water boiled off per second on a strong flame, hot (mL) - 졸이기.")]
+    [SerializeField] private float evaporateMlPerSecond = 0.8f;
+    [Tooltip("How strongly gelled starch thickens the liquid (look tuning).")]
+    [SerializeField] private float thickenStrength = 2.5f;
+
+    private float pendingStarch, pendingSince;
+
+    /// <summary>How much of the starch in it has thickened (0..1) - kept in the sauce itself, so it goes with it.</summary>
+    public float Gel { get => sauce.gel; private set => sauce.gel = value; }
+    /// <summary>Clumps of starch in it (0..1) - stirring breaks a few up.</summary>
+    public float Lumps { get => sauce.lumps; private set => sauce.lumps = value; }
+    public int LumpEvents { get; private set; }
+    public int StarchAddedHot { get; private set; }
+    /// <summary>What happened to it on the way (why it clumped ...).</summary>
+    public IEnumerable<string> Notes => sauce.notes;
+    /// <summary>Water boiled off (mL).</summary>
+    public float EvaporatedMl { get => sauce.evaporatedMl; private set => sauce.evaporatedMl = value; }
+    public float SecondsOnFlame { get; private set; }
+
+    /// <summary>The three starches, told apart: dry powder (감자전분), drained 앙금 (앙금녹말), and the
+    /// starch of 전분물 (its water is kept as 물 - starch and water stored separately).</summary>
+    public const string DryStarch = "감자전분", Settled = "앙금녹말", SlurryStarch = "전분(전분물)";
+    public static bool IsStarch(string name) => name == Settled || name == DryStarch || name == SlurryStarch;
+
+    public float StarchSpoons
+    {
+        get { Normalize(); float s = 0f; foreach (var kv in sauce.parts) if (IsStarch(kv.Key)) s += kv.Value; return s; }
+    }
+
+    /// <summary>How thick the finished sauce is, 0 thin .. 1 set - its pastes
+    /// plus the starch that's thickened it (look tuning, not a rheology model).</summary>
+    public float Thickness =>
+        Mathf.Clamp01(Viscosity * 0.6f + Gel * thickenStrength * StarchSpoons / Mathf.Max(LiquidAmount, 0.5f));
+
+    private void AddLumps(float share, string cause)
+    {
+        Lumps = Mathf.Clamp01(Lumps + Mathf.Clamp01(share));
+        LumpEvents++;
+        sauce.notes.Add(cause);
+        Debug.Log($"[소스] {bowl.name}: 전분 뭉침 ({cause}) → {Lumps:0.00}");
+    }
+
+    /// <summary>Simulated taste balance, from what went in (spoonfuls, per
+    /// spoonful of liquid) - an estimate from the recipe data, not a taste.</summary>
+    public void TasteEstimate(out float sweet, out float sour, out float salty)
+    {
+        Normalize();
+        float Get(string n) => sauce.parts.TryGetValue(n, out float v) ? v : 0f;
+        float liquid = Mathf.Max(LiquidAmount, 0.5f);
+        sweet = (Get("설탕") + Get("케첩") * 0.3f) / liquid;
+        sour = (Get("식초") + Get("케첩") * 0.15f) / liquid;
+        salty = (Get("간장") + Get("소금") * 3f + Get("두반장") * 0.8f + Get("굴소스") * 0.6f + Get("춘장") * 0.7f) / liquid;
     }
 
     public void Consume(float spoons)
@@ -679,37 +1076,164 @@ public class PanSauce : MonoBehaviour
 
     void Update()
     {
-        if (bowl == null || Amount <= 0.001f) return;
+        if (bowl == null) return;
+        VesselHeat vh = VesselHeat.Of(bowl);
+        if (Amount <= 0.001f) { chiliBatch = false; unstirred = 0f; BurnRate = 0f; solidTemp = 20f; if (vh != null) vh.LoadMl = 0f; return; } // (emptied: a new batch next time)
         StoveBurner b = bowl.CurrentBurner;
         bool flame = !bowl.IsHeld && b != null && b.IsOn;
-        float rate = b == null ? 0f : b.Level == StoveBurner.FlameLevel.Strong ? 1f : b.Level == StoveBurner.FlameLevel.Medium ? 0.7f : 0.45f;
-        sauce.heat = flame ? Mathf.Min(1f, sauce.heat + Time.deltaTime * rate / Mathf.Max(heatSeconds, 0.1f))
-                           : Mathf.Max(0f, sauce.heat - Time.deltaTime / 180f);
+        float dt = SpeedMode.Wait(Time.deltaTime); // (빠른 모드: heating, thickening, boiling down go fast)
+        if (flame) SecondsOnFlame += dt;
+
+        // ---- temperature: what's in it follows the pan (its own heat: 예열/잔열 -
+        // VesselHeat), slower the more there is; with water in it, it boils at
+        // 100 °C and goes no higher - oil alone keeps rising with the pan ----
+        Normalize();
+        float ml = Amount * 15f;
+        float pan = vh != null ? vh.PanTemp : sauce.temp;
+        float room = vh != null ? vh.RoomTemp : 20f;
+        if (vh != null) vh.LoadMl = ml;
+        float tau = contentTauBase + contentTauPerMl * ml;
+        sauce.temp += ((pan - sauce.temp) / Mathf.Max(tau, 0.1f) - (sauce.temp - room) / Mathf.Max(contentLossTau, 1f)) * dt;
+        bool watery = HasWaterBasedLiquid();
+        if (watery && sauce.temp > 100f) sauce.temp = 100f;
+        sauce.heat = Mathf.Clamp01((sauce.temp - room) / (100f - room));
+        // boiling moves it about a little by itself (much slower than stirring)
+        if (sauce.temp >= 99f && MixProgress < 1f) MixProgress = Mathf.Min(1f, MixProgress + dt * 0.02f);
+
+        // starch left unstirred after going in hot: clumped
+        if (pendingStarch > 0f && Time.time - pendingSince > lumpWindowSeconds)
+        {
+            AddLumps(0.5f * pendingStarch / Mathf.Max(StarchSpoons, 0.01f), "전분을 넣은 뒤 바로 젓지 않음");
+            pendingStarch = 0f;
+        }
+        // hot, the starch thickens the sauce
+        if (sauce.heat >= 0.5f && Gel < 1f && sauce.parts.Keys.Count > 0)
+        {
+            bool anyStarch = false;
+            foreach (string k in sauce.parts.Keys) if (IsStarch(k)) { anyStarch = true; break; }
+            if (anyStarch)
+            {
+                float was = Gel;
+                // (only as far as it's mixed through - unmixed starch sits in clumps)
+                Gel = Mathf.Min(1f, Gel + dt * sauce.heat * Mathf.Lerp(0.2f, 1f, MixProgress) / Mathf.Max(gelSeconds, 0.1f));
+                if (Mathf.FloorToInt(Gel * 10f) != Mathf.FloorToInt(was * 10f)) Recompute();
+            }
+        }
+        // 졸이기: boiling, the water goes off - faster the hotter the pan under it
+        if (watery && sauce.temp >= 99f && sauce.parts.TryGetValue(Condiments.Water, out float water) && water > 0f)
+        {
+            float push = Mathf.Clamp01((pan - 100f) / 150f);
+            float off = Mathf.Min(water, dt * push * evaporateMlPerSecond / 15f);
+            sauce.parts[Condiments.Water] = water - off;
+            if (sauce.parts[Condiments.Water] <= 1e-5f) sauce.parts.Remove(Condiments.Water);
+            Amount = Mathf.Max(0f, Amount - off);
+            EvaporatedMl += off * 15f;
+        }
         // Cooking hot on the flame spatters the burner's floor (under its grate):
         // oil (with only 식용유 for liquid - frying, 고추기름) or a sauce.
         if (flame && sauce.heat > 0.3f)
-        {
-            bool sauceLike = false;
-            foreach (string key in sauce.parts.Keys)
-                if (!SaucePortion.IsSolid(key) && key != "식용유") { sauceLike = true; break; }
-            BurnerFloorDirt.Soil(b, sauceLike ? BurnerFloorDirt.SoilKind.Sauce : BurnerFloorDirt.SoilKind.Oil, Time.deltaTime);
-        }
+            BurnerFloorDirt.Soil(b, watery ? BurnerFloorDirt.SoilKind.Sauce : BurnerFloorDirt.SoilKind.Oil, dt);
 
-        // Hot oil draws the colour and taste out of a solid in it.
-        if (sauce.heat < 0.35f || sauce.LiquidAmount <= 0.01f) return;
+        if (sauce.LiquidAmount <= 0.01f || sauce.SolidAmount <= 0.001f) { BurnRate = 0f; return; }
         bool changed = false;
-        foreach (string key in new List<string>(sauce.parts.Keys))
+
+        // ---- a solid in the hot liquid: its colour/taste drawn out (by the
+        // liquid's temperature) - and, past that, catching (by the solid's own
+        // temperature: lying still on the hot bottom it's hotter than the oil;
+        // stirred, nearer the oil's - stirring slows it, never stops it). Burnt
+        // stays burnt - stirring or cooling never undoes it. ----
+        bool stirring = Time.time < stirUntil;
+        float contact = stirring ? bottomContactStirred : bottomContactStill;
+        float towards = sauce.temp + contact * (Mathf.Max(0f, pan - sauce.temp) + stuckHotSpot);
+        solidTemp += (towards - solidTemp) * Mathf.Clamp01(dt / Mathf.Max(solidTau, 0.05f));
+        BurnRate = watery || SpeedMode.On ? 0f : Mathf.Max(0f, burnPerSecondByTemp.Evaluate(solidTemp)); // (빠른 모드: nothing burns)
+        bool chili = sauce.parts.ContainsKey("식용유") && sauce.parts.ContainsKey("고춧가루");
+        if (chili && sauce.temp >= 100f)
         {
-            if (!SaucePortion.IsSolid(key)) continue;
-            float had = sauce.InfusionOf(key);
-            if (had >= 1f) continue;
-            float strength = Mathf.Min(1f, sauce.parts[key] / (sauce.LiquidAmount * 0.25f));
-            float now = Mathf.Min(1f, had + Time.deltaTime * sauce.heat * strength / Mathf.Max(infuseSeconds, 0.1f));
-            sauce.infusion[key] = now;
-            if (Mathf.FloorToInt(now * 20f) != Mathf.FloorToInt(had * 20f)) changed = true;
-            if (now >= 0.3f && had < 0.3f) Debug.Log($"[고추기름] {bowl.name}: 기름에 {key} 색·맛이 우러남");
+            // (recorded for the final evaluation - nothing shown now)
+            if (!chiliBatch) { chiliBatch = true; ChiliOilLog.Batches++; }
+            ChiliOilLog.HotSeconds += dt;
+            if (stirring) { ChiliOilLog.StirredSeconds += dt; unstirred = 0f; }
+            else { unstirred += dt; ChiliOilLog.LongestUnstirred = Mathf.Max(ChiliOilLog.LongestUnstirred, unstirred); }
         }
+        if (BurnRate > 0f && sauce.burn < 1f)
+        {
+            float had = sauce.burn;
+            sauce.burn = Mathf.Min(1f, had + BurnRate * dt);
+            if (chili)
+            {
+                ChiliOilLog.BurningSeconds += dt;
+                ChiliOilLog.MaxBurn = Mathf.Max(ChiliOilLog.MaxBurn, sauce.burn);
+            }
+            if (Mathf.FloorToInt(sauce.burn * 20f) != Mathf.FloorToInt(had * 20f)) changed = true;
+            if (had < 0.5f && sauce.burn >= 0.5f) { sauce.notes.Add("고춧가루를 기름에 오래 볶아 탐"); Debug.Log($"[고추기름] {bowl.name}: 탐 (걸러도 탄 맛·색은 남아요)"); }
+        }
+        float extract = watery ? 0f : Mathf.Max(0f, extractionPerSecondByTemp.Evaluate(sauce.temp));
+        if (extract > 0f)
+            foreach (string key in new List<string>(sauce.parts.Keys))
+            {
+                if (!SaucePortion.IsSolid(key)) continue;
+                float had = sauce.InfusionOf(key);
+                if (had >= 1f) continue;
+                float strength = Mathf.Min(1f, sauce.parts[key] / (sauce.LiquidAmount * 0.25f));
+                float now = Mathf.Min(1f, had + dt * extract * strength);
+                sauce.infusion[key] = now;
+                if (Mathf.FloorToInt(now * 20f) != Mathf.FloorToInt(had * 20f)) changed = true;
+                if (now >= 0.3f && had < 0.3f) Debug.Log($"[고추기름] {bowl.name}: 기름에 {key} 색·맛이 우러남 ({sauce.temp:0}°C)");
+            }
         if (changed) Recompute();
+        UpdateSmoke();
+    }
+
+    /// <summary>Water, soy sauce, vinegar ... in it (it boils at 100 °C) - not
+    /// only oil (식용유, 참기름, 고추기름: on up with the pan).</summary>
+    /// <summary>Has water, soy sauce, vinegar ... in it - boils at 100 °C (no searing in it).</summary>
+    public bool IsWatery => HasWaterBasedLiquid();
+
+    private bool HasWaterBasedLiquid()
+    {
+        foreach (var kv in sauce.parts)
+        {
+            if (kv.Value <= 0.001f || SaucePortion.IsSolid(kv.Key)) continue;
+            string k = kv.Key;
+            if (k == "식용유" || k == "참기름" || k.Contains("고추기름")) continue;
+            if (Condiments.Get(k).form == CondimentForm.Liquid) return true;
+        }
+        return false;
+    }
+
+    // ---- 연기: burning hot, a little smoke off it ----
+    private float nextSmoke;
+
+    private void UpdateSmoke()
+    {
+        if (BurnRate < smokeAboveBurnRate || Time.time < nextSmoke) return;
+        nextSmoke = Time.time + Mathf.Lerp(0.6f, 0.15f, Mathf.Clamp01(BurnRate / 0.2f));
+        StartCoroutine(Puff());
+    }
+
+    private System.Collections.IEnumerator Puff()
+    {
+        MovableBowl.Interior inside = bowl.GetInterior();
+        Vector3 from = inside.floorCenter + inside.up * inside.rim + new Vector3(Random.Range(-1f, 1f) * inside.radius * 0.5f, 0f, -0.3f);
+        GameObject g = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        g.name = "Smoke";
+        Destroy(g.GetComponent<Collider>());
+        var m = new Material(Shader.Find("Sprites/Default")) { color = new Color(0.55f, 0.55f, 0.55f, 0.35f) };
+        Renderer r = g.GetComponent<Renderer>();
+        r.sharedMaterial = m;
+        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        const float life = 1.6f;
+        for (float t = 0f; t < life; t += Time.deltaTime)
+        {
+            float k = t / life;
+            g.transform.position = from + Vector3.up * (k * 0.9f) + Vector3.right * Mathf.Sin(k * 6f) * 0.05f;
+            g.transform.localScale = Vector3.one * Mathf.Lerp(0.08f, 0.3f, k);
+            m.color = new Color(0.55f, 0.55f, 0.55f, 0.35f * (1f - k));
+            yield return null;
+        }
+        Destroy(g);
+        Destroy(m);
     }
 
     private void Recompute()
@@ -723,11 +1247,20 @@ public class PanSauce : MonoBehaviour
             // Powders color less than pastes and liquids do; a liquid shows as
             // the liquid it's become (oil gone red).
             float weight = kv.Value * (info.form == CondimentForm.Powder ? 0.5f : 1f);
-            c += (info.form == CondimentForm.Liquid ? liquid : info.color) * weight;
+            // a solid fried too hot goes brown, then black - not just a deeper red
+            Color own = info.form == CondimentForm.Powder ? BurntSolid(info.color, sauce.burn) : info.color;
+            c += (info.form == CondimentForm.Liquid ? liquid : own) * weight;
             visc += weight * (info.form == CondimentForm.Paste ? 0.9f : info.form == CondimentForm.Powder ? 0.5f : 0.15f);
             w += weight;
         }
         if (w > 0f) { Color c2 = c / w; c2.a = 1f; Color = c2; Viscosity = visc / w; }
+    }
+
+    /// <summary>A solid's colour as it burns: its own → brown → near black.</summary>
+    private static Color BurntSolid(Color own, float burn)
+    {
+        Color brown = new Color(0.36f, 0.18f, 0.08f), black = new Color(0.08f, 0.06f, 0.05f);
+        return burn < 0.6f ? Color.Lerp(own, brown, burn / 0.6f) : Color.Lerp(brown, black, (burn - 0.6f) / 0.4f);
     }
 
     void LateUpdate()
@@ -745,21 +1278,97 @@ public class PanSauce : MonoBehaviour
             if (pool != null) { Destroy(pool); pool = null; poolRadius = -1f; }
             return;
         }
-        if (pool == null || Mathf.Abs(r - poolRadius) > poolRadius * 0.08f || !SameColor(poolColor, Color))
+        int lumpCount = Mathf.RoundToInt(Lumps * 10f);
+        bool thick = Thickness > 0.55f;
+        bool tooThick = Thickness > 0.85f;
+        int burnStep = Mathf.FloorToInt(sauce.burn * 10f) + (tooThick ? 100 : 0);
+        if (pool == null || Mathf.Abs(r - poolRadius) > poolRadius * 0.08f || !SameColor(poolColor, Color) || lumpCount != poolLumps || thick != poolThick
+            || burnStep != poolBurnStep)
         {
+            poolBurnStep = burnStep;
             if (pool != null) Destroy(pool);
             pool = new GameObject("PanSauce");
             pool.transform.SetParent(transform, true);
             Condiments.BuildContent(pool.transform, Vector3.zero, Vector3.up, r,
-                Viscosity > 0.55f ? CondimentForm.Paste : CondimentForm.Liquid, Color, "Pool");
+                thick ? CondimentForm.Paste : CondimentForm.Liquid, Color, "Pool");
             // the paste's dollop flattened into a spread-out sauce
             foreach (Transform t in pool.GetComponentsInChildren<Transform>())
                 if (t.name != "PanSauce" && t.name != "Pool") t.localScale = Vector3.Scale(t.localScale, new Vector3(1f, 0.25f, 1f));
+            // clumps of starch showing in it
+            for (int i = 0; i < lumpCount; i++)
+            {
+                float a = i * 2.39996f, d = r * 0.75f * Mathf.Sqrt((i + 0.5f) / Mathf.Max(lumpCount, 1));
+                Condiments.BuildContent(pool.transform, new Vector3(Mathf.Cos(a) * d, r * 0.04f, Mathf.Sin(a) * d), Vector3.up,
+                    r * 0.09f, CondimentForm.Powder, Color.Lerp(Color, new Color(0.95f, 0.94f, 0.9f), 0.6f), "Lump");
+            }
+            // the solids (고춧가루) as grains in the oil: red - some brown, then
+            // black ones, the more it's burnt
+            if (sauce.SolidAmount > 0.001f && !HasWaterBasedLiquid())
+            {
+                const int grains = 14;
+                int dark = Mathf.RoundToInt(Mathf.Clamp01(sauce.burn) * grains);
+                Color solid = Color.red;
+                foreach (var kv in sauce.parts) if (SaucePortion.IsSolid(kv.Key)) { solid = Condiments.Get(kv.Key).color; break; }
+                for (int i = 0; i < grains; i++)
+                {
+                    float a = i * 2.39996f + 0.7f, d = r * 0.8f * Mathf.Sqrt((i + 0.5f) / grains);
+                    Color gc = i < dark ? BurntSolid(solid, Mathf.Min(1f, sauce.burn + 0.25f)) : BurntSolid(solid, sauce.burn * 0.3f);
+                    Condiments.BuildContent(pool.transform, new Vector3(Mathf.Cos(a) * d, r * 0.03f, Mathf.Sin(a) * d), Vector3.up,
+                        r * 0.06f, CondimentForm.Powder, gc, "Grain");
+                }
+            }
+            // too thick: it sits in heavy mounds instead of spreading
+            if (tooThick)
+                for (int i = 0; i < 4; i++)
+                {
+                    float a = i * 1.7f + 0.4f, d = r * 0.45f;
+                    Condiments.BuildContent(pool.transform, new Vector3(Mathf.Cos(a) * d, r * 0.05f, Mathf.Sin(a) * d), Vector3.up,
+                        r * 0.32f, CondimentForm.Paste, Color * 0.95f, "Mound");
+                }
             poolRadius = r;
             poolColor = Color;
+            poolLumps = lumpCount;
+            poolThick = thick;
         }
+        // Tipped, the sauce runs to the low side - quickly when thin, slowly when
+        // thick, hardly at all when it's set (a look, not a fluid simulation).
+        Vector3 downhill = Vector3.ProjectOnPlane(-Carryable.CounterUp, inside.up);
+        float tilt = Mathf.Clamp01(downhill.magnitude * 3f);
+        Vector3 target = level || tilt < 0.05f ? Vector3.zero : downhill.normalized * inside.radius * 0.45f * tilt;
+        float speed = Mathf.Lerp(6f, 0.25f, Mathf.Clamp01(Thickness));
+        poolShift = Vector3.Lerp(poolShift, target, Mathf.Clamp01(Time.deltaTime * speed));
         float height = level ? inside.rim * fill * 0.92f : 0.004f;
-        pool.transform.SetPositionAndRotation(inside.floorCenter + inside.up * Mathf.Max(height, 0.004f), Quaternion.FromToRotation(Vector3.up, inside.up));
+        pool.transform.SetPositionAndRotation(inside.floorCenter + poolShift + inside.up * Mathf.Max(height, 0.004f), Quaternion.FromToRotation(Vector3.up, inside.up));
+    }
+
+    private Vector3 poolShift;
+
+    /// <summary>A drop off the spatula after a stir: a thin sauce runs straight
+    /// off, a thick one hangs a while and falls slowly.</summary>
+    public void DripFrom(Vector3 from)
+    {
+        if (Amount <= 0.01f) return;
+        StartCoroutine(Drip(from));
+    }
+
+    private System.Collections.IEnumerator Drip(Vector3 from)
+    {
+        MovableBowl.Interior inside = bowl.GetInterior();
+        Vector3 to = inside.floorCenter + inside.up * inside.rim * 0.15f;
+        GameObject drop = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        drop.name = "SauceDrip";
+        Destroy(drop.GetComponent<Collider>());
+        float th = Mathf.Clamp01(Thickness);
+        float s = Mathf.Lerp(0.025f, 0.05f, th);
+        drop.transform.localScale = new Vector3(s, s * Mathf.Lerp(1.7f, 1.1f, th), s);
+        var m = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard")) { color = Color };
+        if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", Mathf.Lerp(0.6f, 0.9f, th));
+        drop.GetComponent<Renderer>().sharedMaterial = m;
+        float hang = Mathf.Lerp(0f, 0.8f, th), fall = Mathf.Lerp(0.2f, 1.1f, th);
+        for (float t = 0f; t < hang; t += Time.deltaTime) { drop.transform.position = from; yield return null; }
+        for (float t = 0f; t < fall; t += Time.deltaTime) { float k = t / fall; drop.transform.position = Vector3.Lerp(from, to, k * k); yield return null; }
+        Destroy(drop);
+        Destroy(m);
     }
 
     private static bool SameColor(Color a, Color b) =>

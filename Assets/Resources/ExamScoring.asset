@@ -1,0 +1,421 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e507c533920b3924dbd5652d82913be9, type: 3}
+  m_Name: ExamScoring
+  m_EditorClassIdentifier: Assembly-CSharp::ExamScoring
+  totalScore: 100
+  passScore: 60
+  rules:
+  - id: mapo.doneness
+    dish: "\uB9C8\uD30C\uB450\uBD80"
+    title: "\uC8FC\uC7AC\uB8CC \uC775\uD798"
+    metric: "CookableItem \uB2E8\uACC4: 0 \uB0A0\uAC83, 0.5 \uB35C \uC775\uC74C,
+      1 \uC775\uC74C, 2 \uD0D0/\uACFC\uC870\uB9AC"
+    hasRange: 1
+    okMin: 1
+    okMax: 1
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uAC00\uC6B4\uB370\uAE4C\uC9C0 \uC775\uC744 \uB54C\uAE4C\uC9C0 \uAC00\uC5F4\uD558\uACE0,
+      \uBC14\uB2E5\uC5D0 \uB20C\uC5B4\uBD99\uC9C0 \uC54A\uAC8C \uC800\uC5B4 \uC8FC\uC138\uC694."
+  - id: tangsuyuk.doneness
+    dish: "\uD0D5\uC218\uC721"
+    title: "\uC8FC\uC7AC\uB8CC \uC775\uD798"
+    metric: "CookableItem \uB2E8\uACC4: 0 \uB0A0\uAC83, 0.5 \uB35C \uC775\uC74C,
+      1 \uC775\uC74C, 2 \uD0D0/\uACFC\uC870\uB9AC"
+    hasRange: 1
+    okMin: 1
+    okMax: 1
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uAC00\uC6B4\uB370\uAE4C\uC9C0 \uC775\uC744 \uB54C\uAE4C\uC9C0 \uAC00\uC5F4\uD558\uACE0,
+      \uBC14\uB2E5\uC5D0 \uB20C\uC5B4\uBD99\uC9C0 \uC54A\uAC8C \uC800\uC5B4 \uC8FC\uC138\uC694."
+  - id: tangsuyuk.batter.mix
+    dish: "\uD0D5\uC218\uC721"
+    title: "\uD280\uAE40\uC637 \uBC30\uD569"
+    metric: "\uB4F1\uB85D\uB41C \uBC30\uD569\uACFC\uC758 \uC77C\uCE58 (CookingRecipe.batterMixes)"
+    hasRange: 0
+    okMin: -Infinity
+    okMax: Infinity
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uAE30\uC900 \uBBF8\uC124\uC815"
+    tip: "\uC559\uAE08\uB179\uB9D0\uACFC \uD770\uC790\uB97C \uC815\uB7C9\uC73C\uB85C
+      \uACC4\uB7C9\uD558\uC138\uC694."
+  - id: tangsuyuk.batter.drained
+    dish: "\uD0D5\uC218\uC721"
+    title: "\uC559\uAE08 \uC717\uBB3C \uC81C\uAC70"
+    metric: "BatterCoating.WetSettledMl (\uC717\uBB3C \uC548 \uBC84\uB9B0 \uC559\uAE08
+      mL)"
+    hasRange: 1
+    okMin: -Infinity
+    okMax: 0.01
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uC0AC\uC6A9\uC790 \uC694\uCCAD: \uC717\uBB3C \uC548 \uBC84\uB9B0
+      \uC559\uAE08 \uC0AC\uC6A9\uC740 \uAC10\uC810 \uC0AC\uD56D (\uBC30\uC810 \uBBF8\uC815)"
+    tip: "\uC559\uAE08\uC774 \uAC00\uB77C\uC549\uC73C\uBA74 \uC717\uBB3C\uC744 \uB530\uB77C
+      \uBC84\uB9B0 \uB4A4 \uC559\uAE08\uB9CC \uB5A0\uC11C \uC4F0\uC138\uC694."
+  - id: tangsuyuk.batter.coat
+    dish: "\uD0D5\uC218\uC721"
+    title: "\uD280\uAE40\uC637 \uCF54\uD305\uB7C9"
+    metric: BatterCoating.Thickness (0..1)
+    hasRange: 1
+    okMin: 0.3
+    okMax: 0.85
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uC559\uAE08\uB179\uB9D0\uACFC \uD770\uC790\uC758 \uC591\uC744 \uACE0\uAE30
+      \uC591\uC5D0 \uB9DE\uCDB0 \uACC4\uB7C9\uD558\uACE0, \uB123\uC740 \uB4A4 \uCDA9\uBD84\uD788
+      \uBC84\uBB34\uB9AC\uC138\uC694."
+  - id: tangsuyuk.batter.even
+    dish: "\uD0D5\uC218\uC721"
+    title: "\uD280\uAE40\uC637 \uADE0\uC77C\uB3C4 (\uBC84\uBB34\uB9BC)"
+    metric: BatterCoating.MixProgress (0..1)
+    hasRange: 1
+    okMin: 0.95
+    okMax: Infinity
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uC7AC\uB8CC\uB97C \uBAA8\uB450 \uB123\uC740 \uB4A4 \uACE0\uAE30 \uC804\uCCB4\uC5D0
+      \uACE0\uB8E8 \uBB3B\uC744 \uB54C\uAE4C\uC9C0 \uBC84\uBB34\uB9AC\uC138\uC694."
+  - id: tangsuyuk.batter.retention
+    dish: "\uD0D5\uC218\uC721"
+    title: "\uD280\uAE34 \uB4A4 \uD280\uAE40\uC637 \uC720\uC9C0"
+    metric: "BatterCoating.Retention (0..1, \uCD94\uC815)"
+    hasRange: 1
+    okMin: 0.7
+    okMax: Infinity
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uAE30\uB984 \uC628\uB3C4\uB97C \uD655\uC778\uD55C \uB4A4 \uB123\uACE0,
+      \uD280\uAE40\uC637 \uB18D\uB3C4\uB97C \uB9DE\uCD94\uC138\uC694."
+  - id: tangsuyuk.sauce.thickness
+    dish: "\uD0D5\uC218\uC721"
+    title: "\uC18C\uC2A4 \uB18D\uB3C4"
+    metric: PanSauce.Thickness (0..1)
+    hasRange: 1
+    okMin: 0.35
+    okMax: 0.8
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uC804\uBD84 \uD22C\uC785\uB7C9\uACFC \uD22C\uC785 \uD6C4 \uC11E\uB294
+      \uACFC\uC815, \uC878\uC774\uB294 \uC2DC\uAC04\uC744 \uD655\uC778\uD558\uC138\uC694."
+  - id: tangsuyuk.sauce.lumps
+    dish: "\uD0D5\uC218\uC721"
+    title: "\uC804\uBD84 \uBB49\uCE68"
+    metric: PanSauce.Lumps (0..1)
+    hasRange: 1
+    okMin: -Infinity
+    okMax: 0.1
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uC804\uBD84\uC740 \uBB3C\uC5D0 \uD480\uC5B4 \uB123\uACE0, \uB123\uB294
+      \uC989\uC2DC \uC800\uC5B4 \uC8FC\uC138\uC694."
+  - id: tangsuyuk.sauce.color
+    dish: "\uD0D5\uC218\uC721"
+    title: "\uC18C\uC2A4 \uC0C9"
+    metric: "max(\uC5B4\uB450\uC6C0, \uD0C4 \uC815\uB3C4) (0..1)"
+    hasRange: 1
+    okMin: -Infinity
+    okMax: 0.75
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uAC04\uC7A5 \uC591\uACFC \uAC00\uC5F4 \uC2DC\uAC04\uC744 \uD655\uC778\uD558\uC138\uC694."
+  - id: tangsuyuk.sauce.taste
+    dish: "\uD0D5\uC218\uC721"
+    title: "\uB9DB \uADE0\uD615 (\uC2DC\uBBAC\uB808\uC774\uC158 \uCD94\uC815)"
+    metric: "PanSauce.TasteEstimate - \uAE30\uC900 \uBC30\uD569 \uAC80\uC99D \uC804"
+    hasRange: 0
+    okMin: -Infinity
+    okMax: Infinity
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uAE30\uC900 \uBBF8\uC124\uC815"
+    tip: 
+  - id: mapo.chilioil.burn
+    dish: "\uB9C8\uD30C\uB450\uBD80"
+    title: "\uACE0\uCD94\uAE30\uB984 (\uD0C4 \uC815\uB3C4 \xB7 \uC0AC\uC6A9 \uC5EC\uBD80)"
+    metric: "\uC644\uC131 \uC18C\uC2A4 PanSauce.Burn (0..1)"
+    hasRange: 1
+    okMin: -Infinity
+    okMax: 0.3
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uACE0\uCDA7\uAC00\uB8E8\uB294 \uC57D\uD55C \uBD88\uC5D0\uC11C \uC800\uC5B4
+      \uAC00\uBA70 \uBCF6\uACE0, \uD0D4\uB2E4\uBA74 \uBC84\uB9AC\uACE0 \uB2E4\uC2DC
+      \uB9CC\uB4DC\uC138\uC694."
+  - id: mapo.chilioil.stir
+    dish: "\uB9C8\uD30C\uB450\uBD80"
+    title: "\uACE0\uCD94\uAE30\uB984 \uBCF6\uAE30 - \uC813\uAE30 (\uC870\uB9AC\uACFC\uC815)"
+    metric: "ChiliOilLog.StirredShare (\uBCF6\uB294 \uC2DC\uAC04 \uC911 \uC800\uC740
+      \uBE44\uC728)"
+    hasRange: 1
+    okMin: 0.5
+    okMax: Infinity
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uAE30\uB984\uACFC \uACE0\uCDA7\uAC00\uB8E8\uB97C \uB123\uC73C\uBA74 \uBD88
+      \uC606\uC744 \uB5A0\uB098\uC9C0 \uB9D0\uACE0 \uC8FC\uAC71\uC73C\uB85C \uACC4\uC18D
+      \uC800\uC73C\uC138\uC694."
+  - id: mapo.chilioil.overheat
+    dish: "\uB9C8\uD30C\uB450\uBD80"
+    title: "\uACE0\uCD94\uAE30\uB984 \uACFC\uC5F4 \xB7 \uD0D0 (\uC548\uC804)"
+    metric: "ChiliOilLog.MaxBurn (\uBAA8\uB4E0 \uD68C\uCC28 \uC911 \uCD5C\uB300 \uD0C4
+      \uC815\uB3C4 0..1)"
+    hasRange: 1
+    okMin: -Infinity
+    okMax: 0.3
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uC57D\uBD88\uC5D0\uC11C \uC800\uC5B4 \uAC00\uBA70 \uBCF6\uACE0, \uACE0\uCDA7\uAC00\uB8E8
+      \uC0C9\uC774 \uC6B0\uB7EC\uB098\uBA74 \uBC14\uB85C \uBD88\uC744 \uB044\uACE0
+      \uAC70\uB974\uC138\uC694."
+  - id: mapo.chilioil.strain
+    dish: "\uB9C8\uD30C\uB450\uBD80"
+    title: "\uACE0\uCD94\uAE30\uB984 \uBA74\uBCF4 \uAC70\uB974\uAE30 (\uC870\uB9AC\uACFC\uC815)"
+    metric: "ChiliOilLog.StrainedSpoons > 0 \u2192 1"
+    hasRange: 1
+    okMin: 1
+    okMax: Infinity
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uBCF6\uC740 \uAE30\uB984\uC740 \uBA74\uBCF4\uB97C \uAE50 \uBCFC\uC5D0
+      \uBD80\uC5B4 \uACE0\uCDA7\uAC00\uB8E8\uB97C \uAC78\uB7EC\uB0B4\uC138\uC694."
+  - id: mapo.sauce.thickness
+    dish: "\uB9C8\uD30C\uB450\uBD80"
+    title: "\uC18C\uC2A4 \uB18D\uB3C4"
+    metric: PanSauce.Thickness (0..1)
+    hasRange: 1
+    okMin: 0.35
+    okMax: 0.85
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uC804\uBD84\uBB3C \uC591\uACFC \uB123\uC740 \uB4A4 \uC11E\uB294 \uACFC\uC815,
+      \uC878\uC774\uB294 \uC2DC\uAC04\uC744 \uD655\uC778\uD558\uC138\uC694."
+  - id: mapo.sauce.lumps
+    dish: "\uB9C8\uD30C\uB450\uBD80"
+    title: "\uC804\uBD84 \uBB49\uCE68"
+    metric: PanSauce.Lumps (0..1)
+    hasRange: 1
+    okMin: -Infinity
+    okMax: 0.1
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uC804\uBD84\uC740 \uBB3C\uC5D0 \uD480\uC5B4 \uB123\uACE0, \uB123\uB294
+      \uC989\uC2DC \uC800\uC5B4 \uC8FC\uC138\uC694."
+  - id: mapo.sauce.color
+    dish: "\uB9C8\uD30C\uB450\uBD80"
+    title: "\uC18C\uC2A4 \uC0C9"
+    metric: "max(\uC5B4\uB450\uC6C0, \uD0C4 \uC815\uB3C4) (0..1)"
+    hasRange: 1
+    okMin: -Infinity
+    okMax: 0.88
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uC7A5\uB958 \uC591\uACFC \uAC00\uC5F4 \uC2DC\uAC04\uC744 \uD655\uC778\uD558\uC138\uC694."
+  - id: mapo.sauce.taste
+    dish: "\uB9C8\uD30C\uB450\uBD80"
+    title: "\uB9DB \uADE0\uD615 (\uC2DC\uBBAC\uB808\uC774\uC158 \uCD94\uC815)"
+    metric: "PanSauce.TasteEstimate - \uAE30\uC900 \uBC30\uD569 \uBBF8\uC124\uC815"
+    hasRange: 0
+    okMin: -Infinity
+    okMax: Infinity
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uAE30\uC900 \uBBF8\uC124\uC815"
+    tip: 
+  - id: mapo.tofu.shape
+    dish: "\uB9C8\uD30C\uB450\uBD80"
+    title: "\uB450\uBD80 \uD615\uD0DC \uC720\uC9C0"
+    metric: "\uB450\uBD80 \uC870\uAC01 \uD3C9\uADE0 FoodPiece.Damage (0..1)"
+    hasRange: 1
+    okMin: -Infinity
+    okMax: 0.4
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uB450\uBD80\uB97C \uB123\uC740 \uB4A4\uC5D0\uB294 \uC8FC\uAC71\uC73C\uB85C
+      \uC138\uAC8C \uC813\uC9C0 \uB9D0\uACE0 \uD32C\uC744 \uD754\uB4E4\uC5B4 \uC11E\uC73C\uC138\uC694."
+  - id: cleanup.burnerfloor
+    dish: "\uC815\uB9AC \xB7 \uC704\uC0DD"
+    title: "\uD654\uAD6C \uBC1B\uCE68 \uC544\uB798 \uCCAD\uC18C"
+    metric: "BurnerFloorDirt.DirtLeft (\uB0A8\uC740 \uC5BC\uB8E9 \uD569, 1 = \uC5BC\uB8E9
+      \uD558\uB098)"
+    hasRange: 1
+    okMin: -Infinity
+    okMax: 0.25
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uC815\uB9AC \uB54C \uBC1B\uCE68\uC744 \uBE7C\uACE0 \uC544\uB798\uB97C
+      \uB2E6\uC740 \uB4A4, \uB2E4\uC2DC \uC870\uB9AC\uD558\uC9C0 \uB9D0\uACE0 \uC81C\uCD9C\uD558\uC138\uC694."
+  - id: cleanup.surfaces
+    dish: "\uC815\uB9AC \xB7 \uC704\uC0DD"
+    title: "\uC870\uB9AC\uB300 \xB7 \uAC1C\uC218\uB300 \uC5BC\uB8E9"
+    metric: "WipeableSurface.DirtLeft \uD569"
+    hasRange: 1
+    okMin: -Infinity
+    okMax: 0.5
+    rangeVerified: 0
+    official: 0
+    points: 0
+    pointsVerified: 0
+    evidence: "\uD29C\uB2DD\uAC12 - \uAC80\uC99D \uC804 (\uC5F0\uC2B5 \uD53C\uB4DC\uBC31
+      \uC804\uC6A9)"
+    tip: "\uC815\uB9AC \uB54C \uD589\uC8FC\uB85C \uC870\uB9AC\uB300\uC640 \uAC1C\uC218\uB300
+      \uC8FC\uBCC0\uC744 \uB2E6\uC73C\uC138\uC694."
+  - id: "record.\uC548\uC804.\uCE7C\uC774 \uB193\uC778 \uB3C4\uB9C8\uB97C \uB4E4\uC5B4
+      \uC62C\uB824 \uCE7C\uC774 \uB5A8\uC5B4\uC84C\uC2B5\uB2C8\uB2E4."
+    dish: "\uC815\uB9AC"
+    title: "\uC548\uC804 - \uCE7C \uB099\uD558 (\uD070 \uAC10\uC810)"
+    metric: "\uCE7C\uC774 \uB193\uC778 \uB3C4\uB9C8\uB97C \uB4E4\uC5B4 \uCE7C\uC774
+      \uB5A8\uC5B4\uC9C4 \uD69F\uC218 (\uB099\uD558 1\uBC88 = \uAE30\uB85D 1\uAC1C,
+      BoardSinkWash\uC758 maxKnifeDropRecords\uAE4C\uC9C0)"
+    hasRange: 0
+    okMin: -Infinity
+    okMax: Infinity
+    rangeVerified: 0
+    official: 0
+    points: 10
+    pointsVerified: 0
+    evidence: "\uC790\uCCB4 \uC5F0\uC2B5 \uD3C9\uAC00 - \uACF5\uC2DD \uC2DC\uD5D8
+      \uBC30\uC810\xB7\uC2E4\uACA9 \uAE30\uC900 \uC544\uB2D8 (points\uB294 \uC5F0\uC2B5\uC6A9
+      \uBB34\uAC8C, Inspector\uC5D0\uC11C \uC870\uC815)"
+    tip: "\uB3C4\uB9C8\uB97C \uB4E4\uAC70\uB098 \uC62E\uAE30\uAE30 \uC804\uC5D0 \uCE7C\uC744
+      \uBA3C\uC800 \uCE58\uC6CC \uC548\uC804\uD55C \uACF3\uC5D0 \uB450\uC138\uC694."
+  - id: "record.\uC870\uB9AC\uACFC\uC815.\uC704\uCABD(1\uBC88) \uD654\uAD6C\uC5D0
+      \uBD88\uC744 \uCF2C"
+    dish: "\uC815\uB9AC"
+    title: "\uC704\uCABD(1\uBC88) \uD654\uAD6C \uC0AC\uC6A9 (\uAC10\uC810 \xB7 \uC2E4\uACA9
+      \uC5EC\uBD80 \uAC80\uD1A0 \uC911)"
+    metric: "StoveHandle_1\uB85C \uC704\uCABD \uD654\uAD6C(Burner_L)\uC5D0 \uBD88\uC744
+      \uCF30\uB294\uC9C0 (\uCF20 \uD69F\uC218\uC640 \uAD00\uACC4\uC5C6\uC774 1\uBC88
+      \uAE30\uB85D)"
+    hasRange: 0
+    okMin: -Infinity
+    okMax: Infinity
+    rangeVerified: 0
+    official: 0
+    points: 10
+    pointsVerified: 0
+    evidence: "\uC790\uCCB4 \uC5F0\uC2B5 \uD3C9\uAC00 - \uAC10\uC810/\uC2E4\uACA9
+      \uAE30\uC900 \uD655\uC815 \uC804 (points\uB294 \uC5F0\uC2B5\uC6A9, Inspector\uC5D0\uC11C
+      \uC870\uC815)"
+    tip: "\uBC30\uC815\uB41C \uD654\uAD6C\uB9CC \uC0AC\uC6A9\uD558\uC138\uC694."
+  disqualifyRules:
+  - id: tangsuyuk.missing
+    dish: "\uD0D5\uC218\uC721"
+    title: "\uD0D5\uC218\uC721 \uBBF8\uC644\uC131"
+    conditionKey: dish_missing
+    threshold: 0
+    enabled: 0
+    verified: 0
+    evidence: 
+  - id: mapo.missing
+    dish: "\uB9C8\uD30C\uB450\uBD80"
+    title: "\uB9C8\uD30C\uB450\uBD80 \uBBF8\uC644\uC131"
+    conditionKey: dish_missing
+    threshold: 0
+    enabled: 0
+    verified: 0
+    evidence: 
+  - id: mapo.burnt
+    dish: "\uB9C8\uD30C\uB450\uBD80"
+    title: "\uC18C\uC2A4 \uD0D0"
+    conditionKey: sauce_burnt
+    threshold: 0.8
+    enabled: 0
+    verified: 0
+    evidence: 
+  - id: upper_burner
+    dish: "\uC815\uB9AC"
+    title: "\uC704\uCABD(1\uBC88) \uD654\uAD6C \uC0AC\uC6A9 - \uC2E4\uACA9"
+    conditionKey: upper_burner_lit
+    threshold: 0
+    enabled: 0
+    verified: 0
+    evidence: 

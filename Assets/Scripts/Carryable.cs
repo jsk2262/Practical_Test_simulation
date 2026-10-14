@@ -16,6 +16,7 @@ public abstract class Carryable : Interactable, IDraggable
     /// transform.position would.</summary>
     private Vector3 tempHoldOffset;
     protected void SetTempHoldOffset(Vector3 offset) => tempHoldOffset = offset;
+    protected Vector3 TempHoldOffset => tempHoldOffset;
 
     /// <summary>Same idea as tempHoldOffset but for rotation - identity by
     /// default (so every other held item's look is unchanged), applied AFTER

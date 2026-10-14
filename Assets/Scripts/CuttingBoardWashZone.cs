@@ -28,11 +28,11 @@ public class CuttingBoardWashZone : CuttingBoardZoneBase
         // fallback if that isn't on the board.
         if (board.GetComponent<BoardSinkWash>() is BoardSinkWash byHand)
         {
-            if (!byHand.TryPickUp(out string reason)) ShowToast(reason);
+            if (!byHand.TryPickUp(out string why)) Debug.Log("[도마] " + why); // (nothing said on screen)
             return;
         }
         WashBasin sink = FindFirstObjectByType<WashBasin>();
         if (sink != null && !board.WashAtSink(sink.transform, knifeHygiene))
-            ShowToast(board.Current != null ? "재료를 먼저 치우세요" : "씻는 중");
+            ShowToast(board.HasIngredients ? "재료를 먼저 치우세요" : "씻는 중");
     }
 }

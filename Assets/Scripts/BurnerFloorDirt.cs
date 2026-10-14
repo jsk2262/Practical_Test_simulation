@@ -112,10 +112,26 @@ public class BurnerFloorDirt : MonoBehaviour
     /// <summary>The burner's middle, on the floor (the grate's ring centre if set).</summary>
     private Vector3 BurnerCenter() => grate != null ? grate.HomeCenter : burner.transform.position;
 
+    public static IReadOnlyList<BurnerFloorDirt> All => all;
+    public bool GrateInstalled => grate == null || grate.IsInstalled;
+    /// <summary>Was clean at some point after being soiled - and soiled again since.</summary>
+    public bool WasCleanedOnce { get; private set; }
+    public bool SoiledAgainAfterCleaning { get; private set; }
+
+    void Update()
+    {
+        if (NeedsCleaning && !WasCleanedOnce && IsClean) { WasCleanedOnce = true; Debug.Log($"[화구 청소] {name}: 청소됨 (기록)"); }
+        if (WasCleanedOnce && !IsClean) SoiledAgainAfterCleaning = true;
+    }
+
+    /// <summary>Judged at the end on its final state only (DishEvaluation - cleaned
+    /// once then soiled again and handed in so: not done). Logged here.</summary>
     private void Evaluate()
     {
-        bool installed = grate == null || grate.IsInstalled;
-        Debug.Log($"[최종 평가] {name}: 청소 필요 {NeedsCleaning}, 남은 오염 {DirtLeft:0.##} (완료 기준 {cleanThreshold:0.##} 이하), 받침 원위치 {(installed ? "장착됨" : "장착 안 됨")}");
-        if (NeedsCleaning && !IsClean) ExamDeductions.Add(deductionCategory, deductionReason);
+        Debug.Log($"[최종 평가] {name}: 청소 필요 {NeedsCleaning}, 남은 오염 {DirtLeft:0.##} (완료 기준 {cleanThreshold:0.##} 이하), 받침 원위치 {(GrateInstalled ? "장착됨" : "장착 안 됨")}");
     }
+
+    public float CleanThreshold => cleanThreshold;
+    public string DeductionCategory => deductionCategory;
+    public string DeductionReason => deductionReason;
 }

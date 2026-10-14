@@ -22,13 +22,24 @@ public class PlatingDestination : MonoBehaviour
     {
         get
         {
-            if (Plate == null || !isActiveAndEnabled || Plate.IsHeld) return false;
+            if (Plate == null || !isActiveAndEnabled || Plate.IsHeld || Submitted) return false;
             foreach (Carryable c in Plate.Contents) return false;
             return !(Plate.CurrentContainer is DishShelfController);
         }
     }
 
     void Awake() => Plate = GetComponent<MovableBowl>();
+
+    /// <summary>Handed in (제출): it and what's on it can't be touched any more.</summary>
+    public bool Submitted { get; private set; }
+
+    public void LockSubmitted()
+    {
+        if (Submitted || Plate == null) return;
+        Submitted = true;
+        foreach (Collider c in Plate.GetComponentsInChildren<Collider>()) c.enabled = false;
+        Debug.Log($"[제출] {Plate.name} 잠금 ({(Plate.HasIngredients ? "요리 있음" : "빈 접시")})");
+    }
     void OnEnable() => All.Add(this);
     void OnDisable() => All.Remove(this);
 

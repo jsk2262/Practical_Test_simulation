@@ -20,15 +20,14 @@ public class HygieneLog : MonoBehaviour
     {
         ViolationCount++;
         Violations.Add(message);
-        Debug.LogWarning($"[위생 감점 {ViolationCount}] {message}");
+        Debug.Log($"[위생 기록 {ViolationCount}] {message} (최종 평가에서 판단)");
         UpdateLabel();
     }
 
+    /// <summary>Recorded only: no count shown while cooking - judged and shown
+    /// after submission (ExamEvaluation / ExamResultView).</summary>
     private void UpdateLabel()
     {
-        if (countLabel != null)
-        {
-            countLabel.text = $"감점: {ViolationCount}";
-        }
+        if (countLabel != null) countLabel.text = "";
     }
 }

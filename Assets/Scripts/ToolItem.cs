@@ -4,7 +4,7 @@ using UnityEngine;
 
 public enum ToolKind { Knife, CuttingBoard, Wok, Pot, Ladle, Spatula, Spoon, Chopsticks, Bowl, MeasuringCup, Strainer, SmallDish, Rag, Cloth, PaperTowel, Whisk, MeasuringSpoon }
 
-public class ToolItem : Carryable
+public partial class ToolItem : Carryable
 {
     [SerializeField] protected ToolKind kind;
 
@@ -28,9 +28,6 @@ public class ToolItem : Carryable
     private Collider wrappedCollider;
     private Renderer wrappedRenderer;
 
-    private const float LoadedSpoonScaleBulge = 1.15f;
-    private string loadedSeasoning;
-
     /// <summary>The scene's measuring spoon, registered by itself - a seasoning
     /// bottle "used" on something summons it into the hand for one scoop
     /// without needing a hand-wired reference on every bottle.</summary>
@@ -39,7 +36,7 @@ public class ToolItem : Carryable
     protected override void Awake()
     {
         base.Awake();
-        if (kind == ToolKind.MeasuringSpoon) MeasuringSpoon = this;
+        if (kind == ToolKind.MeasuringSpoon) { MeasuringSpoon = this; spoonHome = transform.position; }
     }
 
     void OnDestroy()
@@ -47,46 +44,7 @@ public class ToolItem : Carryable
         if (MeasuringSpoon == this) MeasuringSpoon = null;
     }
 
-    /// <summary>Whether this measuring spoon currently holds one scooped dose,
-    /// waiting to be poured into a bowl.</summary>
-    public bool IsSpoonLoaded => loadedSeasoning != null;
-    public string LoadedSeasoning => loadedSeasoning;
-
-    /// <summary>Scoops one dose of the given seasoning onto this (empty)
-    /// measuring spoon - called by SeasoningBottle.OnClickedWhileHandFull when
-    /// this spoon, held in hand, clicks a bottle resting anywhere in the scene.</summary>
-    public void LoadSeasoning(string seasoningName)
-    {
-        if (IsSpoonLoaded && loadedSeasoning == seasoningName) return;
-        // A spoon still holding a different dose is emptied first (tipped back)
-        // rather than mixing two seasonings in one spoonful.
-        loadedSeasoning = seasoningName;
-        transform.localScale = BaseLocalScale * LoadedSpoonScaleBulge;
-        ShowSpoonContent(seasoningName);
-    }
-
-    /// <summary>Empties the spoon after its one loaded dose has been poured into
-    /// a bowl - ready to scoop again.</summary>
-    public void ConsumeSeasoning()
-    {
-        loadedSeasoning = null;
-        transform.localScale = BaseLocalScale;
-        if (spoonContent != null) Destroy(spoonContent);
-    }
-
-    private GameObject spoonContent;
-
-    /// <summary>The scooped spoonful, sitting in the spoon's bowl: a dry heap for
-    /// a powder, a thin glossy pool for a liquid, a dollop for a thick sauce.</summary>
-    private void ShowSpoonContent(string seasoningName)
-    {
-        if (spoonContent != null) Destroy(spoonContent);
-        MeshFilter mf = GetComponentInChildren<MeshFilter>();
-        if (mf == null || mf.sharedMesh == null) return;
-        if (!TrySpoonBowl(mf, out Vector3 center, out Vector3 up, out float radius)) return;
-        Condiments.Info info = Condiments.Get(seasoningName);
-        spoonContent = Condiments.BuildContent(mf.transform, center + up * radius * 0.15f, up, radius * 0.85f, info.form, info.color, "SpoonContent");
-    }
+    // (the measuring spoon's 큰술/작은술, its loaded dose in mL: ToolItem.MeasuringSpoon.cs)
 
     /// <summary>The spoon's bowl in its mesh's own space: the end of the long
     /// axis away from the grip; its depth axis (the thinnest there) turned
@@ -119,7 +77,12 @@ public class ToolItem : Carryable
         // otherwise the end opposite gripLocalDir.
         int side;
         HandController handCtl = HandController.Instance;
-        if (handCtl != null && ((Vector2)(transform.position - handCtl.transform.position)).magnitude < 2.5f)
+        // The two-ended measuring spoon: whichever end is in use (큰술 / 작은술).
+        if (kind == ToolKind.MeasuringSpoon && Mathf.Abs(ActiveEndLocal[len]) > 1e-4f)
+        {
+            side = ActiveEndLocal[len] > 0f ? 1 : -1;
+        }
+        else if (handCtl != null && ((Vector2)(transform.position - handCtl.transform.position)).magnitude < 2.5f)
         {
             Vector3 maxEnd = lb.center, minEnd = lb.center;
             maxEnd[len] = lb.max[len]; minEnd[len] = lb.min[len];
@@ -318,12 +281,13 @@ public class ToolItem : Carryable
 
         Renderer rend = GetComponent<Renderer>();
         laidDownInHand = IsUtensil && rend != null && rend.bounds.size.y > rend.bounds.size.x * 1.3f;
-        if (!laidDownInHand) return;
+        if (!laidDownInHand) { AfterSpoonPickedUp(); return; }
 
         // Lying head-left: the right hand closes on the handle's end (now its right end).
         Quaternion lay = Quaternion.AngleAxis(90f, Vector3.forward);
         SetTempHoldRotation(lay);
         SetTempHoldOffset(-GripPointAlong(Vector2.right, lay * RestingRotation));
+        AfterSpoonPickedUp();
     }
 
     /// <summary>Setting the towel down anywhere unwraps whatever it was carrying,
@@ -332,6 +296,7 @@ public class ToolItem : Carryable
     public override void OnPlaced()
     {
         base.OnPlaced();
+        AfterSpoonPlaced();
 
         // The knife set down with cut pieces still on its blade: they're left
         // right where they are.
@@ -580,6 +545,7 @@ public class ToolItem : Carryable
 
     void LateUpdate()
     {
+        if (kind == ToolKind.MeasuringSpoon) UpdateSpoonLabel();
         if (KnifeLoad != null && loadRoutine == null) KnifeLoad.transform.position = LoadPositionOnBlade(KnifeLoad);
         if (scraps.Count > 0)
         {
@@ -791,6 +757,81 @@ public class ToolItem : Carryable
     /// <summary>Out of the upright chop stance, lying flat in the hand again -
     /// for 포 뜨기, slicing sideways through meat with the blade flat.</summary>
     public void LayFlatInHand() => EndChopStance();
+
+    /// <summary>포 뜨기: the knife flat, turned round so its blade points left -
+    /// it goes into the meat from the right, blade first, the right hand on the
+    /// handle at its right end (held the usual way the handle went in first).
+    /// EndLayFlat puts it back.</summary>
+    public void LayFlatBladeLeft()
+    {
+        EndChopStance();
+        Quaternion turn = Quaternion.AngleAxis(180f, Carryable.CounterUp);
+        SetTempHoldRotation(turn);
+        SetTempHoldOffset(-GripPointAlong(Vector2.right, turn * RestingRotation));
+    }
+
+    public void EndLayFlat()
+    {
+        SetTempHoldRotation(Quaternion.identity);
+        SetTempHoldOffset(Vector3.zero);
+    }
+
+    /// <summary>The same, turned over seconds (out of the upright chop stance
+    /// first, if it's in it) - a pose change, not a snap.</summary>
+    public IEnumerator TurnFlatBladeLeft(float seconds)
+    {
+        if (chopMotionRoutine != null)
+        {
+            StopCoroutine(chopMotionRoutine);
+            chopMotionRoutine = null;
+            yield return BlendChopPose(0f, seconds * 0.5f);
+            HandController.Instance?.SetChopPose(0f, Vector3.zero);
+        }
+        Quaternion turn = Quaternion.AngleAxis(180f, Carryable.CounterUp);
+        Vector3 grip = -GripPointAlong(Vector2.right, turn * RestingRotation);
+        for (float t = 0f; t < seconds; t += Time.deltaTime)
+        {
+            float k = Mathf.SmoothStep(0f, 1f, t / seconds);
+            SetTempHoldRotation(Quaternion.Slerp(Quaternion.identity, turn, k));
+            SetTempHoldOffset(Vector3.Lerp(Vector3.zero, grip, k));
+            yield return null;
+        }
+        SetTempHoldRotation(turn);
+        SetTempHoldOffset(grip);
+    }
+
+    /// <summary>From lying flat (TurnFlatBladeLeft) back to the usual way round, over seconds.</summary>
+    public IEnumerator UnturnFlat(float seconds)
+    {
+        Quaternion from = HoldTurn;
+        Vector3 off = TempHoldOffset;
+        for (float t = 0f; t < seconds; t += Time.deltaTime)
+        {
+            float k = Mathf.SmoothStep(0f, 1f, t / seconds);
+            SetTempHoldRotation(Quaternion.Slerp(from, Quaternion.identity, k));
+            SetTempHoldOffset(Vector3.Lerp(off, Vector3.zero, k));
+            yield return null;
+        }
+        EndLayFlat();
+    }
+
+    /// <summary>The knife brought up into the upright chop stance (blade down,
+    /// its flat side across the board) and held there - no stroke; each
+    /// PlayChopMotion then is one cut, the knife staying up between them until
+    /// LayFlatInHand / the stance's own hold runs out.</summary>
+    public void RaiseUpright(float seconds = 0.25f)
+    {
+        if (kind != ToolKind.Knife || !IsHeld) return;
+        if (chopMotionRoutine != null) StopCoroutine(chopMotionRoutine);
+        else ComputeChopStance();
+        chopMotionRoutine = StartCoroutine(HoldUprightRoutine(seconds));
+    }
+
+    private IEnumerator HoldUprightRoutine(float seconds)
+    {
+        yield return BlendChopPose(1f, seconds);
+        while (true) yield return null; // (until a cut or LayFlatInHand)
+    }
 
     private void EndChopStance()
     {

@@ -151,6 +151,9 @@ public class SupportHandController : MonoBehaviour
     /// <summary>Moves the hand so its middle knuckle sits at the given point.</summary>
     public void HoldKnucklesAt(Vector3 worldPoint) => transform.position = worldPoint - knuckleDelta;
 
+    /// <summary>Curls the fingers while held (kneading - MeatKneader).</summary>
+    public void SetCurl(float curl) => poser?.SetCurl(curl);
+
     private Vector3 knuckleDelta;
 
     /// <summary>Shows the support hand holding steady just beside the given

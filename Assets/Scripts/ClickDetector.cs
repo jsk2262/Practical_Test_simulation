@@ -36,11 +36,13 @@ public class ClickDetector : MonoBehaviour
     /// stays held through use until deliberately held down somewhere.</summary>
     [SerializeField] private float holdSeconds = 0.4f;
 
-    private enum HoldMode { None, PickUpTool, PutDownTool, UnfoldTowel }
+    private enum HoldMode { None, PickUpTool, PutDownTool, UnfoldTowel, CrackEgg, FlipSpoon, TakePiece }
+    private float holdNeeded; // (this hold's length: holdSeconds, or the measuring spoon's own flip hold)
     private HoldMode holdMode;
     private float holdTimer;
     private bool holdDone;
     private IClickable holdTarget; // the tool (or towel box) a pick-up hold acts on
+    private bool shortClickActs;   // let go before the hold fills: still a click on it
 
     void Awake()
     {
@@ -64,7 +66,7 @@ public class ClickDetector : MonoBehaviour
         // (A press on something else puts it away first - ClothWiper runs
         // before this - and is then taken here as usual.)
         // (Likewise the cutting board carried to the sink - BoardSinkWash.)
-        if ((HandCarry.Instance != null && HandCarry.Instance.IsLocked) || ClothWiper.InputCaptured || BoardSinkWash.InputCaptured || BurnerGrate.InputCaptured)
+        if (ConfirmDialog.IsOpen || ExamResultView.IsOpen || (HandCarry.Instance != null && HandCarry.Instance.IsLocked) || ClothWiper.InputCaptured || BoardSinkWash.InputCaptured || BurnerGrate.InputCaptured || MeatKneader.InputCaptured || LeftHandCarry.IsCarrying)
         {
             HoldProgressRing.Hide();
             holdMode = HoldMode.None;
@@ -85,6 +87,17 @@ public class ClickDetector : MonoBehaviour
             && !CutMethodChooser.Instance.IsOver(targetCamera.ScreenPointToRay(mouse.position.ReadValue())))
         {
             CutMethodChooser.Instance.Close();
+            pressedTarget = null;
+            isPressing = false;
+            isDragging = false;
+            activeDraggable = null;
+            return;
+        }
+        // (likewise the 계란 사용 menu)
+        if (mouse.leftButton.wasPressedThisFrame && EggPartChooser.IsOpen
+            && !EggPartChooser.IsOver(targetCamera.ScreenPointToRay(mouse.position.ReadValue())))
+        {
+            EggPartChooser.Close();
             pressedTarget = null;
             isPressing = false;
             isDragging = false;
@@ -115,6 +128,11 @@ public class ClickDetector : MonoBehaviour
             holdTimer = 0f;
             holdDone = false;
             holdTarget = null;
+            holdNeeded = holdSeconds;
+            shortClickActs = false;
+            stirBowl = StirTargetFor(hand, pressedTarget);
+            stirDist = 0f;
+            stirStrokes = 0;
             if (hand != null && hand.Current == null && pressedTarget != null)
             {
                 // Pulling a kitchen-towel sheet from the tissue box takes the same
@@ -125,6 +143,21 @@ public class ClickDetector : MonoBehaviour
                 else if (box != null) holdTarget = box;
                 else if (HeldVesselTarget(pressedTarget) is MovableBowl vessel) holdTarget = vessel;
                 if (holdTarget != null) holdMode = HoldMode.PickUpTool;
+                // (a strainer resting across a bowl with something in it: a plain click tips it in; held, it's picked up)
+                shortClickActs = tool is Strainer resting && resting.IsResting && resting.HasContents;
+
+                // Cut meat/vegetable lying in a bowl in pieces: held down, the
+                // one piece under the cursor is taken on its own (a piece of
+                // the battered meat to test the oil, to drop in one by one); a
+                // plain click does what it always did (버무리기, or the lot).
+                if (holdTarget == null && pressedTarget.GetComponentInParent<IngredientItem>() is IngredientItem cut
+                    && !cut.IsHeld && cut.Container is MovableBowl lying && !lying.HasFryingOil
+                    && cut.GetComponent<FoodPieceGroup>() is FoodPieceGroup cutPieces && cutPieces.Count >= 2)
+                {
+                    pieceSource = cut;
+                    holdMode = HoldMode.TakePiece;
+                    shortClickActs = true;
+                }
 
                 // A towel folded round a piece: held down it opens out; a plain
                 // click carries the bundle (see the release below).
@@ -133,6 +166,24 @@ public class ClickDetector : MonoBehaviour
                     holdTarget = folded.UnfoldAction;
                     holdMode = HoldMode.UnfoldTowel;
                 }
+            }
+            // 달걀 in hand held down on a bowl: knocked on its rim and broken
+            // into it; a plain click still sets the whole egg in the bowl.
+            else if (hand != null && hand.Current != null && hand.Current.GetComponent<EggCracker>() is EggCracker egg && pressedTarget != null
+                     && pressedTarget.GetComponentInParent<MovableBowl>() is MovableBowl crackInto && egg.CanCrackInto(crackInto))
+            {
+                holdTarget = egg.CrackIntoAction(crackInto);
+                holdMode = HoldMode.CrackEgg;
+            }
+            // 계량스푼 in hand held down (anywhere but on a menu/button): turned
+            // round to its other end (큰술 ↔ 작은술); a plain click scoops/pours
+            // as before - or, on empty counter, sets it down.
+            else if (hand != null && hand.Current is ToolItem measuring && measuring.Kind == ToolKind.MeasuringSpoon
+                     && !measuring.IsFlipping && !IsOnUi(pressedTarget))
+            {
+                holdTarget = measuring.FlipAction;
+                holdMode = HoldMode.FlipSpoon;
+                holdNeeded = measuring.FlipHoldSeconds;
             }
             else if (hand != null && hand.Current is ToolItem heldTool && heldTool.KnifeLoad == null
                      && (pressedTarget == null || pressedTarget.GetComponentInParent<IClickable>() == null))
@@ -145,6 +196,21 @@ public class ClickDetector : MonoBehaviour
         {
             Vector2 pos = mouse.position.ReadValue();
 
+            // 젓기: the tool dragged through the food - strokes by the distance
+            // it actually moves over the pan/bowl (held still: nothing).
+            if (stirBowl != null)
+            {
+                if (OverBowl(stirBowl, pos)) stirDist += (pos - lastMousePos).magnitude;
+                while (stirDist >= stirPixelsPerStroke)
+                {
+                    stirDist -= stirPixelsPerStroke;
+                    stirStrokes++;
+                    StirStroke(stirBowl);
+                }
+                if (stirStrokes > 0) { holdMode = HoldMode.None; HoldProgressRing.Hide(); }
+                dragChecked = true; // (the tool isn't dragged away while stirring)
+            }
+
             if (!dragChecked && Vector2.Distance(pos, pressStartPos) >= dragThreshold)
             {
                 dragChecked = true;
@@ -156,13 +222,14 @@ public class ClickDetector : MonoBehaviour
             if (holdMode != HoldMode.None && !holdDone && !isDragging)
             {
                 holdTimer += Time.deltaTime;
-                HoldProgressRing.Show(targetCamera, pos, holdTimer / Mathf.Max(holdSeconds, 0.01f));
-                if (holdTimer >= holdSeconds)
+                HoldProgressRing.Show(targetCamera, pos, holdTimer / Mathf.Max(holdNeeded, 0.01f));
+                if (holdTimer >= holdNeeded)
                 {
                     holdDone = true;
                     HoldProgressRing.Hide();
-                    if ((holdMode == HoldMode.PickUpTool || holdMode == HoldMode.UnfoldTowel) && holdTarget != null) holdTarget.OnClicked();
+                    if ((holdMode == HoldMode.PickUpTool || holdMode == HoldMode.UnfoldTowel || holdMode == HoldMode.CrackEgg || holdMode == HoldMode.FlipSpoon) && holdTarget != null) holdTarget.OnClicked();
                     else if (holdMode == HoldMode.PutDownTool) DropHeldAt(pos);
+                    else if (holdMode == HoldMode.TakePiece) TakePieceAt(pos);
                 }
             }
 
@@ -178,7 +245,11 @@ public class ClickDetector : MonoBehaviour
             {
                 activeDraggable.OnDragEnd();
             }
-            else if (holdDone || (holdMode != HoldMode.None && holdMode != HoldMode.UnfoldTowel))
+            else if (stirBowl != null && stirStrokes > 0)
+            {
+                // stirred by dragging - not also a click
+            }
+            else if (holdDone || (holdMode != HoldMode.None && holdMode != HoldMode.UnfoldTowel && holdMode != HoldMode.CrackEgg && holdMode != HoldMode.FlipSpoon && !shortClickActs))
             {
                 // The hold already did its pick-up/put-down - or was let go too
                 // early, which does nothing (a tool isn't grabbed or dropped by a
@@ -296,6 +367,90 @@ public class ClickDetector : MonoBehaviour
         return nearest.collider.gameObject;
     }
 
+    // ---- 젓기 by dragging ----
+
+    [Tooltip("Screen pixels of the tool moving over the food per stir stroke.")]
+    [SerializeField] private float stirPixelsPerStroke = 140f;
+    private IngredientItem pieceSource;
+
+    /// <summary>The hold on cut food in a bowl filled: the piece nearest the
+    /// cursor comes away on its own, into the hand.</summary>
+    private void TakePieceAt(Vector2 screen)
+    {
+        IngredientItem from = pieceSource;
+        pieceSource = null;
+        HandCarry hand = HandCarry.Instance;
+        if (from == null || hand == null || hand.Current != null || !(from.GetComponent<FoodPieceGroup>() is FoodPieceGroup g)) return;
+        FoodPiece nearest = null;
+        float best = float.MaxValue;
+        foreach (FoodPiece p in g.Pieces)
+        {
+            if (p == null) continue;
+            float d = Vector2.Distance(screen, targetCamera.WorldToScreenPoint(p.transform.position));
+            if (d < best) { best = d; nearest = p; }
+        }
+        IngredientItem one = from.SplitOffPiece(nearest);
+        if (one != null) hand.PickUp(one);
+    }
+
+    private MovableBowl stirBowl;
+    private float stirDist;
+    private int stirStrokes;
+
+    private static bool IsStirTool(ToolItem t) =>
+        t != null && (t.Kind == ToolKind.Spatula || t.Kind == ToolKind.Spoon || t.Kind == ToolKind.Whisk || t.Kind == ToolKind.Ladle
+                      || (t.Kind == ToolKind.Chopsticks && !(t is FryingChopsticks)));
+
+    /// <summary>A stirring tool in hand pressed on a pan/bowl (or the food in it)
+    /// that has something to stir: that vessel.</summary>
+    private static MovableBowl StirTargetFor(HandCarry hand, GameObject pressed)
+    {
+        if (hand == null || pressed == null || !(hand.Current is ToolItem tool) || !IsStirTool(tool)) return null;
+        MovableBowl b = pressed.GetComponentInParent<MovableBowl>();
+        if (b == null && pressed.GetComponentInParent<IngredientItem>() is IngredientItem ing) b = ing.Container;
+        if (b == null || b.IsHeld) return null;
+        bool any = b.HasIngredients || (PanSauce.Of(b, false) is PanSauce s && s.Amount > 0.01f) || b.HasPortion || b.HasEgg;
+        return any ? b : null;
+    }
+
+    private bool OverBowl(MovableBowl b, Vector2 screen)
+    {
+        MovableBowl.Interior i = b.GetInterior();
+        Vector3 c = targetCamera.WorldToScreenPoint(i.floorCenter);
+        Vector3 e = targetCamera.WorldToScreenPoint(i.floorCenter + Vector3.right * i.radius);
+        float r = Mathf.Abs(e.x - c.x) * 1.25f;
+        return ((Vector2)c - screen).sqrMagnitude <= r * r;
+    }
+
+    /// <summary>One stroke through it: 버무리기, the starch water, the egg, or the pan.</summary>
+    private static void StirStroke(MovableBowl b)
+    {
+        ToolItem tool = HandCarry.Instance != null ? HandCarry.Instance.Current as ToolItem : null;
+        if (!b.IsCookingVessel && b.BatterTarget() is IngredientItem meat && BatterCoating.Of(meat, false) is BatterCoating coat && coat.HasAny)
+        {
+            coat.MixStroke(tool, b);
+            return;
+        }
+        if (b.GetComponent<PortionedCondiment>() is PortionedCondiment pc && pc.TryStir()) return;
+        if (EggContents.Of(b, false) is EggContents egg && egg.HasAny && !egg.Beaten && tool != null && tool.Kind != ToolKind.Spatula)
+        {
+            egg.TryBeat(tool);
+            return;
+        }
+        b.StirWithSpatula();
+    }
+
+    /// <summary>A press on a menu or button (the cut ring, 계란 사용, a screen
+    /// button - clickable things that aren't kitchen objects), or over the
+    /// uGUI: not for the spoon's turn-round hold.</summary>
+    private static bool IsOnUi(GameObject pressed)
+    {
+        if (UnityEngine.EventSystems.EventSystem.current != null && UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()) return true;
+        if (pressed == null) return false;
+        IClickable c = pressed.GetComponentInParent<IClickable>();
+        return c != null && !(c is Interactable);
+    }
+
     /// <summary>The wok/pan/pot or bowl a press would pick up - held down
     /// like a tool. The pressed thing itself (not something sitting in it: an
     /// ingredient on a plate is taken with a plain click), or the vessel on a
@@ -307,6 +462,8 @@ public class ClickDetector : MonoBehaviour
         if (c == null && pressed.GetComponentInParent<StoveBurner>() is StoveBurner burner) vessel = burner.CurrentVessel;
         // Plates (dishes) only move in clean-up mode, so there they're taken and
         // set down with a plain click - no hold.
+        // (a bowl of broken egg: a plain click opens 계란 사용 - no hold)
+        if (vessel != null && EggContents.Of(vessel, false) is EggContents egg && egg.IsSeparable) return null;
         return vessel != null && !vessel.IsDish && vessel.WouldPickUp ? vessel : null;
     }
 

@@ -63,6 +63,36 @@ public static class CheeseclothSetup
         }
         if (!found) Debug.LogWarning("[면보] no open spot found on the counter - placed at the first one anyway");
 
+        // the folded cloth's model and material, saved - so they show in the
+        // editor too (made only when play started, they were invisible there)
+        const string dir = "Assets/Generated/Cheesecloth";
+        if (!AssetDatabase.IsValidFolder("Assets/Generated")) AssetDatabase.CreateFolder("Assets", "Generated");
+        if (!AssetDatabase.IsValidFolder(dir)) AssetDatabase.CreateFolder("Assets/Generated", "Cheesecloth");
+        Mesh folded = AssetDatabase.LoadAssetAtPath<Mesh>(dir + "/CheeseclothFolded.asset");
+        if (folded == null)
+        {
+            folded = Cheesecloth.FoldedMesh(new Vector2(0.42f, 0.34f), 0.05f);
+            AssetDatabase.CreateAsset(folded, dir + "/CheeseclothFolded.asset");
+        }
+        Material mat = AssetDatabase.LoadAssetAtPath<Material>(dir + "/Cheesecloth.mat");
+        if (mat == null)
+        {
+            mat = new Material(Shader.Find("Universal Render Pipeline/Lit")) { color = new Color(0.97f, 0.97f, 0.95f) };
+            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.05f);
+            AssetDatabase.CreateAsset(mat, dir + "/Cheesecloth.mat");
+        }
+        foreach (GameObject c in cloths)
+        {
+            MeshFilter mf = c.GetComponent<MeshFilter>();
+            MeshRenderer mr = c.GetComponent<MeshRenderer>();
+            BoxCollider bc = c.GetComponent<BoxCollider>();
+            Undo.RecordObject(mf, "Setup Cheesecloth");
+            Undo.RecordObject(mr, "Setup Cheesecloth");
+            mf.sharedMesh = folded;
+            mr.sharedMaterial = mat;
+            if (bc != null) { Undo.RecordObject(bc, "Setup Cheesecloth"); bc.center = folded.bounds.center; bc.size = folded.bounds.size; }
+        }
+
         Vector3 right = Vector3.ProjectOnPlane(Vector3.right, up).normalized;
         Vector3 back = Vector3.Cross(right, up).normalized;
         for (int i = 0; i < Count; i++)

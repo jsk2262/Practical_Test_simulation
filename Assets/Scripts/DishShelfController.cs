@@ -68,11 +68,20 @@ public class DishShelfController : Interactable, ISlotContainer
         if (!hand.PlaceAtFreeLocalPosition(root, root.InverseTransformPoint(target))) return;
         dish.CurrentContainer = this;
 
-        // Bring the dish forward until it's fully in front of the shelf surface
-        // (its own thickness varies by model), so it never sinks into the shelf.
-        Renderer dishRend = dish.GetComponent<Renderer>();
+        // The model that shows - not the dish's pivot (Bowl_Prepped's plate sits
+        // far from its pivot: lined up by the pivot it landed deep behind the
+        // cabinet, out of sight) - is put where it was clicked...
+        Renderer dishRend = dish.VisibleDishRenderer();
+        if (dishRend == null || !dishRend.enabled) dishRend = dish.GetComponentInChildren<Renderer>();
         if (dishRend != null)
         {
+            Vector3 c = dishRend.bounds.center;
+            // (the whole dish on the shelf - a big one clicked near an end doesn't hang off it)
+            float half = dishRend.bounds.extents.x;
+            float x = shelf.size.x > half * 2f ? Mathf.Clamp(target.x, shelf.min.x + half, shelf.max.x - half) : shelf.center.x;
+            dish.transform.position += new Vector3(x - c.x, target.y - c.y, shelf.min.z - c.z);
+            // ...and brought forward until it's fully in front of the shelf
+            // surface (its thickness varies by model), never sinking into it.
             float overlap = dishRend.bounds.max.z - (shelf.min.z - surfaceGap);
             if (overlap > 0f) dish.transform.position -= new Vector3(0f, 0f, overlap);
         }

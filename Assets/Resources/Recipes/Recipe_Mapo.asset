@@ -1,0 +1,156 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2888fba457c074c46942cdd5448b2e2d, type: 3}
+  m_Name: Recipe_Mapo
+  m_EditorClassIdentifier: Assembly-CSharp::CookingRecipe
+  recipeId: mapo
+  displayName: "\uB9C8\uD30C\uB450\uBD80"
+  meatIngredientName: "\uB3FC\uC9C0\uACE0\uAE30"
+  baseMeatGrams: 50
+  meatBasis: 0
+  sourceNote: "\uAC04 \uB3FC\uC9C0\uACE0\uAE30 50g\uB9CC \uD655\uC815(\uC0AC\uC6A9\uC790
+    \uC9C0\uC815 \uD504\uB85C\uC81D\uD2B8 \uAE30\uC900). \uB098\uBA38\uC9C0 \uD56D\uBAA9\uC740
+    \uBBF8\uC124\uC815 - \uD0D5\uC218\uC721 \uAC12\uC5D0\uC11C \uAC00\uC838\uC624\uC9C0
+    \uC54A\uC74C."
+  hasBatter: 0
+  batterMixes: []
+  offRecipeGrade: 0
+  batterLook:
+    stiffnessByLiquidRatio:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.35
+        value: 0.78
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.65
+        value: 0.5
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0.25
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1.6
+        value: 0.05
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    thicknessByLoad:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 10
+        value: 0.3
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 25
+        value: 0.6
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 50
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    maxInflate: 0.22
+    batterColor: {r: 0.96, g: 0.94, b: 0.86, a: 1}
+    lumpyAbove: 0.68
+    runnyBelow: 0.32
+  strokesToMix: 8
+  mixDoneAt: 0.95
+  marinade: []
+  sauce: []
+  otherItems:
+  - name: "\uB450\uBD80"
+    amount: 0
+    unit: g
+    asWritten: 
+    verified: 0
+    note: "\uBBF8\uC124\uC815"
+  - name: "\uC591\uB150"
+    amount: 0
+    unit: mL
+    asWritten: 
+    verified: 0
+    note: "\uBBF8\uC124\uC815 (\uB450\uBC18\uC7A5 \uB4F1 \uD56D\uBAA9\uBCC4\uB85C
+      \uCD94\uAC00)"
+  - name: "\uBB3C"
+    amount: 0
+    unit: mL
+    asWritten: 
+    verified: 0
+    note: "\uBBF8\uC124\uC815"
+  - name: "\uB18D\uB3C4 \uC870\uC808\uC6A9 \uC804\uBD84"
+    amount: 0
+    unit: mL
+    asWritten: 
+    verified: 0
+    note: "\uBBF8\uC124\uC815"
+  unfitMixDeductionCategory: 
+  unmixedDeductionCategory: 

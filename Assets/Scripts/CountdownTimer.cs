@@ -23,11 +23,12 @@ public class CountdownTimer : MonoBehaviour
     {
         if (!started || remaining <= 0f) return;
 
-        remaining -= Time.deltaTime;
+        // (빠른 모드: real time - not the sped-up animations)
+        remaining -= SpeedMode.On ? Time.unscaledDeltaTime : Time.deltaTime;
         if (remaining < 0f) remaining = 0f;
 
         UpdateLabel();
-        if (remaining <= 0f) ExamEvaluation.RunFinal(); // time's up: the final evaluation (once)
+        if (remaining <= 0f) ExamFlow.TimeUp(); // time's up: what's plated is handed in, then the final evaluation (once)
     }
 
     /// <summary>Called once the pre-start 순서도 planning screen's "시작하세요" button

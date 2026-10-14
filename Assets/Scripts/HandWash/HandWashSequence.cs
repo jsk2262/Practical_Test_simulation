@@ -160,7 +160,7 @@ public sealed class HandWashSequence : MonoBehaviour
         if (soapVisual != null) soapVisual.SetActive(soapActive);
         if (towelVisual != null) towelVisual.SetActive(towelActive);
         if (statusLabel != null) statusLabel.text=oldLabel;
-        if (completed) HandsWashed = true;
+        if (completed) { HandsWashed = true; HandHygiene.Washed(); }
         if (completed) onCompleted?.Invoke(); else onCancelled?.Invoke();
     }
     private void OnDisable() { CancelWash(); }

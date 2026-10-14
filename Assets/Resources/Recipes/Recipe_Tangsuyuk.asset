@@ -1,0 +1,232 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2888fba457c074c46942cdd5448b2e2d, type: 3}
+  m_Name: Recipe_Tangsuyuk
+  m_EditorClassIdentifier: Assembly-CSharp::CookingRecipe
+  recipeId: tangsuyuk
+  displayName: "\uD0D5\uC218\uC721"
+  meatIngredientName: "\uB3FC\uC9C0\uB4F1\uC2EC"
+  baseMeatGrams: 200
+  meatBasis: 0
+  sourceNote: "\uB3FC\uC9C0\uACE0\uAE30 200g: \uC0AC\uC6A9\uC790 \uC9C0\uC815 \uD504\uB85C\uC81D\uD2B8
+    \uAE30\uC900(\uC9C0\uAE09\uB7C9).\n\uD280\uAE40\uC637 '\uC559\uAE08\uB179\uB9D0
+    30mL + \uD770\uC790 15mL'\uB294 200g \uAE30\uC900 \uC784\uC2DC \uD14C\uC2A4\uD2B8
+    \uBC30\uD569 - \uAC80\uC99D \uC804, \uC815\uB2F5\uC73C\uB85C \uC4F0\uC9C0 \uC54A\uC74C.\n'\uC559\uAE08
+    \uC804\uB7C9 60~70g' \uC81C\uC548\uC740 \uBCC4\uB3C4 \uD56D\uBAA9(\uAE30\uD0C0)\uC73C\uB85C\uB9CC
+    \uBCF4\uAD00 - \uC704 \uBC30\uD569\uACFC \uD569\uCE58\uAC70\uB098 \uB36E\uC5B4\uC4F0\uC9C0
+    \uC54A\uC74C."
+  hasBatter: 1
+  batterMixes:
+  - label: "\uC784\uC2DC \uD14C\uC2A4\uD2B8 30/15"
+    settledStarchMl: 30
+    eggWhiteMl: 15
+    grade: 0
+    verified: 0
+    source: "\uC0AC\uC6A9\uC790 \uC81C\uACF5 \uCC38\uACE0 \uBC30\uD569 (\uB3FC\uC9C0\uACE0\uAE30
+      200g \uAE30\uC900) - \uBBF8\uAC80\uC99D"
+  offRecipeGrade: 0
+  batterLook:
+    stiffnessByLiquidRatio:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.35
+        value: 0.78
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.65
+        value: 0.5
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0.25
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1.6
+        value: 0.05
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    thicknessByLoad:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 10
+        value: 0.3
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 25
+        value: 0.6
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 50
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    maxInflate: 0.22
+    batterColor: {r: 0.96, g: 0.94, b: 0.86, a: 1}
+    lumpyAbove: 0.68
+    runnyBelow: 0.32
+    retentionByStiffness:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.3
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.3
+        value: 0.7
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.55
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.85
+        value: 0.9
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0.75
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    friedColor: {r: 0.86, g: 0.62, b: 0.28, a: 1}
+    fryBrownSeconds: 40
+  strokesToMix: 6
+  mixDoneAt: 0.95
+  marinade:
+  - name: "\uCCAD\uC8FC"
+    amount: 5
+    unit: mL
+    asWritten: 1t
+    verified: 0
+    note: "\uCC38\uACE0\uD45C(g \uAE30\uC900 \uC81C\uC548) - \uBBF8\uAC80\uC99D"
+  sauce:
+  - name: "\uBB3C"
+    amount: 200
+    unit: mL
+    asWritten: 200mL
+    verified: 0
+    note: "\uBBF8\uAC80\uC99D \uD14C\uC2A4\uD2B8 \uBC30\uD569"
+  - name: "\uC124\uD0D5"
+    amount: 60
+    unit: mL
+    asWritten: 4T
+    verified: 0
+    note: "\uC2A4\uD47C \uBD80\uD53C 4T(60mL) \uBCF4\uC874. '\uC124\uD0D5 60g'\uACFC
+      \uAC19\uC740 \uAC12\uC73C\uB85C \uBCF4\uC9C0 \uC54A\uC74C"
+  - name: "\uC2DD\uCD08"
+    amount: 45
+    unit: mL
+    asWritten: 3T
+    verified: 0
+    note: "\uBBF8\uAC80\uC99D \uD14C\uC2A4\uD2B8 \uBC30\uD569"
+  - name: "\uAC04\uC7A5"
+    amount: 15
+    unit: mL
+    asWritten: 1T
+    verified: 0
+    note: "\uBBF8\uAC80\uC99D \uD14C\uC2A4\uD2B8 \uBC30\uD569 ('25g \uCD08\uACFC
+      \uB300\uB7C9 \uAC10\uC810' \uADDC\uCE59\uC740 \uC801\uC6A9\uD558\uC9C0 \uC54A\uC74C)"
+  otherItems:
+  - name: "\uC559\uAE08 \uC0AC\uC6A9\uB7C9"
+    amount: 0
+    unit: g
+    asWritten: 
+    verified: 0
+    note: "\uC81C\uC548: \uC559\uAE08 \uC804\uB7C9 \uC57D 60~70g - \uBBF8\uC815.
+      \uC559\uAE08 \uC794\uB958 \uC218\uBD84 \uAE30\uC900\uB3C4 \uBBF8\uC815 (KitchenDevSettings
+      \uAC00\uC815)"

@@ -136,7 +136,7 @@ public class CondimentDish : SeasoningBottle
     {
         if (!isMustard || Mustard != MustardState.Mixed || IsHeld) return;
         if (!NearLitBurner()) return;
-        fermentTimer += Time.deltaTime;
+        fermentTimer += SpeedMode.Wait(Time.deltaTime);
         if (fermentTimer < fermentSeconds) return;
         Mustard = MustardState.Fermented;
         RebuildContent();

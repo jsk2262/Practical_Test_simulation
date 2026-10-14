@@ -12,7 +12,7 @@ using UnityEngine;
 public static class ExamDeductions
 {
     /// <summary>The usual categories (any other text works too).</summary>
-    public const string Hygiene = "위생", Attitude = "조리태도", Process = "조리과정";
+    public const string Hygiene = "위생", Safety = "안전", Attitude = "조리태도", Process = "조리과정";
 
     public struct Entry
     {
@@ -34,7 +34,7 @@ public static class ExamDeductions
         if (Items.Contains(key)) return;
         Items.Add(key);
         Entries.Add(new Entry { category = category, reason = reason, time = Time.time });
-        Debug.LogWarning($"[감점 예정] {key}");
+        Debug.Log($"[기록] {key} (최종 평가에서 판단 - 조리 중에는 표시하지 않음)");
         Added?.Invoke(key);
     }
 

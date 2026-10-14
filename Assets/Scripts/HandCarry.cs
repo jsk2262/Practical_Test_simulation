@@ -95,9 +95,15 @@ public class HandCarry : MonoBehaviour
 
     private static float SafeDivide(float a, float b) => Mathf.Approximately(b, 0f) ? a : a / b;
 
+    /// <summary>A hand-over inside one action (LeftHandCarry passing food to the
+    /// right hand to set it down, the knife taken straight back) - not a real
+    /// pickup: not recorded for hygiene.</summary>
+    public static bool QuietPickUp;
+
     public bool PickUp(Carryable item)
     {
         if (Current != null || item == null || item.IsHeld) return false;
+        if (KnifeFall.IsFalling(item)) return false; // (still falling - picked up once it's down)
 
         if (item.CurrentContainer != null)
         {
@@ -118,6 +124,7 @@ public class HandCarry : MonoBehaviour
         item.transform.SetParent(null, true);
         item.transform.localScale = item.BaseLocalScale;
         item.OnPickedUp();
+        if (!QuietPickUp) HandHygiene.PickedUp(item);
         return true;
     }
 

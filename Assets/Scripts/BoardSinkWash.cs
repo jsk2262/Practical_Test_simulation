@@ -7,8 +7,9 @@ using UnityEngine.InputSystem;
 /// 도마 씻기 (정리 mode), by hand:
 /// - "씻기" on the board (CuttingBoardWashZone) picks the board up - no
 ///   animation, it just follows the mouse. Only an empty board (no
-///   ingredient, scraps or towel on it), and the knife washed first and kept
-///   apart (not resting on the board).
+///   ingredient, scraps or towel on it), and the knife kept
+///   apart (not resting on the board) - washed before it or not (that order is
+///   only recorded, for the final evaluation).
 /// - Clicked over the sink: it's leant in the sink, corner-ways, and washed -
 ///   water run over it (down its slope and off the low end), dish soap
 ///   squeezed on (DishSoap), scrubbed back and forth with the Sponge, turned
@@ -98,17 +99,24 @@ public class BoardSinkWash : MonoBehaviour
         reason = null;
         if (washing) { reason = "씻는 중"; return false; }
         if (HandCarry.Instance != null && HandCarry.Instance.Current != null) { reason = "손을 먼저 비우세요"; return false; }
-        if (board.Current != null) { reason = "재료를 먼저 치우세요"; return false; }
+        if (board.HasIngredients) { reason = "재료를 먼저 치우세요"; return false; }
         if (board.HasTowelLiner) { reason = "키친타올을 먼저 치우세요"; return false; }
         foreach (FoodScrap s in FindObjectsByType<FoodScrap>(FindObjectsSortMode.None))
             if ((object)s.CurrentContainer == board) { reason = "자투리를 먼저 치우세요"; return false; }
+        var falling = new List<ToolItem>();
         foreach (ToolItem t in FindObjectsByType<ToolItem>(FindObjectsSortMode.None))
         {
             if (t.GetType() != typeof(ToolItem) || t.Kind != ToolKind.Knife) continue;
-            if ((object)t.CurrentContainer == board || t.transform.IsChildOf(board.Anchor)) { reason = "칼을 먼저 씻어서 따로 두세요"; return false; }
+            // The knife left lying on the board: lifted with it, it slides off
+            // and falls to the floor - a safety record, nothing said.
+            if ((object)t.CurrentContainer == board || t.transform.IsChildOf(board.Anchor)) { falling.Add(t); continue; }
+            // (the knife not washed yet: the board can still be washed first -
+            // nothing said, only recorded for the final evaluation)
             HygieneTracker h = t.GetComponent<HygieneTracker>();
-            if (h != null && (h.NeedsWash || h.LastCategory != IngredientCategory.None)) { reason = "칼을 먼저 씻으세요"; return false; }
+            if (h != null && (h.NeedsWash || h.LastCategory != IngredientCategory.None))
+                ExamDeductions.Add(ExamDeductions.Hygiene, "칼보다 도마를 먼저 씻음 (칼은 아직 씻지 않음)");
         }
+        foreach (ToolItem t in falling) KnifeFall.Begin(t, transform, floorY, floorZ, maxKnifeDropRecords);
         pickedPos = transform.position;
         pickedRot = transform.rotation;
         pickedFrom = state;
@@ -455,19 +463,21 @@ public class BoardSinkWash : MonoBehaviour
         return m;
     }
 
-    private void Toast(string text)
+    /// <summary>Why it didn't go - for developers only (the console): nothing
+    /// is shown on screen, as at the real counter.</summary>
+    private static void Toast(string text)
     {
-        if (string.IsNullOrEmpty(text)) return;
-        Debug.Log("[도마] " + text);
-        var go = new GameObject("BoardToast");
-        Vector3 c = Box.center;
-        go.transform.position = new Vector3(c.x, c.y + 1.0f, c.z - 1.5f);
-        TextMesh tm = go.AddComponent<TextMesh>();
-        tm.text = text;
-        tm.fontSize = 40;
-        tm.characterSize = 0.1f;
-        tm.anchor = TextAnchor.MiddleCenter;
-        tm.color = new Color(0.15f, 0.15f, 0.15f);
-        Destroy(go, 1.4f);
+        if (!string.IsNullOrEmpty(text)) Debug.Log("[도마] " + text);
     }
+
+    // ---- the knife left on the board ----
+
+    [Header("도마 위 칼이 떨어질 때")]
+    [Tooltip("Where it comes to rest on the floor (world y), in front of the cabinet.")]
+    [SerializeField] private float floorY = -6.0f;
+    [Tooltip("Its depth there - in front of the counter's lip and the cabinet doors.")]
+    [SerializeField] private float floorZ = 1.3f;
+
+    [Tooltip("How many falls are recorded at most (each its own safety record).")]
+    [SerializeField] private int maxKnifeDropRecords = 3;
 }

@@ -84,12 +84,75 @@ public class Cheesecloth : Carryable
         mr = GetComponent<MeshRenderer>();
         if (mr == null) mr = gameObject.AddComponent<MeshRenderer>();
         box = GetComponent<BoxCollider>();
+        // its own copy of the cloth material (it gets stained): the one set in
+        // the scene (Tools > Kitchen > Setup Cheesecloth), else a plain one
         Shader lit = Shader.Find("Universal Render Pipeline/Lit");
-        mr.sharedMaterial = new Material(lit != null ? lit : Shader.Find("Standard")) { color = clothColor };
+        mr.sharedMaterial = mr.sharedMaterial != null ? new Material(mr.sharedMaterial)
+                          : new Material(lit != null ? lit : Shader.Find("Standard")) { color = clothColor };
         if (mr.sharedMaterial.HasProperty("_Smoothness")) mr.sharedMaterial.SetFloat("_Smoothness", 0.05f);
-        foldedMesh = ClothWiper.PadMesh(foldedSize.x, foldedSize.y, foldedThickness, 0.04f, Vector2.zero);
+        clothColor = mr.sharedMaterial.color;
+        foldedMesh = mf.sharedMesh != null ? mf.sharedMesh : FoldedMesh(foldedSize, foldedThickness);
         ShowFolded();
         base.Awake();
+    }
+
+    /// <summary>The cloth folded: three thin layers one on another, each a little
+    /// off the one under it (the folded edges showing) - flat, soft-cornered,
+    /// each face its own vertices so it shades as cloth (not as a puffy pad).
+    /// Also the model the setup saves, so it shows in the editor too.</summary>
+    public static Mesh FoldedMesh(Vector2 size, float thickness)
+    {
+        var v = new List<Vector3>();
+        var t = new List<int>();
+        const int layers = 3, seg = 4;
+        float h = thickness / layers;
+        for (int l = 0; l < layers; l++)
+        {
+            float shrink = 1f - 0.035f * l;
+            float w = size.x * shrink, d = size.y * shrink, r = Mathf.Min(w, d) * 0.08f;
+            Vector3 off = new Vector3(0.012f * (l % 2 == 0 ? 1f : -1f), -thickness * 0.5f + h * l, 0.008f * l);
+            var ring = new List<Vector2>();
+            Vector2[] corners = { new Vector2(w / 2 - r, d / 2 - r), new Vector2(-w / 2 + r, d / 2 - r), new Vector2(-w / 2 + r, -d / 2 + r), new Vector2(w / 2 - r, -d / 2 + r) };
+            for (int c = 0; c < 4; c++)
+                for (int i = 0; i <= seg; i++)
+                {
+                    float a = (c * 90f + 90f * i / seg) * Mathf.Deg2Rad;
+                    ring.Add(corners[c] + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r);
+                }
+            int n = ring.Count;
+            // top and bottom faces (fans)
+            int top = v.Count;
+            v.Add(off + new Vector3(0f, h, 0f));
+            foreach (Vector2 p in ring) v.Add(off + new Vector3(p.x, h, p.y));
+            int bottom = v.Count;
+            v.Add(off);
+            foreach (Vector2 p in ring) v.Add(off + new Vector3(p.x, 0f, p.y));
+            for (int i = 0; i < n; i++)
+            {
+                t.AddRange(new[] { top, top + 1 + (i + 1) % n, top + 1 + i });
+                t.AddRange(new[] { bottom, bottom + 1 + i, bottom + 1 + (i + 1) % n });
+            }
+            // the edge all round - its own vertices, so it isn't shaded into the faces
+            for (int i = 0; i < n; i++)
+            {
+                Vector2 p = ring[i], q = ring[(i + 1) % n];
+                int s = v.Count;
+                v.Add(off + new Vector3(p.x, h, p.y));
+                v.Add(off + new Vector3(q.x, h, q.y));
+                v.Add(off + new Vector3(p.x, 0f, p.y));
+                v.Add(off + new Vector3(q.x, 0f, q.y));
+                t.AddRange(new[] { s, s + 1, s + 2, s + 1, s + 3, s + 2 });
+            }
+        }
+        var m = new Mesh { name = "CheeseclothFolded" };
+        m.SetVertices(v);
+        m.SetTriangles(t, 0);
+        var uv = new Vector2[v.Count];
+        for (int i = 0; i < uv.Length; i++) uv[i] = new Vector2(v[i].x / size.x + 0.5f, v[i].z / size.y + 0.5f);
+        m.uv = uv;
+        m.RecalculateNormals();
+        m.RecalculateBounds();
+        return m;
     }
 
     void OnDisable() => spreadOnes.Remove(this);
@@ -201,17 +264,24 @@ public class Cheesecloth : Carryable
         Vector3 c = Sag(0f);
         MovableBowl.Interior panIn = pan.GetInterior();
 
-        // The pan brought up beside the cloth, to its upper right.
+        // The pan brought up beside the cloth, to its upper right - steered by
+        // where the pan's body actually is (a pan held by its handle doesn't
+        // sit where the hand's offset says: aimed by that, it ended up on the
+        // bowl's left, pouring away from it).
+        Vector3 reach = Vector3.zero;
         if (hc != null)
         {
-            // (where its body is from the hand holding it - by its hold offset:
-            // just picked up, it hasn't been brought to the hand yet)
-            Vector3 bodyFromHand = pan.HandHoldOffset + (pan.BodyCenterWorld() - pan.transform.position);
             Vector3 want = c + new Vector3(rimR + panIn.radius * 0.8f, rimR + 0.35f, 0f);
-            Vector3 to = want - bodyFromHand;
-            hc.GoTo(new Vector3(to.x, to.y, hc.transform.position.z), null);
+            for (float t = 0f; t < 0.5f; t += Time.deltaTime)
+            {
+                Vector3 err = want - pan.BodyCenterWorld();
+                err.z = 0f;
+                reach += err * Mathf.Clamp01(Time.deltaTime * 10f);
+                hc.SetGestureOffset(reach);
+                yield return null;
+            }
         }
-        yield return new WaitForSeconds(0.4f);
+        else yield return new WaitForSeconds(0.4f);
 
         float tilt = 0f, poured = 0f;
         bool stop = false;
@@ -234,7 +304,9 @@ public class Cheesecloth : Carryable
             if (amount > 0f)
             {
                 SaucePortion poured1 = sauce.Take(amount);
+                bool chili = poured1.parts.ContainsKey("고춧가루") && poured1.parts.ContainsKey("식용유");
                 residue.Add(poured1.TakeSolids());   // the 고춧가루 stays in the cloth
+                if (chili) ChiliOilLog.StrainedSpoons += poured1.LiquidAmount; // (recorded: 고추기름 strained)
                 pending.Add(poured1);               // the oil, on its way through
                 oilColor = pending.LiquidColor;
                 poured += poured1.Amount;
@@ -253,6 +325,7 @@ public class Cheesecloth : Carryable
             yield return null;
         }
         pan.SetPourTilt(Quaternion.identity);
+        hc?.SetGestureOffset(Vector3.zero); // (back from beside the cloth)
         Debug.Log($"[면보] 부음 {poured:0.##}스푼 - 팬에 남음 {sauce.Amount:0.##}, 면보 위 기름 {pending.Amount:0.##}, 찌꺼기 {residue.Amount:0.##}");
         if (hand != null) hand.IsLocked = false;
         IsPouring = false;

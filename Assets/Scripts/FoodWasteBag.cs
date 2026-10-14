@@ -121,6 +121,18 @@ public class FoodWasteBag : Interactable
                 WasteLog.Add(pc.CondimentName, pc.CurrentStage == PortionedCondiment.Stage.Drained ? PortionedCondiment.SettledStarch : "덜어둔 것");
                 pc.Remove();
             }
+            if (EggContents.Of(bowl, false) is EggContents egg && egg.HasAny)
+            {
+                WasteLog.Add("달걀", egg.Label);
+                egg.Clear();
+            }
+            // sauce or oil in it (e.g. 고추기름 burnt and made again): thrown out, recorded as such
+            if (PanSauce.Of(bowl, false) is PanSauce sauce && sauce.Amount > 0.01f)
+            {
+                string what = sauce.LiquidName ?? "소스";
+                WasteLog.Add(what, sauce.Burn >= 0.5f ? "탄 것 폐기" : "폐기");
+                sauce.Take(sauce.Amount);
+            }
         }
         else if (held is Strainer strainer) food.AddRange(strainer.TakeAllForDisposal());
         else if (held is Cheesecloth cloth) cloth.EmptyResidue(); // (the cloth stays in hand, used)

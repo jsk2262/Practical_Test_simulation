@@ -1039,9 +1039,9 @@ public static class HandWashPlayTest
         hand.PickUp(spoon);
         for (int i = 0; i < 3; i++) { ((IClickable)dish).OnClicked(); ((IClickable)bowl).OnClicked(); }
         PortionedCondiment pc = bowl.GetComponent<PortionedCondiment>();
-        string afterStarch = $"{pc?.Spoons} spoons {pc?.CurrentStage}";
+        string afterStarch = $"{pc?.StarchMl}mL starch {pc?.CurrentStage}";
         for (int i = 0; i < 3; i++) { ((IClickable)cup).OnClicked(); ((IClickable)bowl).OnClicked(); }
-        string afterWater = $"{pc?.WaterSpoons} water {pc?.CurrentStage}";
+        string afterWater = $"{pc?.WaterMl}mL water {pc?.CurrentStage}";
         hand.PlaceFreeAt(new Vector3(-2.3f, -0.4f, 0f)); // spoon down beside it
         Debug.Log($"[HandWashTest] starch in {bowl.name}: after starch {afterStarch}; after water {afterWater}");
     }
@@ -1080,7 +1080,7 @@ public static class HandWashPlayTest
         ToolItem spoon = ToolItem.MeasuringSpoon;
         string loaded = spoon?.LoadedSeasoning;
         ((IClickable)bowl).OnClicked();
-        Debug.Log($"[HandWashTest] spoon had '{loaded}', hand={HandCarry.Instance.Current?.name}; bowl starch spoons={bowl.GetComponent<PortionedCondiment>()?.Spoons}");
+        Debug.Log($"[HandWashTest] spoon had '{loaded}', hand={HandCarry.Instance.Current?.name}; bowl starch mL={bowl.GetComponent<PortionedCondiment>()?.StarchMl}");
     }
 
     [MenuItem("Tools/Kitchen/Test/Starch: Skip 10 Min + Pour Off")]

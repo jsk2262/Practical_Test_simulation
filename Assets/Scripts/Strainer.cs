@@ -279,6 +279,24 @@ public class Strainer : ToolItem
         base.OnClickedWhileHandFull(held);
     }
 
+    /// <summary>Resting across a bowl with something in it, a plain click (no
+    /// hold - that still picks it up) tips it all into the bowl underneath -
+    /// drained or not (not drained: the water goes in with it).</summary>
+    protected override bool OnClickedWhileHandEmpty()
+    {
+        if (IsResting && HasContents)
+        {
+            MovableBowl bowl = restingOn;
+            int n = contents.Count;
+            CenterIn(bowl);
+            DumpInto(bowl);
+            HandController.Instance?.PlayChopGesture();
+            Debug.Log($"[체망] {bowl.name}에 쏟음 ({n - contents.Count}개{(drained ? "" : ", 물기 덜 빠짐")})");
+            return true;
+        }
+        return base.OnClickedWhileHandEmpty();
+    }
+
     /// <summary>Everything in the basket, handed over to be thrown away.</summary>
     public List<IngredientItem> TakeAllForDisposal()
     {

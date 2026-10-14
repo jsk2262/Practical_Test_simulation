@@ -34,7 +34,7 @@ public class CookingPlanManager : MonoBehaviour
     {
         new StepDef("손씻기", 0),
         new StepDef("재료\n분리", 0),
-        new StepDef("전분앙금\n만들기", 1),
+        new StepDef("전분 2T 나눠\n앙금 만들기", 1),
         new StepDef("달걀\n분리", 1),
         new StepDef("고기\n키친타올", 1),
         new StepDef("다진고기\n키친타올", 1),
@@ -55,6 +55,7 @@ public class CookingPlanManager : MonoBehaviour
         new StepDef("팬\n세척", 4),
         new StepDef("팬에 마파두부\n완성", 4),
         new StepDef("주변\n정돈", FreePhase),
+        new StepDef("마무리\n정리", 5),          // (맨 마지막 - 최종 점검)
     };
 
     private const int GridCols = 5;
@@ -154,7 +155,7 @@ public class CookingPlanManager : MonoBehaviour
             int col = i < half ? 0 : 1;
             int row = i < half ? i : i - half;
             float x = col == 0 ? -5.6f : 0.8f;
-            float y = 3.9f - row * 0.7f;
+            float y = 3.9f - row * 0.64f; // (13 rows a column now - clear of the 닫기 button)
             string line = (i + 1) + ". " + Steps[i].Label.Replace("\n", " ");
             TextMesh tm = CreateLabel(hintPanel.transform, line, new Vector3(x, y, -0.05f), 20, Color.white);
             tm.anchor = TextAnchor.MiddleLeft;

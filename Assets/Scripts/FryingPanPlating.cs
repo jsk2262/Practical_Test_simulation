@@ -36,7 +36,7 @@ public class FryingPanPlating : MonoBehaviour
     /// across on its own, keeping its cooking and sauce.</summary>
     public readonly List<FoodPiece> PlatedPieces = new List<FoodPiece>();
 
-    /// <summary>In hand, with food in it, all of it cooked (not raw or still cooking).</summary>
+    /// <summary>In hand, with food in it (cooked or not - judged as handed in).</summary>
     public bool CanPlate
     {
         get
@@ -47,8 +47,7 @@ public class FryingPanPlating : MonoBehaviour
             {
                 if (!(c is IngredientItem ing)) continue;
                 any = true;
-                CookableItem cook = ing.GetComponent<CookableItem>();
-                if (cook != null && (cook.CurrentStage == CookableItem.Stage.Raw || cook.CurrentStage == CookableItem.Stage.InProgress)) return false;
+                // (undercooked or burnt, it can still be plated - it's judged as handed in)
             }
             return any;
         }

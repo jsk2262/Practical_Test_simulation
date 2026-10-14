@@ -20,7 +20,10 @@ public class GeneralTrashCan : Interactable
     /// <summary>What counts as general waste: a paper towel (키친타올) sheet that
     /// isn't wrapped round something.</summary>
     public static bool IsGeneralWaste(Carryable c) =>
-        c is ToolItem t && t.Kind == ToolKind.PaperTowel && !t.IsWrapping;
+        (c is ToolItem t && t.Kind == ToolKind.PaperTowel && !t.IsWrapping) || IsEggShell(c);
+
+    /// <summary>The empty shell of an egg broken into a bowl (EggCracker) - 달걀 껍데기는 일반쓰레기.</summary>
+    public static bool IsEggShell(Carryable c) => c != null && c.GetComponent<EggCracker>() is EggCracker e && e.IsCracked;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void SetUpScene()

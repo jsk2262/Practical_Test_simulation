@@ -33,7 +33,196 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
     public override void Release(Carryable item)
     {
         if ((object)item == Liner) Liner = null;
-        base.Release(item);
+        // (the one being worked on taken off: the last of the others is next - not "the board's empty")
+        if ((object)Current == item) Current = null;
+        if (Current == null) Current = LastOtherThan(item);
+    }
+
+    // ---- several ingredients on the board ----
+
+    [Header("여러 재료 놓기")]
+    [Tooltip("Gap kept between ingredients set down side by side (world units).")]
+    [SerializeField] private float placeSpacing = 0.15f;
+    [Tooltip("Step of the search for the nearest free spot (world units).")]
+    [SerializeField] private float placeSearchStep = 0.06f;
+
+    /// <summary>Every ingredient lying on the board (its own, not held, not
+    /// wrapped in a towel) - read from what's actually there, so it never
+    /// drifts from it; in the order they were set down. Current is the one
+    /// being worked on (손질·썰기) - the last one set down, or the one picked.</summary>
+    public System.Collections.Generic.List<IngredientItem> Items
+    {
+        get
+        {
+            var list = new System.Collections.Generic.List<IngredientItem>();
+            if (ingredientRoot == null && transform.Find("IngredientRoot") == null && (transform.parent == null || transform.parent.Find("IngredientRoot") == null))
+                return list;
+            foreach (Transform t in IngredientRoot)
+                if (t.GetComponent<IngredientItem>() is IngredientItem ing && (object)ing.CurrentContainer == this && !ing.IsHeld && !list.Contains(ing))
+                    list.Add(ing);
+            return list;
+        }
+    }
+
+    public bool HasIngredients => Items.Count > 0;
+
+    /// <summary>Makes this one the work target (outlined while there are others).
+    /// Not while a cut is going on (the hand is locked then).</summary>
+    public void Select(IngredientItem item)
+    {
+        if (item == null || (object)item.CurrentContainer != this) return;
+        if (HandCarry.Instance != null && HandCarry.Instance.IsLocked) return;
+        Current = item;
+        Debug.Log($"[도마] 작업 대상: {item.IngredientName}");
+    }
+
+    private IngredientItem LastOtherThan(Carryable gone)
+    {
+        var items = Items;
+        for (int i = items.Count - 1; i >= 0; i--) if ((object)items[i] != gone) return items[i];
+        return null;
+    }
+
+    /// <summary>What shows of each ingredient on the board (but skip), as screen rects.</summary>
+    private System.Collections.Generic.List<Rect> Footprints(Carryable skip, bool zones = true)
+    {
+        var rects = new System.Collections.Generic.List<Rect>();
+        foreach (IngredientItem ing in Items)
+        {
+            if ((object)ing == skip) continue;
+            Bounds b = ing.VisibleBounds;
+            rects.Add(new Rect(b.min.x, b.min.y, b.size.x, b.size.y));
+        }
+        // what else lies on the board and isn't to be covered: the knife resting
+        // on it, the scraps in the corner, the zones' spots (뒤집기·씻기) while they show
+        void Add(Component c)
+        {
+            Bounds b = WholeBounds(c);
+            if (b.size.sqrMagnitude > 1e-6f) rects.Add(new Rect(b.min.x, b.min.y, b.size.x, b.size.y));
+        }
+        foreach (Transform t in Anchor)
+            if (t.GetComponent<ToolItem>() is ToolItem resting && !resting.IsHeld) Add(resting);
+        foreach (FoodScrap s in FindObjectsByType<FoodScrap>(FindObjectsSortMode.None))
+            if ((object)s.CurrentContainer == this) Add(s);
+        if (zones && transform.parent != null)
+            foreach (CuttingBoardZoneBase z in transform.parent.GetComponentsInChildren<CuttingBoardZoneBase>())
+                if (z.GetComponent<Collider>() is Collider zc && zc.enabled)
+                    rects.Add(new Rect(zc.bounds.min.x, zc.bounds.min.y, zc.bounds.size.x, zc.bounds.size.y));
+        return rects;
+    }
+
+    /// <summary>A rect (world x, y) clear of the other ingredients on the board
+    /// (with the spacing kept between them) - for a work area (cutting, turning).</summary>
+    public bool IsClear(Rect area, Carryable except, float gap = -1f)
+    {
+        Rect a = Expand(area, gap < 0f ? placeSpacing : gap);
+        foreach (Rect r in Footprints(except, false)) // (the zones' spots are only for clicking - the knife may pass over them)
+            if (r.Overlaps(a)) return false;
+        return true;
+    }
+
+    private static Rect Expand(Rect r, float by) => new Rect(r.xMin - by, r.yMin - by, r.width + 2f * by, r.height + 2f * by);
+
+    /// <summary>The nearest spot (world, the item's visible middle) to want where
+    /// the item fits on the board without touching the others: on the board's
+    /// top, the spacing kept. False when there's no room anywhere (it stays in
+    /// hand). Never made smaller to fit.</summary>
+    public bool FindFreeSpot(IngredientItem item, Vector2 want, out Vector2 spot)
+    {
+        spot = want;
+        Rect top = VisibleTopRect();
+        Vector3 half = item.VisibleBounds.extents;
+        float minX = top.xMin + half.x, maxX = top.xMax - half.x, minY = top.yMin + half.y, maxY = top.yMax - half.y;
+        if (minX > maxX || minY > maxY) return false; // (bigger than the board)
+        var others = Footprints(item);
+        bool Free(Vector2 c)
+        {
+            Rect r = new Rect(c.x - half.x - placeSpacing, c.y - half.y - placeSpacing, 2f * (half.x + placeSpacing), 2f * (half.y + placeSpacing));
+            foreach (Rect o in others) if (o.Overlaps(r)) return false;
+            return true;
+        }
+        Vector2 start = new Vector2(Mathf.Clamp(want.x, minX, maxX), Mathf.Clamp(want.y, minY, maxY));
+        if (Free(start)) { spot = start; return true; }
+        float step = Mathf.Max(placeSearchStep, 0.01f);
+        float best = float.MaxValue;
+        bool found = false;
+        for (float x = minX; x <= maxX + 1e-4f; x += step)
+            for (float y = minY; y <= maxY + 1e-4f; y += step)
+            {
+                Vector2 c = new Vector2(Mathf.Min(x, maxX), Mathf.Min(y, maxY));
+                float d = (c - start).sqrMagnitude;
+                if (d >= best || !Free(c)) continue;
+                best = d;
+                spot = c;
+                found = true;
+            }
+        return found;
+    }
+
+    // ---- outlines: where it'll go, and which one is worked on ----
+
+    private LineRenderer previewLine, selectLine;
+    private IngredientItem blockedItem;
+    private float blockedUntil;
+
+    /// <summary>Outlines it red for a moment (no room round it to cut) - nothing said.</summary>
+    public void FlashBlocked(IngredientItem item) { blockedItem = item; blockedUntil = Time.time + 1.2f; }
+
+    void Update()
+    {
+        HandCarry hand = HandCarry.Instance;
+        bool showPreview = false;
+        if (hand != null && hand.Current is IngredientItem held && !hand.IsLocked && Accepts(held) && Camera.main != null
+            && UnityEngine.InputSystem.Mouse.current != null && !(GetComponent<BoardSinkWash>() is BoardSinkWash w && w.IsAway))
+        {
+            Camera cam = Camera.main;
+            Vector2 sp = UnityEngine.InputSystem.Mouse.current.position.ReadValue();
+            Vector3 cursor = cam.ScreenToWorldPoint(new Vector3(sp.x, sp.y, transform.position.z - cam.transform.position.z));
+            if (ShowsAt(cursor) && FindFreeSpot(held, cursor, out Vector2 spot))
+            {
+                Vector3 half = held.VisibleBounds.extents;
+                DrawRect(ref previewLine, "PlacePreview", new Rect(spot.x - half.x, spot.y - half.y, 2f * half.x, 2f * half.y), new Color(1f, 1f, 1f, 0.8f));
+                showPreview = true;
+            }
+        }
+        if (previewLine != null) previewLine.enabled = showPreview;
+
+        // the work target outlined - only once there's more than one to choose from
+        // (red a moment when there wasn't room round it to cut)
+        bool showSelect = false;
+        bool blocked = blockedItem != null && Time.time < blockedUntil;
+        IngredientItem outlined = blocked ? blockedItem : Current as IngredientItem;
+        if (outlined != null && (object)outlined.CurrentContainer == this && !outlined.IsHeld && (blocked || Items.Count >= 2))
+        {
+            Bounds b = outlined.VisibleBounds;
+            DrawRect(ref selectLine, "WorkTarget", new Rect(b.min.x - 0.04f, b.min.y - 0.04f, b.size.x + 0.08f, b.size.y + 0.08f),
+                blocked ? new Color(0.9f, 0.15f, 0.1f, 0.95f) : new Color(1f, 0.82f, 0.2f, 0.95f));
+            showSelect = true;
+        }
+        if (selectLine != null) selectLine.enabled = showSelect;
+    }
+
+    private void DrawRect(ref LineRenderer line, string name, Rect r, Color color)
+    {
+        if (line == null)
+        {
+            var go = new GameObject(name);
+            line = go.AddComponent<LineRenderer>();
+            line.loop = true;
+            line.positionCount = 4;
+            line.widthMultiplier = 0.025f;
+            line.useWorldSpace = true;
+            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            Shader sh = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
+            line.sharedMaterial = new Material(sh);
+        }
+        line.sharedMaterial.color = color;
+        if (line.sharedMaterial.HasProperty("_BaseColor")) line.sharedMaterial.SetColor("_BaseColor", color);
+        float z = FrontZ(transform.position.z) - 0.4f; // (in front of the board and what's on it)
+        line.SetPosition(0, new Vector3(r.xMin, r.yMin, z));
+        line.SetPosition(1, new Vector3(r.xMax, r.yMin, z));
+        line.SetPosition(2, new Vector3(r.xMax, r.yMax, z));
+        line.SetPosition(3, new Vector3(r.xMin, r.yMax, z));
     }
 
     /// <summary>The held paper towel goes down flat in the middle of the
@@ -290,7 +479,7 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
 
             // A fresh paper towel on an empty board is spread out to drain meat/tofu
             // on (put it down first, then the ingredient); otherwise it wipes.
-            if (tool.Kind == ToolKind.PaperTowel && Liner == null && Current == null)
+            if (tool.Kind == ToolKind.PaperTowel && Liner == null && !HasIngredients)
             {
                 LayLiner(tool);
                 return;
@@ -318,7 +507,7 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
         // PlaceSlot's default Activate() always uses Anchor, which is also
         // where the knife rests (off toward one corner), so every ingredient
         // used to end up there regardless of where the player aimed.
-        if (hand?.Current is IngredientItem ingredient && Current == null && Accepts(ingredient))
+        if (hand?.Current is IngredientItem ingredient && Accepts(ingredient))
         {
             PlaceIngredientFree(ingredient);
             return;
@@ -369,24 +558,22 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
             : CursorPivotFor(item, topCenter);
         Vector3 desired = root.InverseTransformPoint(aim);
 
-        Vector2 center = Vector2.zero, extents = placementExtents;
-        if (GetComponent<Collider>() != null)
+        // On the board, clear of what's already on it (the nearest free spot to
+        // where it was aimed - those already there aren't moved); no room
+        // anywhere: it stays in hand.
+        Vector3 pivotToShown = item.VisibleBounds.center - item.transform.position;
+        Vector3 aimShown = aim + new Vector3(pivotToShown.x, pivotToShown.y, 0f);
+        if (!FindFreeSpot(item, aimShown, out Vector2 spot))
         {
-            Vector3 c = root.InverseTransformPoint(topCenter);
-            Vector3 itemHalf = item.VisibleBounds.extents;
-            center = new Vector2(c.x, c.y);
-            extents = new Vector2(Mathf.Max(top.width * 0.5f - itemHalf.x, 0f), Mathf.Max(top.height * 0.5f - itemHalf.y, 0f));
+            Debug.Log($"[도마] {item.IngredientName}: 놓을 자리가 없음 - 손에 든 채로");
+            return;
         }
+        Vector3 local = root.InverseTransformPoint(new Vector3(spot.x - pivotToShown.x, spot.y - pivotToShown.y, aim.z));
 
-        Vector3 clamped = new Vector3(
-            Mathf.Clamp(desired.x, center.x - extents.x, center.x + extents.x),
-            Mathf.Clamp(desired.y, center.y - extents.y, center.y + extents.y),
-            -0.05f);
-
-        if (HandCarry.Instance.PlaceAtFreeLocalPosition(root, clamped))
+        if (HandCarry.Instance.PlaceAtFreeLocalPosition(root, new Vector3(local.x, local.y, -0.05f)))
         {
             item.CurrentContainer = this;
-            Current = item;
+            Current = item; // (the last one set down is the one worked on)
             PullIngredientsInFront(); // a thick ingredient mustn't sink into the board
         }
     }
@@ -428,6 +615,9 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
         if (item is ToolItem knife && knife.Kind == ToolKind.Knife)
             return true;
 
+        // (more than one ingredient: room for it is checked as it's set down)
+        if (item is IngredientItem) return Accepts(item);
+
         return base.CanAcceptDrop(item);
     }
 
@@ -447,7 +637,7 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
     /// happens) if an ingredient is still on the board or it's busy.</summary>
     public bool WashAtSink(Transform sink, HygieneTracker knifeHygiene)
     {
-        if (isWashing || isFlipping || Current != null || sink == null) return false;
+        if (isWashing || isFlipping || HasIngredients || sink == null) return false;
         StartCoroutine(WashRoutine(sink, knifeHygiene));
         return true;
     }
