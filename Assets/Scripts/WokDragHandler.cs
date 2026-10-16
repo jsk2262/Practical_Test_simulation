@@ -54,6 +54,8 @@ public class WokDragHandler : MonoBehaviour, IDraggable
             currentOffset = Vector3.zero;
         }
 
+        UpdateButtonShake();
+
         currentOffset = Vector3.Lerp(currentOffset, Vector3.zero, Time.deltaTime * springBack);
         transform.localPosition = homeLocalPos + currentOffset;
 
@@ -62,8 +64,66 @@ public class WokDragHandler : MonoBehaviour, IDraggable
         HandController.Instance?.SetHandShake(ShakeSpeed, 300f);
     }
 
+    // ---- 우클릭(또는 휠 버튼)으로 흔들기 ----
+    // 불 위의 팬·웍을 오른쪽 버튼(확대 중이 아니면 휠 버튼도)으로 누른 채 끌면, 왼손이
+    // 손잡이를 잡고 흔든다. 왼쪽 버튼은 집기·젓기에 그대로 (왼쪽 끌기 흔들기도 유지).
+    // 칼을 든 채 우클릭은 왼손 재료 옮기기(LeftHandCarry)가 먼저.
+    private bool buttonShaking;
+    private Vector2 lastShakeMouse;
+
+    private void UpdateButtonShake()
+    {
+        var mouse = UnityEngine.InputSystem.Mouse.current;
+        if (mouse == null) return;
+        bool middleFree = !KitchenCamera.IsZoomed; // (확대 중 휠 버튼은 화면 이동)
+        bool pressedNow = mouse.rightButton.wasPressedThisFrame || (middleFree && mouse.middleButton.wasPressedThisFrame);
+        bool held = mouse.rightButton.isPressed || (middleFree && mouse.middleButton.isPressed);
+        Vector2 screen = mouse.position.ReadValue();
+
+        if (!buttonShaking && pressedNow && CanButtonShake() && PointerOnThis(screen))
+        {
+            buttonShaking = true;
+            lastShakeMouse = screen;
+            OnDragStart();
+        }
+        if (!buttonShaking) return;
+        if (!held || vessel == null || vessel.CurrentBurner == null || vessel.IsHeld)
+        {
+            buttonShaking = false;
+            OnDragEnd();
+            return;
+        }
+        OnDragMove(screen - lastShakeMouse, Mathf.Max(Time.deltaTime, 1e-4f));
+        lastShakeMouse = screen;
+    }
+
+    private static bool CanButtonShake()
+    {
+        HandCarry hand = HandCarry.Instance;
+        if (hand != null && (hand.IsLocked || hand.IsDragging)) return false;
+        if (hand != null && hand.Current is ToolItem t && t.Kind == ToolKind.Knife) return false; // (왼손 재료 옮기기가 먼저)
+        if (LeftHandCarry.IsCarrying || MeatKneader.InputCaptured || ConfirmDialog.IsOpen || ExamResultView.IsOpen) return false;
+        return !(UnityEngine.EventSystems.EventSystem.current != null && UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject());
+    }
+
+    /// <summary>커서가 이 팬(이나 그 안의 음식, 이 팬이 올라간 화구) 위인지.</summary>
+    private bool PointerOnThis(Vector2 screen)
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return false;
+        foreach (RaycastHit h in Physics.RaycastAll(cam.ScreenPointToRay(screen), 200f))
+        {
+            if (h.collider.transform.IsChildOf(transform)) return true;
+            if (h.collider.GetComponentInParent<StoveBurner>() is StoveBurner b && (object)b.CurrentVessel == vessel) return true;
+            if (h.collider.GetComponentInParent<IngredientItem>() is IngredientItem ing && (object)ing.Container == vessel) return true;
+        }
+        return false;
+    }
+
     public bool OnDragStart()
     {
+        // 흔드는 동안 왼손이 손잡이를 잡고 팬을 따라 움직인다 (손잡이로 드는 팬·웍)
+        if (carryable != null && carryable.HoldsByHandle) carryable.ShowHandleHeldInPlace();
         return true;
     }
 
@@ -79,5 +139,7 @@ public class WokDragHandler : MonoBehaviour, IDraggable
 
     public void OnDragEnd()
     {
+        // 다 흔들면 왼손은 손잡이에서 놓는다 (팬을 든 게 아니라 화구 위에 그대로)
+        if (carryable != null && carryable.HoldsByHandle && !carryable.IsHeld) SupportHandController.Instance?.Hide();
     }
 }

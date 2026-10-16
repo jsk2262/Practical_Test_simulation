@@ -62,6 +62,8 @@ public class FryingPanPlating : MonoBehaviour
         foreach (MovableBowl b in Object.FindObjectsByType<MovableBowl>(FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
             if (System.Array.IndexOf(PanNames, b.name) >= 0 && b.GetComponent<FryingPanPlating>() == null) b.gameObject.AddComponent<FryingPanPlating>();
+            // 프라이팬도 웍처럼 화구 위에서 끌어 흔든다 (볶기·소스 버무리기 - 왼손이 손잡이를 잡고)
+            if (System.Array.IndexOf(PanNames, b.name) >= 0 && b.GetComponent<WokDragHandler>() == null) b.gameObject.AddComponent<WokDragHandler>();
             if (System.Array.IndexOf(PlatingDestination.PlateNames, b.name) >= 0 && b.GetComponent<PlatingDestination>() == null) b.gameObject.AddComponent<PlatingDestination>();
         }
     }

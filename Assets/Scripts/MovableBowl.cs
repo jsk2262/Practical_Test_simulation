@@ -151,7 +151,10 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         // heated: 고추기름); into a bowl, what's kept there (strained oil).
         // (PanSauce counts in 큰술 - 15 mL each)
         // (water too, into a pan that doesn't hold water of its own - a sauce's water; a pot's water is its own)
-        if ((GetComponent<FryingPanPlating>() != null || IsCookingVessel || PanSauce.Of(this, false) != null) && (seasoningName != Condiments.Water || !canHoldWater))
+        // 소스 그릇: 재료 없는 빈 종지·그릇·접시에 양념을 계량해 넣으면 거기 소스로 담긴다
+        // (섞어서 팬에 붓는 순서 - 숟가락으로 젓기, 들고 팬을 누르면 부음 PourSauceFrom)
+        bool sauceDish = !IsCookingVessel && !HasIngredients && !HasPortion && !HasEgg;
+        if ((GetComponent<FryingPanPlating>() != null || IsCookingVessel || sauceDish || PanSauce.Of(this, false) != null) && (seasoningName != Condiments.Water || !canHoldWater))
             PanSauce.Of(this, true).Add(seasoningName, ml / ToolItem.TablespoonMl);
     }
 
@@ -251,7 +254,8 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         return inside;
     }
 
-    public bool IsFull => occupied.Count >= (HasFryingOil ? Mathf.Max(capacity, fryingCapacity) : capacity);
+    // (튀김 기름 그릇과 팬·웍·냄비는 한 조각씩 넣어도 넉넉하게 - 튀긴 조각을 소스 팬에 옮겨 담기 등)
+    public bool IsFull => occupied.Count >= (HasFryingOil || IsCookingVessel ? Mathf.Max(capacity, fryingCapacity) : capacity);
 
     [Tooltip("튀김 기름이 든 팬/웍에 한 조각씩 넣을 수 있는 개수 (조각 하나하나가 따로 들어감).")]
     [SerializeField] private int fryingCapacity = 30;
@@ -1014,7 +1018,8 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     /// itself become a normal Carryable again.</summary>
     /// <summary>Whether an empty-handed click right now would pick this vessel
     /// itself up (not refused as a dish outside clean-up, nor taking what's in it).</summary>
-    public bool WouldPickUp => !IsHeld && !(isDish && !DishMovableNow) && occupied.Count == 0;
+    // (팬·웍·냄비는 음식이 든 채로도 든다 - 완성 접시에 담으러, 다른 화구로)
+    public bool WouldPickUp => !IsHeld && !(isDish && !DishMovableNow) && (occupied.Count == 0 || IsCookingVessel);
 
     [Tooltip("A dish that may also be moved during the opening ingredient check (not only in 정리). Off for the prepped-ingredients plate.")]
     [SerializeField] private bool movableDuringBriefing = true;
@@ -1023,7 +1028,9 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     /// check (ExamBriefing) runs, to sort the ingredients into them per dish;
     /// but not the prepped-ingredients plate then (movableDuringBriefing off).</summary>
     // (a plate with starch portioned into it can be carried too - to the sink to pour the water off)
-    private bool DishMovableNow => CleanupMode.IsOn || (ExamBriefing.IsPlaying && movableDuringBriefing) || HasPortion;
+    private bool DishMovableNow => CleanupMode.IsOn || (ExamBriefing.IsPlaying && movableDuringBriefing) || HasPortion
+        // (소스를 담은 접시·종지도 - 들고 가서 팬에 붓는다)
+        || (!HasIngredients && PanSauce.Of(this, false) is PanSauce s && s.Amount > 0.01f);
 
     /// <summary>요리를 담은 완성 접시 (PlatingDestination, 아직 제출 전): 요리째
     /// 통째로 들어서 제출대(SubmitShelf)로 옮긴다 - 음식을 하나씩 집지 않는다.</summary>
@@ -1070,7 +1077,8 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             if (!egg.Beaten && egg.HasWhite != egg.HasYolk) return false; // (only one part left: as it is)
             if (!egg.Beaten) egg.Say("다른 재료와 섞여서 흰자·노른자를 나눌 수 없어요");
         }
-        return occupied.Count > 0;
+        // (팬·웍·냄비는 음식째 든다 - 길게 눌러서. 그릇·접시는 음식이 있으면 그릇은 그대로)
+        return occupied.Count > 0 && !IsCookingVessel;
     }
 
     /// <summary>Tips the vessel in hand (담기 - FryingPanPlating's pour).</summary>
