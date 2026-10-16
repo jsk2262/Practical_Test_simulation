@@ -85,6 +85,14 @@ public class CookableItem : MonoBehaviour
     public bool IsColdShocked { get; private set; }
     public int FryPasses { get; private set; }
 
+    /// <summary>실행 중에 붙인 것 (익는 설정이 없던 채소 - IngredientItem.EnsurePieceGroup):
+    /// 팬에서 볶이고, 익은 색은 제 색보다 살짝 숨이 죽은 정도.</summary>
+    public void SetupAsVegetable(Color raw)
+    {
+        process = CookProcess.Grill;
+        doneColor = new Color(raw.r * 0.86f, raw.g * 0.9f, raw.b * 0.82f, 1f);
+    }
+
     /// <summary>Takes over another's cooking state (a piece split off from it).</summary>
     public void CopyFrom(CookableItem o)
     {

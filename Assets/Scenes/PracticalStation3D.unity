@@ -1965,7 +1965,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
@@ -2451,7 +2451,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
@@ -3652,6 +3652,7 @@ MonoBehaviour:
   - Label_CleanupTab
   - SubmitButton
   - SpeedModeButton
+  burnerButtonDrop: 0.72
 --- !u!1 &331421514
 GameObject:
   m_ObjectHideFlags: 0
@@ -3790,7 +3791,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
@@ -4271,7 +4272,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
@@ -5235,7 +5236,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
@@ -7313,7 +7314,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 1
@@ -7492,7 +7493,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
@@ -8135,7 +8136,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
@@ -8210,7 +8211,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
@@ -8291,7 +8292,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
@@ -8514,7 +8515,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
@@ -8595,7 +8596,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
@@ -10746,7 +10747,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
@@ -11152,7 +11153,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 1
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
@@ -16477,7 +16478,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
@@ -16766,7 +16767,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
@@ -17944,7 +17945,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
@@ -18072,7 +18073,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
@@ -18984,7 +18985,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
@@ -21009,7 +21010,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
@@ -21644,7 +21645,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
@@ -23525,7 +23526,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 1
@@ -25426,7 +25427,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
@@ -26298,7 +26299,7 @@ MonoBehaviour:
   fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
-  oilLevel: 0.5
+  oilLevel: 0.72
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
@@ -30457,6 +30458,7 @@ MonoBehaviour:
   flatDepthTurnDegrees: -90
   flatDepthGripAdjust: {x: 0, y: 0, z: 0}
   contentSpread: 0.12
+  leaveInPotWhileBlanching: 0
   drainSeconds: 4
 --- !u!65 &2390767099079631931
 BoxCollider:
@@ -31417,6 +31419,22 @@ MonoBehaviour:
     middle: {x: 0, y: 0, z: 75}
     distal: {x: 0, y: 0, z: 45}
   poseResponse: 14
+  chopstickGrip:
+  - proximal: {x: -15, y: 25, z: 15}
+    middle: {x: 0, y: 0, z: 22}
+    distal: {x: 0, y: 0, z: 12}
+  - proximal: {x: 0, y: 0, z: 18}
+    middle: {x: 0, y: 0, z: 40}
+    distal: {x: 0, y: 0, z: 18}
+  - proximal: {x: 0, y: 0, z: 28}
+    middle: {x: 0, y: 0, z: 48}
+    distal: {x: 0, y: 0, z: 25}
+  - proximal: {x: 0, y: 0, z: 48}
+    middle: {x: 0, y: 0, z: 72}
+    distal: {x: 0, y: 0, z: 42}
+  - proximal: {x: 0, y: 0, z: 55}
+    middle: {x: 0, y: 0, z: 78}
+    distal: {x: 0, y: 0, z: 48}
 --- !u!1 &3408889118545973404
 GameObject:
   m_ObjectHideFlags: 0
@@ -32628,6 +32646,22 @@ MonoBehaviour:
     middle: {x: 0, y: 0, z: 75}
     distal: {x: 0, y: 0, z: 45}
   poseResponse: 14
+  chopstickGrip:
+  - proximal: {x: -15, y: 25, z: 15}
+    middle: {x: 0, y: 0, z: 22}
+    distal: {x: 0, y: 0, z: 12}
+  - proximal: {x: 0, y: 0, z: 18}
+    middle: {x: 0, y: 0, z: 40}
+    distal: {x: 0, y: 0, z: 18}
+  - proximal: {x: 0, y: 0, z: 28}
+    middle: {x: 0, y: 0, z: 48}
+    distal: {x: 0, y: 0, z: 25}
+  - proximal: {x: 0, y: 0, z: 48}
+    middle: {x: 0, y: 0, z: 72}
+    distal: {x: 0, y: 0, z: 42}
+  - proximal: {x: 0, y: 0, z: 55}
+    middle: {x: 0, y: 0, z: 78}
+    distal: {x: 0, y: 0, z: 48}
 --- !u!23 &4268552747159713285
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -37936,6 +37970,7 @@ MonoBehaviour:
   flatDepthTurnDegrees: -90
   flatDepthGripAdjust: {x: 0, y: 0, z: 0}
   contentSpread: 0.12
+  leaveInPotWhileBlanching: 0
   drainSeconds: 4
 --- !u!65 &9080364287152162487
 BoxCollider:

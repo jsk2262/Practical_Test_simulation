@@ -85,14 +85,25 @@ public partial class Strainer : ToolItem
     /// <summary>The pieces it brought into the pot - only these come back up with it.</summary>
     private readonly List<IngredientItem> dipped = new List<IngredientItem>();
 
-    /// <summary>데치기: the pieces go into the boiling water and the strainer is
-    /// set down standing in the pot (basket in, handle up) until taken again.</summary>
+    [Tooltip("데치기: 끄면 콩만 끓는 물에 넣고 체망은 손에 남는다 (위생 - 체망째 냄비에 넣어 두지 않음). 켜면 예전처럼 체망째 냄비에 세워 둔다.")]
+    [SerializeField] private bool leaveInPotWhileBlanching = false;
+
+    /// <summary>데치기: 재료(완두콩)만 끓는 물에 넣고 체망은 손에 남는다 - 다 데쳐지면
+    /// 빈 체망으로 누른 자리에서 건진다 (StrainerLocalScoop). 체망째 냄비에 넣어 두면
+    /// 위생 감점 소지가 있어서. (leaveInPotWhileBlanching을 켜면 예전 방식)</summary>
     public void DipInto(MovableBowl pot)
     {
         HandCarry hand = HandCarry.Instance;
         if (!HasContents || hand == null || (object)hand.Current != this) return;
         // Into the middle of the pot's water, not wherever the basket was held.
         CenterIn(pot);
+        if (!leaveInPotWhileBlanching)
+        {
+            DumpInto(pot);
+            HandController.Instance?.PlayChopGesture();
+            Debug.Log($"[체망] {pot.name}: 재료만 끓는 물에 넣음 - 체망은 손에 (다 데쳐지면 빈 체망으로 건지세요)");
+            return;
+        }
         dipped.Clear();
         dipped.AddRange(contents);
         DumpInto(pot);

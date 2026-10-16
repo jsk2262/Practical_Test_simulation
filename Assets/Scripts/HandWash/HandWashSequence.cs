@@ -83,7 +83,12 @@ public sealed class HandWashSequence : MonoBehaviour
     private bool HandsEmpty => HandCarry.Instance == null || HandCarry.Instance.Current == null;
     private bool WaterAvailable => waterTap != null && waterTap.IsOn;
 
-    public void BeginWash()
+    /// <summary>지금 하는 게 간단 손씻기(1단계 적시기만)인지.</summary>
+    public bool IsShortWash { get; private set; }
+
+    /// <summary>firstStepOnly: 처음·마지막 정리 때가 아닌 중간 손씻기 - 1단계(손과
+    /// 손목 적시기)만 하고 끝난다.</summary>
+    public void BeginWash(bool firstStepOnly = false)
     {
         // Starts even with the tap off - step 1 (wetting) just waits, with a
         // prompt, until the water is turned on.
@@ -96,6 +101,8 @@ public sealed class HandWashSequence : MonoBehaviour
             if (step == null || step.seconds <= 0) return;
             total += step.seconds;
         }
+        IsShortWash = firstStepOnly;
+        if (firstStepOnly) total = steps[0].seconds; // (적시기 단계에서 그대로 끝남)
         if (!leftHand.Bind() || !rightHand.Bind()) return;
         soapActive=soapVisual != null && soapVisual.activeSelf;
         towelActive=towelVisual != null && towelVisual.activeSelf;
@@ -160,7 +167,7 @@ public sealed class HandWashSequence : MonoBehaviour
         if (soapVisual != null) soapVisual.SetActive(soapActive);
         if (towelVisual != null) towelVisual.SetActive(towelActive);
         if (statusLabel != null) statusLabel.text=oldLabel;
-        if (completed) { HandsWashed = true; HandHygiene.Washed(); }
+        if (completed) { if (!IsShortWash) HandsWashed = true; HandHygiene.Washed(); }
         if (completed) onCompleted?.Invoke(); else onCancelled?.Invoke();
     }
     private void OnDisable() { CancelWash(); }

@@ -406,6 +406,16 @@ public class ClickDetector : MonoBehaviour
             }
             if (best != null) return best.Value.collider.gameObject;
         }
+        // 씻은 접시를 들고 정리 중: 선반(PlateShelf)에 이미 놓인 접시가 앞을 가려도
+        // 선반이 클릭을 받는다 - 안 그러면 진열된 접시 위를 누르면 아무 일도 없었다.
+        if (HandCarry.Instance != null && HandCarry.Instance.Current is MovableBowl heldDish)
+        {
+            foreach (RaycastHit h in hits)
+            {
+                if (h.collider.GetComponentInParent<DishShelfController>() is DishShelfController shelf
+                    && shelf.CanAcceptDrop(heldDish)) return shelf.gameObject;
+            }
+        }
         return nearest.collider.gameObject;
     }
 

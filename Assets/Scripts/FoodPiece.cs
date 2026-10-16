@@ -134,6 +134,35 @@ public class FoodPiece : MonoBehaviour
 
     /// <summary>Shows its own cooked color - browned and charred where it is -
     /// with its sauce over it.</summary>
+    /// <summary>썰린 채소 조각처럼 조각마다 제 색(대파 흰·초록...)이 있는 것: 한 색으로
+    /// 덮지 않고, 제 재질 색에 익은 정도(raw → cooked 비율)를 곱해 칠한다.</summary>
+    public bool UseOwnColors { get; set; }
+
+    public void Show(Color cooked, Color raw)
+    {
+        if (!UseOwnColors) { Show(cooked); return; }
+        if (rend == null) rend = GetComponent<Renderer>();
+        if (rend == null) return;
+        Material[] mats = rend.sharedMaterials;
+        Color ratio = new Color(cooked.r / Mathf.Max(raw.r, 0.02f), cooked.g / Mathf.Max(raw.g, 0.02f), cooked.b / Mathf.Max(raw.b, 0.02f), 1f);
+        float s = Mathf.Lerp(0.2f, 0.85f, Coat * Mathf.Lerp(0.35f, 1f, CoatViscosity));
+        block ??= new MaterialPropertyBlock();
+        for (int i = 0; i < mats.Length; i++)
+        {
+            if (mats[i] == null) continue;
+            Color own = mats[i].HasProperty("_BaseColor") ? mats[i].GetColor("_BaseColor") : mats[i].color;
+            Color c = new Color(Mathf.Clamp01(own.r * ratio.r), Mathf.Clamp01(own.g * ratio.g), Mathf.Clamp01(own.b * ratio.b), own.a);
+            c = Color.Lerp(c, SearBrown, Sear * 0.8f);
+            c = Color.Lerp(c, CharBlack, Char);
+            c = Color.Lerp(c, CoatColor, Coat * 0.85f);
+            block.Clear();
+            block.SetColor("_BaseColor", c);
+            block.SetColor("_Color", c);
+            block.SetFloat("_Smoothness", s);
+            rend.SetPropertyBlock(block, i);
+        }
+    }
+
     public void Show(Color cooked)
     {
         if (rend == null) rend = GetComponent<Renderer>();
@@ -315,8 +344,9 @@ public class FoodPieceGroup : MonoBehaviour
         }
         if (simBowl != null) Step(Mathf.Min(Time.deltaTime, 0.05f));
 
+        Color rawRef = cookable != null ? cookable.ColorAt(0f) : Color.white;
         foreach (FoodPiece p in Pieces)
-            p.Show(p.PanCooked ? PanColor(p) : cookable != null ? cookable.ColorAt(p.Cook) : Color.white);
+            p.Show(p.PanCooked ? PanColor(p) : cookable != null ? cookable.ColorAt(p.Cook) : Color.white, rawRef);
     }
 
     /// <summary>In a pan/wok/oil (not in water): there's a pan's heat to cook by.</summary>
@@ -352,7 +382,9 @@ public class FoodPieceGroup : MonoBehaviour
     private void CookInPan(float dt)
     {
         PanSauce sauce = simBowl.GetComponent<PanSauce>();
-        bool watery = sauce != null && sauce.IsWatery && sauce.Amount > 0.5f;
+        // (소스가 졸아붙어 타는 중이면 물기 소스로 치지 않는다 - 재료도 바닥에 눌어 탄다)
+        bool watery = sauce != null && sauce.IsWatery && sauce.Amount > 0.5f && sauce.BurnRate <= 0f;
+        float charring = 0f;
         float pan, room = 20f;
         bool oil = simBowl.HasFryingOil;
         if (oil) pan = Mathf.Lerp(room, 175f, simBowl.OilHeat01);
@@ -374,12 +406,25 @@ public class FoodPieceGroup : MonoBehaviour
             if (!watery && (onFloor || oil))
             {
                 p.Sear = Mathf.Min(1f, p.Sear + dt * Mathf.Max(0f, searRateByTemp.Evaluate(surface)));
-                if (!oil && !SpeedMode.On) p.Char = Mathf.Min(1f, p.Char + dt * Mathf.Max(0f, charRateByTemp.Evaluate(surface)));
+                if (!oil && !SpeedMode.On)
+                {
+                    float cr = Mathf.Max(0f, charRateByTemp.Evaluate(surface));
+                    // 소스가 바닥에 눌어붙어 타는 중이면, 바닥에 닿은 조각도 같이 탄다
+                    if (sauce != null && sauce.BurnRate > 0f && onFloor) cr += sauce.BurnRate * 0.9f;
+                    if (p.Char < 1f) charring += cr;
+                    p.Char = Mathf.Min(1f, p.Char + dt * cr);
+                }
             }
             // 튀김 기름에 너무 오래: 다 익고도 계속 두면 타 들어간다 (기름이 뜨거울수록 빨리)
             if (oil && !SpeedMode.On && p.Cook > TimeToCooked * overfryAfter)
+            {
+                if (p.Char < 1f) charring += oilCharPerSecond * simBowl.OilHeat01;
                 p.Char = Mathf.Min(1f, p.Char + dt * oilCharPerSecond * simBowl.OilHeat01);
+            }
         }
+        // 타 들어가는 조각이 있으면 탄 연기 (많이·빨리 탈수록 진하게)
+        if (charring > 0.005f && Pieces.Count > 0)
+            BurnSmoke.For(simBowl)?.Emit(Mathf.Clamp01(0.3f + charring / Pieces.Count / 0.04f));
     }
 
     /// <summary>Seconds-scale for a piece to take on the heat around it: bigger, slower.</summary>
@@ -451,6 +496,10 @@ public class FoodPieceGroup : MonoBehaviour
         // "Down" is into the counter (the scene's counter is tilted to the camera);
         // a container tilted off it lets the pieces slide.
         Vector3 g = inv * (-Carryable.CounterUp * gravity);
+        // 놓여 있는 그릇은 바닥이 평평하다 (팬 모델의 '위'가 조리대 기울기와 조금 달라서,
+        // 그대로면 가만히 둬도 조각이 앞쪽 벽 밑으로 미끄러져 가려졌다) - 손에 들고
+        // 기울일 때만 기운 쪽으로 미끄러진다
+        if (!simBowl.IsHeld) g = new Vector3(0f, -gravity, 0f);
 
         PanSauce sauce = simBowl.GetComponent<PanSauce>();
         float sauceAvail = sauce != null ? Mathf.Clamp01(sauce.Amount / 3f) : 0f;
@@ -1108,6 +1157,11 @@ public class PanSauce : MonoBehaviour
     [SerializeField] private float solidTau = 4f;
     private float solidTemp = 20f;
     [SerializeField] private float smokeAboveBurnRate = 0.02f;
+    [Tooltip("물기 소스가 이만큼(큰술) 이하로 적고 물이 거의 없으면, 뜨거운 팬에서 졸아붙어 탄다.")]
+    [SerializeField] private float scorchBelowSpoons = 4f;
+    [Tooltip("x: 팬 온도 °C → y: 물기 소스가 1초에 타는 정도 (0.5 넘으면 '탐').")]
+    [SerializeField] private AnimationCurve scorchPerSecondByPanTemp = new AnimationCurve(
+        new Keyframe(130f, 0f), new Keyframe(160f, 0.008f), new Keyframe(200f, 0.025f), new Keyframe(250f, 0.06f));
 
     /// <summary>What's in the pan (°C) - its own, apart from the pan's.</summary>
     public float Temperature => sauce.temp;
@@ -1363,6 +1417,28 @@ public class PanSauce : MonoBehaviour
         if (flame && sauce.heat > 0.3f)
             BurnerFloorDirt.Soil(b, watery ? BurnerFloorDirt.SoilKind.Sauce : BurnerFloorDirt.SoilKind.Oil, dt);
 
+        // ---- 물기 소스가 졸아 타기: 물이 거의 없는 적은 양의 소스(간장·식초·설탕...)가
+        // 뜨거운 팬에 오래 있으면 바닥에 눌어붙어 검게 탄다 (저으면 덜). 연기도. ----
+        if (watery && flame && !SpeedMode.On
+            && !(sauce.parts.TryGetValue(Condiments.Water, out float wetLeft) && wetLeft > 0.2f) && Amount <= scorchBelowSpoons)
+        {
+            bool stirringNow = Time.time < stirUntil;
+            BurnRate = Mathf.Max(0f, scorchPerSecondByPanTemp.Evaluate(pan)) * (stirringNow ? 0.4f : 1f)
+                       * Mathf.Lerp(1.5f, 0.6f, Mathf.Clamp01(Amount / scorchBelowSpoons)); // (적을수록 빨리)
+            if (BurnRate > 0f && sauce.burn < 1f)
+            {
+                float had = sauce.burn;
+                sauce.burn = Mathf.Min(1f, had + BurnRate * dt);
+                if (Mathf.FloorToInt(sauce.burn * 20f) != Mathf.FloorToInt(had * 20f)) Recompute();
+                if (had < 0.5f && sauce.burn >= 0.5f)
+                {
+                    sauce.notes.Add("소스가 졸아붙어 탐");
+                    Debug.Log($"[소스] {bowl.name}: 졸아붙어 탐 (불을 줄이거나 저으세요)");
+                }
+            }
+            UpdateSmoke();
+            return;
+        }
         if (sauce.LiquidAmount <= 0.01f || sauce.SolidAmount <= 0.001f) { BurnRate = 0f; return; }
         bool changed = false;
 
@@ -1431,38 +1507,11 @@ public class PanSauce : MonoBehaviour
         return false;
     }
 
-    // ---- 연기: burning hot, a little smoke off it ----
-    private float nextSmoke;
-
+    // ---- 연기: 타는 동안 탄 연기 (파티클 - Vefects 연기 텍스처, BurnSmoke) ----
     private void UpdateSmoke()
     {
-        if (BurnRate < smokeAboveBurnRate || Time.time < nextSmoke) return;
-        nextSmoke = Time.time + Mathf.Lerp(0.6f, 0.15f, Mathf.Clamp01(BurnRate / 0.2f));
-        StartCoroutine(Puff());
-    }
-
-    private System.Collections.IEnumerator Puff()
-    {
-        MovableBowl.Interior inside = bowl.GetInterior();
-        Vector3 from = inside.floorCenter + inside.up * inside.rim + new Vector3(Random.Range(-1f, 1f) * inside.radius * 0.5f, 0f, -0.3f);
-        GameObject g = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        g.name = "Smoke";
-        Destroy(g.GetComponent<Collider>());
-        var m = new Material(Shader.Find("Sprites/Default")) { color = new Color(0.55f, 0.55f, 0.55f, 0.35f) };
-        Renderer r = g.GetComponent<Renderer>();
-        r.sharedMaterial = m;
-        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        const float life = 1.6f;
-        for (float t = 0f; t < life; t += Time.deltaTime)
-        {
-            float k = t / life;
-            g.transform.position = from + Vector3.up * (k * 0.9f) + Vector3.right * Mathf.Sin(k * 6f) * 0.05f;
-            g.transform.localScale = Vector3.one * Mathf.Lerp(0.08f, 0.3f, k);
-            m.color = new Color(0.55f, 0.55f, 0.55f, 0.35f * (1f - k));
-            yield return null;
-        }
-        Destroy(g);
-        Destroy(m);
+        if (BurnRate < smokeAboveBurnRate * 0.25f) return;
+        BurnSmoke.For(bowl)?.Emit(Mathf.Clamp01(0.25f + BurnRate / 0.06f));
     }
 
     private void Recompute()

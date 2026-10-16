@@ -201,6 +201,44 @@ public class IngredientItem : Carryable
         return clone;
     }
 
+    // ---- 썬 채소를 조각 단위로 (팬에서 익고·타고·저으면 움직이게) ----
+
+    /// <summary>썰려서 겉모양 조각(Piece_*)만 있고 조각 시뮬레이션(FoodPieceGroup)이 없는
+    /// 재료(대파·오이·당근 등의 편썰기)를 조리 그릇에 넣을 때: 조각마다 FoodPiece를 붙여
+    /// 고기 조각처럼 각자 익고, 노릇해지고, 타고, 저으면 움직이게 한다. 익는 설정
+    /// (CookableItem)이 없던 재료면 채소용으로 붙인다. 이미 있으면 아무것도 안 함.</summary>
+    public void EnsurePieceGroup()
+    {
+        if (CurrentState != State.Cut || GetComponent<FoodPieceGroup>() != null) return;
+        var pieces = new List<Renderer>();
+        foreach (Renderer r in GetComponentsInChildren<Renderer>())
+            if (r.name.StartsWith("Piece_") && r.GetComponent<MeshFilter>() != null && r.GetComponent<FoodPiece>() == null) pieces.Add(r);
+        if (pieces.Count == 0) return;
+
+        if (GetComponent<CookableItem>() == null)
+        {
+            CookableItem ck = gameObject.AddComponent<CookableItem>();
+            Color raw = rend != null && rend.sharedMaterial != null ? rend.sharedMaterial.color : Color.white;
+            ck.SetupAsVegetable(raw);
+        }
+        FoodPieceGroup group = gameObject.AddComponent<FoodPieceGroup>();
+        float grams = amountGrams > 0f ? amountGrams / pieces.Count : 0f;
+        foreach (Renderer r in pieces)
+        {
+            if (r.GetComponent<Collider>() == null)
+            {
+                BoxCollider box = r.gameObject.AddComponent<BoxCollider>();
+                box.center = r.GetComponent<MeshFilter>().sharedMesh.bounds.center;
+                box.size = r.GetComponent<MeshFilter>().sharedMesh.bounds.size;
+            }
+            FoodPiece fp = r.gameObject.AddComponent<FoodPiece>();
+            fp.Init(this, grams, 0f, r.bounds.size);
+            fp.UseOwnColors = true; // (조각마다 제 색 - 대파 흰·초록 등)
+            group.Add(fp);
+        }
+        Debug.Log($"[{ingredientName}] 조각 {pieces.Count}개를 따로 익고 움직이게 함 (팬·냄비에 들어감)");
+    }
+
     // ---- 밑간 주무르기 ----
 
     /// <summary>How evenly the marinade is worked into it (0..1) - new seasoning

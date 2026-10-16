@@ -43,6 +43,20 @@ public class WashBasin : Interactable
             // over and the same on the other side.
             StartCoroutine(RinseHeld(tool, true, true, () => tool.GetComponent<HygieneTracker>()?.Wash()));
         }
+        else if (hand?.Current is ToolItem measuringSpoon && measuringSpoon.Kind == ToolKind.MeasuringSpoon)
+        {
+            // 계량스푼 씻기: 담겨 있던 것은 흘려 버리고 물에 헹군다 (들고 있는 그대로).
+            if (measuringSpoon.IsSpoonLoaded)
+            {
+                Debug.Log($"[세척] 계량스푼에 남은 {measuringSpoon.LoadedSeasoning} 버림");
+                measuringSpoon.ConsumeSeasoning();
+            }
+            StartCoroutine(RinseHeld(measuringSpoon, false, false, () =>
+            {
+                measuringSpoon.GetComponent<HygieneTracker>()?.Wash();
+                measuringSpoon.SpoonNotice("계량스푼 세척 완료");
+            }));
+        }
         else if (hand?.Current is ToolItem towel && towel.IsTowelKind)
         {
             // A wrapped towel needs somewhere to unwrap, and a plain one
@@ -101,9 +115,29 @@ public class WashBasin : Interactable
             // planning cards. With the 15-second wash sequence set up (Tools >
             // Kitchen > Setup Hand Wash) that plays the full 1→2→3→5→6→9→10
             // routine; otherwise just the short rub gesture as before.
-            if (handWash != null) handWash.BeginWash();
+            // 전체 과정은 처음(시험 시작) 한 번과 마지막 정리 때 한 번만 - 그 사이
+            // 중간중간 손씻기는 1단계(적시기)만 하는 간단 버전.
+            if (handWash != null)
+            {
+                bool full = !handWash.HandsWashed || (CleanupMode.IsOn && !cleanupWashDone);
+                if (full && CleanupMode.IsOn) WatchCleanupWash();
+                handWash.BeginWash(!full);
+            }
             else HandController.Instance?.PlayWashGesture();
         }
+    }
+
+    /// <summary>마지막 정리 때 전체 손씻기를 끝까지 했는지 (중간에 끊기면 다시 전체).</summary>
+    private bool cleanupWashDone, watchingCleanupWash;
+
+    private void WatchCleanupWash()
+    {
+        if (watchingCleanupWash) return;
+        watchingCleanupWash = true;
+        handWash.onCompleted.AddListener(() =>
+        {
+            if (CleanupMode.IsOn && !handWash.IsShortWash) cleanupWashDone = true;
+        });
     }
 
     // ---- washing what's in hand ----

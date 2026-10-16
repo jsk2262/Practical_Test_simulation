@@ -530,7 +530,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     /// dish (탕수육 etc.), it starts already holding cooking oil up to
     /// oilLevel of its depth, the way the exam station is set up.</summary>
     [SerializeField] private bool oilForFrying;
-    [SerializeField, Range(0.1f, 1f)] private float oilLevel = 0.5f;
+    [SerializeField, Range(0.1f, 1f)] private float oilLevel = 0.72f;
     [SerializeField] private Color oilColor = new Color(0.86f, 0.66f, 0.18f);
     private static readonly string[] FriedDishKeywords = { "탕수육", "튀김", "강정", "까스", "커틀릿" };
 
@@ -1835,6 +1835,8 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         if (item is IngredientItem || item is FoodScrap)
         {
             Interior inside = GetInterior();
+            // 썬 채소가 팬·웍·냄비에 들어가면: 조각마다 따로 익고·타고·저으면 움직이게
+            if (IsCookingVessel && item is IngredientItem toCook) toCook.EnsurePieceGroup();
             if (item is IngredientItem cut && cut.CurrentState == IngredientItem.State.Cut)
                 cut.GatherPieces(Mathf.Min(InsideRadius(), inside.radius * 0.45f));
             // What shows of it (cut slices lie off to one side of the pivot) goes on the spot.
