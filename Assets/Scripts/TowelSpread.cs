@@ -43,7 +43,7 @@ public class TowelSpread : Interactable
         anim = StartCoroutine(Fold(false));
     }
     private Coroutine anim;
-    private Transform leftHinge, rightHinge;
+    private Transform leftHinge, rightHinge, topHinge, bottomHinge;
     private GameObject center;
 
     public void Init(ToolItem towel, Interactable under)
@@ -120,6 +120,7 @@ public class TowelSpread : Interactable
         Renderer flat = GetComponent<Renderer>();
         BuildFlaps(flat);
         List<IngredientItem> pieces = PiecesOnIt();
+        if (close) FitTo(pieces);
 
         // How far in front of the sheet the flaps must come to lie over the piece.
         float lift = 0.02f;
@@ -155,17 +156,78 @@ public class TowelSpread : Interactable
                 bundleWasHeld = false;
             }
         }
+        BoxCollider box = GetComponent<BoxCollider>();
+        if (box != null)
+        {
+            box.center = close ? new Vector3((coverMinX + coverMaxX) * 0.5f,
+                (coverMinY + coverMaxY) * 0.5f, -liftLocal * 0.5f) : Vector3.zero;
+            box.size = close ? new Vector3(coverMaxX - coverMinX, coverMaxY - coverMinY,
+                liftLocal + 0.02f) : new Vector3(1f, 1f, 0.02f);
+        }
         folded = close;
         anim = null;
     }
 
+    // 접혔을 때 덮는 영역 (시트 로컬 좌표, 시트 전체가 -0.5~0.5)
+    private float coverMinX = -1f / 6f, coverMaxX = 1f / 6f, coverMinY = -0.5f, coverMaxY = 0.5f;
+
+    /// <summary>접기 전에, 재료가 어디에 어떤 크기로 놓였든 접힌 타월이 재료
+    /// 전체를 덮도록 가운데 면과 양쪽 날개의 크기·위치를 맞춘다 (재료의 보이는
+    /// 범위를 시트 평면에 투영하고 여유를 둔다). 날개는 각각 가운데 면 전체
+    /// 너비라서 한쪽만으로도 다 덮인다.</summary>
+    private void FitTo(List<IngredientItem> pieces)
+    {
+        float minX = -1f / 6f, maxX = 1f / 6f, minY = -0.5f, maxY = 0.5f;
+        bool any = false;
+        float pMinX = 0f, pMaxX = 0f, pMinY = 0f, pMaxY = 0f;
+        foreach (IngredientItem p in pieces)
+        {
+            Bounds b = p.VisibleBounds;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 corner = new Vector3((i & 1) == 0 ? b.min.x : b.max.x, (i & 2) == 0 ? b.min.y : b.max.y, (i & 4) == 0 ? b.min.z : b.max.z);
+                Vector3 l = transform.InverseTransformPoint(corner);
+                if (!any) { pMinX = pMaxX = l.x; pMinY = pMaxY = l.y; any = true; }
+                else { pMinX = Mathf.Min(pMinX, l.x); pMaxX = Mathf.Max(pMaxX, l.x); pMinY = Mathf.Min(pMinY, l.y); pMaxY = Mathf.Max(pMaxY, l.y); }
+            }
+        }
+        if (any)
+        {
+            // (가장자리가 살짝 보이지 않게 크기의 15% + 고정 여유)
+            float padX = (pMaxX - pMinX) * 0.05f + 0.01f, padY = (pMaxY - pMinY) * 0.05f + 0.01f;
+            minX = pMinX - padX; maxX = pMaxX + padX;
+            minY = pMinY - padY; maxY = pMaxY + padY;
+        }
+        coverMinX = minX; coverMaxX = maxX; coverMinY = minY; coverMaxY = maxY;
+
+        float w = maxX - minX, h = maxY - minY, cy = (minY + maxY) * 0.5f;
+        center.transform.localPosition = new Vector3((minX + maxX) * 0.5f, cy, 0f);
+        center.transform.localScale = new Vector3(w, h, 1f);
+        Transform lf = leftHinge.GetChild(0), rf = rightHinge.GetChild(0);
+        lf.localPosition = new Vector3(-w * 0.5f, cy, 0f);
+        lf.localScale = new Vector3(w, h, 1f);
+        rf.localPosition = new Vector3(w * 0.5f, cy, 0f);
+        rf.localScale = new Vector3(w, h, 1f);
+        float cx = (minX + maxX) * 0.5f;
+        Transform tf = topHinge.GetChild(0), bf = bottomHinge.GetChild(0);
+        tf.localPosition = new Vector3(cx, h * 0.25f, 0f);
+        bf.localPosition = new Vector3(cx, -h * 0.25f, 0f);
+        tf.localScale = bf.localScale = new Vector3(w, h * 0.5f, 1f);
+    }
+
     private void Pose(float k, float liftLocal)
     {
-        leftHinge.localRotation = Quaternion.AngleAxis(-180f * k, Vector3.up);
-        rightHinge.localRotation = Quaternion.AngleAxis(180f * k, Vector3.up);
+        float sides = Mathf.Clamp01(k * 1.5f);
+        leftHinge.localRotation = Quaternion.AngleAxis(-180f * sides, Vector3.up);
+        rightHinge.localRotation = Quaternion.AngleAxis(180f * sides, Vector3.up);
         float z = -liftLocal * k;
-        leftHinge.localPosition = new Vector3(-1f / 6f, 0f, z);
-        rightHinge.localPosition = new Vector3(1f / 6f, 0f, z - 0.001f);
+        leftHinge.localPosition = new Vector3(coverMinX, 0f, z);
+        rightHinge.localPosition = new Vector3(coverMaxX, 0f, z - 0.001f);
+        float ends = Mathf.Clamp01((k - 0.35f) / 0.65f);
+        topHinge.localRotation = Quaternion.AngleAxis(-180f * ends, Vector3.right);
+        bottomHinge.localRotation = Quaternion.AngleAxis(180f * ends, Vector3.right);
+        topHinge.localPosition = new Vector3(0f, coverMaxY, -liftLocal * ends - 0.003f);
+        bottomHinge.localPosition = new Vector3(0f, coverMinY, -liftLocal * ends - 0.005f);
     }
 
     private void BuildFlaps(Renderer flat)
@@ -187,6 +249,12 @@ public class TowelSpread : Interactable
         rightHinge.SetParent(transform, false);
         Part("LeftFlap", leftHinge, new Vector3(-1f / 6f, 0f, 0f), 1f / 3f, m);
         Part("RightFlap", rightHinge, new Vector3(1f / 6f, 0f, 0f), 1f / 3f, m);
+        topHinge = new GameObject("TopHinge").transform;
+        bottomHinge = new GameObject("BottomHinge").transform;
+        topHinge.SetParent(transform, false);
+        bottomHinge.SetParent(transform, false);
+        Part("TopFlap", topHinge, Vector3.zero, 1f, m);
+        Part("BottomFlap", bottomHinge, Vector3.zero, 1f, m);
         Pose(0f, 0f);
     }
 
@@ -210,5 +278,7 @@ public class TowelSpread : Interactable
         center.SetActive(on);
         leftHinge.GetChild(0).gameObject.SetActive(on);
         rightHinge.GetChild(0).gameObject.SetActive(on);
+        topHinge.GetChild(0).gameObject.SetActive(on);
+        bottomHinge.GetChild(0).gameObject.SetActive(on);
     }
 }

@@ -343,13 +343,27 @@ public class IngredientItem : Carryable
 
     protected override bool OnClickedWhileHandEmpty()
     {
+        // 완성 접시에 담긴 요리를 누르면: 음식만 집지 않고 접시째 든다 (제출대로)
+        if (InBowl is MovableBowl served && served.CarriesAsServed)
+        {
+            HandCarry.Instance?.PickUp(served);
+            return true;
+        }
+
         // 버무리기 by hand: the meat with its 튀김옷 (or a 밑간 not worked in yet) in
         // a bowl, not on the heat - both hands into the bowl (MeatKneader; held
         // down, they knead). One piece is taken by pressing and holding on it.
         if (InBowl is MovableBowl mixBowl && !mixBowl.IsCookingVessel && Category == IngredientCategory.Meat
-            && ((BatterCoating.Of(this, false) is BatterCoating batter && batter.HasAny) || (HasMarinade && MarinadeMix < 1f)))
+            && MeatKneader.HasMeatToKnead(mixBowl))
         {
             MeatKneader.Begin(mixBowl);
+            return true;
+        }
+        // 다 버무린 그릇의 고기: 더 버무리지 않고 [반죽 조각 / 고기 한 점 / 닫기] 선택창
+        if (InBowl is MovableBowl doneBowl && !doneBowl.IsCookingVessel && Category == IngredientCategory.Meat
+            && BowlMixInteraction.For(doneBowl).ShowsChooser())
+        {
+            BowlMixInteraction.For(doneBowl).OpenChooser();
             return true;
         }
 
@@ -418,7 +432,15 @@ public class IngredientItem : Carryable
     protected override void OnClickedWhileHandFull(Carryable held)
     {
         // The strainer in hand scoops this one piece up (the peas off their plate).
-        if (held is Strainer strainer && !IsHeld && strainer.TakeIn(this)) return;
+        if (held is Strainer strainer && !IsHeld)
+        {
+            if (CurrentContainer is MovableBowl vessel && !strainer.HasContents)
+            {
+                strainer.ScoopFrom(vessel);
+                return;
+            }
+            if (strainer.TakeIn(this)) return;
+        }
 
         // Frying chopsticks pinch this piece up (e.g. out of the hot oil).
         if (held is FryingChopsticks chop)
@@ -456,7 +478,10 @@ public class IngredientItem : Carryable
             && InBowl is MovableBowl pan && pan.GetComponent<FryingPanPlating>() != null)
         {
             string sauceName = panSpoon.LoadedSeasoning;
-            pan.AddSeasoning(sauceName, panSpoon.ConsumeSeasoning());
+            SaucePortion portion = panSpoon.LoadedSauce;
+            float ml = panSpoon.ConsumeSeasoning();
+            if (portion != null) pan.AddSaucePortion(portion);
+            else pan.AddSeasoning(sauceName, ml);
             return;
         }
         if (held is ToolItem spoon && spoon.Kind == ToolKind.MeasuringSpoon && spoon.IsSpoonLoaded)
@@ -1512,8 +1537,8 @@ public class IngredientItem : Carryable
                 handCtl?.SlideTo(handBase + Vector3.right * (b.extents.x + 0.45f), 0.3f * slow);
                 yield return new WaitForSeconds(0.3f * slow);
                 yield return StepGate("② 칼을 눕히기 · 왼손 바닥으로 누르기");
-                if (knife != null) yield return knife.TurnFlatBladeLeft(0.35f * slow);
-                PalmOnTop(rig.TransformPoint(new Vector3(b.center.x - b.extents.x * 0.3f, b.max.y, b.center.z)));
+                if (knife != null) yield return knife.TurnFlatAlongDepth(0.35f * slow);
+                PalmOnTop(PalmPoint(rig, b));
             }
             float topLeftover = cuts.Count > 0 && H - sheets * thickW > SizeTolerance * thickW ? cuts[0] : float.NaN;
             int pass = 0;
@@ -1830,8 +1855,13 @@ public class IngredientItem : Carryable
         if (!meatCutStepMode) yield break;
         var kb = UnityEngine.InputSystem.Keyboard.current;
         yield return null;
-        while (kb != null && !kb.nKey.wasPressedThisFrame) yield return null;
+        stepAdvance = false;
+        while (meatCutStepMode && !stepAdvance && kb != null && !kb.nKey.wasPressedThisFrame) yield return null;
+        stepAdvance = false;
     }
+
+    /// <summary>단계 모드에서 N 키 대신 다음 단계로 (에디터 테스트용, 리플렉션으로 설정).</summary>
+    private static bool stepAdvance;
 
     /// <summary>The meat turned flat on the board by degrees (about the board's
     /// up through its middle - not tipped over), the left hand holding it by its
@@ -1885,46 +1915,97 @@ public class IngredientItem : Carryable
     /// brought in from the right side of the meat at height y (rig) and drawn
     /// through to the left and out - steered every frame by where the blade
     /// actually is; the left hand flat on top of the meat meanwhile.</summary>
+    // ---- 포 뜨기 동작 설정 (Inspector에서 조정) ----
+    [Header("포 뜨기 (칼 앞뒤 왕복 + 왼쪽 전진)")]
+    [Tooltip("앞뒤 왕복 거리 (cm, 도마 위 실제 거리): 시작점 → 앞으로 이만큼 → 다시 시작점. ±가 아니라 전체 범위.")]
+    [SerializeField] private float poStrokeCm = 5f;
+    [Tooltip("왕복 한 번(앞으로 갔다 돌아오기)에 걸리는 시간 (초).")]
+    [SerializeField] private float poStrokeSeconds = 0.7f;
+    [Tooltip("왼쪽으로 전진하는 속도 (cm/초, 도마 위 실제 거리).")]
+    [SerializeField] private float poAdvanceCmPerSecond = 2.2f;
+    [Tooltip("칼 길이 중 고기 가운데에 맞출 지점 - 칼끝에서부터의 비율 (0 = 칼끝, 1 = 손잡이 끝). 칼날 가운데쯤.")]
+    [SerializeField, Range(0f, 1f)] private float poBladeAimFromTip = 0.3f;
+
+    /// <summary>칼(눕혀서 길이가 도마 앞뒤 방향, TurnFlatAlongDepth)을 높이 y(rig)에
+    /// 맞춰 고기 오른쪽 바깥에 대고, 앞뒤 왕복(poStrokeCm)을 하면서 동시에
+    /// 왼쪽으로 전진시켜 칼날 왼쪽 끝이 고기 왼쪽 끝을 지나면 끝난다.
+    /// 칼 높이는 내내 그대로 - 왕복은 칼 길이 방향(도마 앞뒤)으로만.
+    /// 왼손은 고기 윗면에 고정 (칼을 따라 흔들리지 않음).</summary>
     private IEnumerator KnifeFlatFromRight(Transform rig, Bounds b, float y, HandController handCtl, Renderer knifeR, float slow)
     {
+        float wpc = worldPerCm;
         float right = rig.TransformPoint(new Vector3(b.max.x, y, b.center.z)).x;
         float left = rig.TransformPoint(new Vector3(b.min.x, y, b.center.z)).x;
-        Vector3 cutAt = rig.TransformPoint(new Vector3(b.center.x, y, b.center.z));
-        Vector3 press = rig.TransformPoint(new Vector3(b.center.x - b.extents.x * 0.35f, b.max.y, b.center.z));
-        for (float e = 0f, dur = 1.4f * slow; e < dur; e += Time.deltaTime)
+        Vector3 press = PalmPoint(rig, b);
+        float startX = right + 0.04f, endX = left - 0.06f;
+
+        // 1) 고기 오른쪽 바깥에서 높이·위치 맞추기 (칼이 고기 밖에 있을 때만 높이를 바꾼다)
+        for (float e = 0f, dur = 0.4f * slow; e < dur; e += Time.deltaTime)
         {
-            // the first part lines it up beside the meat's right side; then a sawing pass leftward
-            float k = Mathf.Clamp01((e / dur - 0.25f) / 0.75f);
-            float lead = Mathf.Lerp(right + 0.04f, left - 0.08f, k) + Mathf.Sin(k * Mathf.PI * 6f) * 0.025f;
-            if (handCtl != null && knifeR != null)
-            {
-                Vector3 err = new Vector3(lead - knifeR.bounds.min.x, cutAt.y - knifeR.bounds.center.y, 0f);
-                handCtl.SlideTo(handCtl.RestPosition + err, 0.03f);
-            }
-            PalmOnTop(press); // (the left hand stays flat on top - it doesn't go down with the knife)
+            SteerFlatKnife(rig, b, y, startX, 0f, handCtl, knifeR, 0.06f);
+            PalmOnTop(press);
             yield return null;
         }
+
+        // 2) 앞뒤 왕복 + 왼쪽 전진 동시에
+        float advance = Mathf.Max(0.1f, poAdvanceCmPerSecond) * wpc / Mathf.Max(slow, 0.01f);
+        float period = Mathf.Max(0.1f, poStrokeSeconds) * slow;
+        float stroke = poStrokeCm * wpc;
+        float x = startX, t = 0f;
+        int doneCycle = -1;
+        while (true)
+        {
+            t += Time.deltaTime;
+            int cycle = Mathf.FloorToInt(t / period);
+            // 끝까지 통과한 뒤에는 지금 하던 왕복만 마저 하고 (시작점으로 돌아와서) 끝
+            if (doneCycle >= 0 && cycle > doneCycle) break;
+            x = Mathf.Max(endX, x - advance * Time.deltaTime);
+            // 0 → stroke → 0, 양 끝에서 부드럽게 방향 전환 (코사인)
+            float saw = stroke * 0.5f * (1f - Mathf.Cos(t / period * Mathf.PI * 2f));
+            SteerFlatKnife(rig, b, y, x, saw, handCtl, knifeR, 0.03f);
+            PalmOnTop(press);
+            bool through = knifeR == null || knifeR.bounds.min.x <= left - 0.02f;
+            if (doneCycle < 0 && x <= endX && through) doneCycle = cycle;
+            if (t > 30f) break; // (안전장치)
+            yield return null;
+        }
+        SteerFlatKnife(rig, b, y, x, 0f, handCtl, knifeR, 0.05f);
     }
 
-    /// <summary>After a flat pass: the knife drawn back out to the right at the
-    /// same height, all of the blade clear of the meat before it moves on.</summary>
+    /// <summary>포 뜨기 한 번 뒤: 같은 높이 그대로 칼을 오른쪽 바깥으로 완전히
+    /// 빼낸다 (칼 전체가 고기에서 벗어날 때까지).</summary>
     private IEnumerator KnifeFlatWithdraw(Transform rig, Bounds b, float y, HandController handCtl, Renderer knifeR, float slow)
     {
         float right = rig.TransformPoint(new Vector3(b.max.x, y, b.center.z)).x;
-        Vector3 cutAt = rig.TransformPoint(new Vector3(b.center.x, y, b.center.z));
-        Vector3 press = rig.TransformPoint(new Vector3(b.center.x - b.extents.x * 0.35f, b.max.y, b.center.z));
+        Vector3 press = PalmPoint(rig, b);
         float from = knifeR != null ? knifeR.bounds.min.x : right;
         for (float e = 0f, dur = 0.6f * slow; e < dur; e += Time.deltaTime)
         {
             float lead = Mathf.Lerp(from, right + 0.06f, Mathf.SmoothStep(0f, 1f, e / dur));
-            if (handCtl != null && knifeR != null)
-            {
-                Vector3 err = new Vector3(lead - knifeR.bounds.min.x, cutAt.y - knifeR.bounds.center.y, 0f);
-                handCtl.SlideTo(handCtl.RestPosition + err, 0.03f);
-            }
+            SteerFlatKnife(rig, b, y, lead, 0f, handCtl, knifeR, 0.03f);
             PalmOnTop(press);
             yield return null;
         }
+    }
+
+    /// <summary>왼손 누르는 자리: 고기 윗면, 칼이 들어오는 오른쪽에서 먼 왼쪽 부분.</summary>
+    private static Vector3 PalmPoint(Transform rig, Bounds b) =>
+        rig.TransformPoint(new Vector3(b.center.x - b.extents.x * 0.35f, b.max.y, b.center.z));
+
+    /// <summary>눕힌 칼을 손으로 움직여: 칼날 왼쪽 끝(진행 방향 끝)을 leadX(월드 x)에,
+    /// 칼 길이의 조준점(poBladeAimFromTip)을 높이 y · 고기 앞뒤 가운데 + saw(앞으로,
+    /// 도마 뒤쪽 방향)에 둔다. 화면(직교 카메라) 기준 x·y만 맞추고, 손 위치로 움직인다.</summary>
+    private void SteerFlatKnife(Transform rig, Bounds b, float y, float leadX, float saw, HandController handCtl, Renderer knifeR, float seconds)
+    {
+        if (handCtl == null || knifeR == null) return;
+        Bounds kb = knifeR.bounds;
+        // 칼끝은 화면 위(max.y), 손잡이 끝은 아래(min.y)
+        float aimY = Mathf.Lerp(kb.max.y, kb.min.y, poBladeAimFromTip);
+        Vector3 target = rig.TransformPoint(new Vector3(b.center.x, y, b.center.z + saw));
+        // (깊이 z도 절단면에 맞춘다 - 고기 안에 들어간 칼날은 윗장에 가려지고,
+        // 윗면을 누르는 왼손이 칼 위에 보이게: 칼이 손·고기를 뚫고 지나가 보이지 않게)
+        Vector3 err = new Vector3(leadX - kb.min.x, target.y - aimY, target.z - kb.center.z);
+        handCtl.SlideTo(handCtl.RestPosition + err, seconds);
     }
 
     /// <summary>What the strips are cut from should already be whole sizes of

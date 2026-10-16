@@ -15,11 +15,49 @@ public class FryingChopsticks : ToolItem
 
     public IngredientItem Pinched { get; private set; }
     private Collider[] pinchedColliders;
+    public float GripClosure { get; private set; }
+    private MeshFilter stickFilter;
+    private Mesh originalMesh, animatedMesh;
+    private Vector3[] originalVertices, posedVertices;
+
+    void Update()
+    {
+        bool pressing = IsHeld && UnityEngine.InputSystem.Mouse.current != null
+            && UnityEngine.InputSystem.Mouse.current.leftButton.isPressed;
+        GripClosure = Mathf.MoveTowards(GripClosure, Pinched != null || pressing ? 1f : 0f, Time.deltaTime * 8f);
+        if (animatedMesh != null)
+        {
+            Bounds bounds = originalMesh.bounds;
+            Vector3 pivot = new Vector3(bounds.center.x, bounds.min.y + bounds.size.y * 0.2f, bounds.center.z);
+            Quaternion open = Quaternion.AngleAxis(IsHeld ? -4f * (1f - GripClosure) : 0f, Vector3.forward);
+            for (int i = 0; i < originalVertices.Length; i++)
+                posedVertices[i] = originalVertices[i].x > bounds.center.x
+                    ? pivot + open * (originalVertices[i] - pivot) : originalVertices[i];
+            animatedMesh.vertices = posedVertices;
+            animatedMesh.RecalculateBounds();
+            animatedMesh.RecalculateNormals();
+        }
+    }
 
     protected override void Awake()
     {
         kind = ToolKind.Chopsticks;
         base.Awake();
+        stickFilter = GetComponent<MeshFilter>();
+        if (stickFilter != null && stickFilter.sharedMesh != null && stickFilter.sharedMesh.isReadable)
+        {
+            originalMesh = stickFilter.sharedMesh;
+            animatedMesh = Instantiate(originalMesh);
+            originalVertices = originalMesh.vertices;
+            posedVertices = new Vector3[originalVertices.Length];
+            stickFilter.sharedMesh = animatedMesh;
+        }
+    }
+
+    void OnDestroy()
+    {
+        if (stickFilter != null && originalMesh != null) stickFilter.sharedMesh = originalMesh;
+        if (animatedMesh != null) Destroy(animatedMesh);
     }
 
     public bool TryPinch(IngredientItem ing)

@@ -66,13 +66,16 @@ public static class DishEvaluation
     /// <summary>Handed in on a serving plate (PlatingPlate), and how done it is.</summary>
     private static void CheckSubmitted(string dish, string id, params string[] mains)
     {
-        IngredientItem onPlate = null, anywhere = null;
+        IngredientItem onPlate = null, anywhere = null, notShelved = null;
         foreach (string m in mains)
             foreach (IngredientItem i in Object.FindObjectsByType<IngredientItem>(FindObjectsSortMode.None))
             {
                 if (i.IngredientName != m) continue;
                 if (anywhere == null) anywhere = i;
-                if (onPlate == null && i.Container != null && i.Container.GetComponent<PlatingDestination>() != null) onPlate = i;
+                if (i.Container == null || i.Container.GetComponent<PlatingDestination>() == null) continue;
+                // (제출대가 있으면 거기 올린 접시만 제출된 것 - 시간 초과 땐 담긴 그대로 걷어 간다)
+                if (SubmitShelf.Instance != null && !PassFail.TimedOut && !SubmitShelf.Holds(i.Container)) { if (notShelved == null) notShelved = i; continue; }
+                if (onPlate == null) onPlate = i;
             }
         if (onPlate == null)
         {
@@ -80,7 +83,9 @@ public static class DishEvaluation
             ExamEvaluation.Add(new ExamEvaluation.Item
             {
                 ruleId = $"{id}.submitted", dish = dish, title = "완성품 제출", status = ExamEvaluation.Status.감점,
-                observed = "완성 접시(PlatingPlate)에 담아 제출하지 않음", cause = anywhere != null && anywhere.Container != null ? $"기록: {anywhere.Container.name}에 남아 있음" : "",
+                observed = notShelved != null ? "완성 접시에 담았지만 제출대에 올리지 않음" : "완성 접시(PlatingPlate)에 담아 제출하지 않음",
+                cause = notShelved != null ? $"기록: {notShelved.Container.name}이(가) 제출대에 없음"
+                      : anywhere != null && anywhere.Container != null ? $"기록: {anywhere.Container.name}에 남아 있음" : "",
                 tip = "팬에서 완성 접시로 옮겨 담은 뒤 제출하세요.", pointsText = "미완성 - 불합격 사유",
             });
             return;

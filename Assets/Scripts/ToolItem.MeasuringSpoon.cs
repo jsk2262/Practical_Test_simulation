@@ -42,6 +42,15 @@ public partial class ToolItem
     /// <summary>Holding something, waiting to be tipped in.</summary>
     public bool IsSpoonLoaded => loadedSeasoning != null && LoadedMl > 0.001f;
     public string LoadedSeasoning => IsSpoonLoaded ? loadedSeasoning : null;
+    public SaucePortion LoadedSauce { get; private set; }
+
+    // 이름만 옮기지 않고 실제로 덜어낸 기름의 성분/추출/탄 정도를 보관한다.
+    public bool TryLoadSauce(PanSauce source)
+    {
+        if (source == null || !TryLoadUpTo(source.LiquidName, source.LiquidAmount * TablespoonMl)) return false;
+        LoadedSauce = source.Take(LoadedMl / TablespoonMl, true);
+        return true;
+    }
 
     /// <summary>A level spoonful (the end in use) of it, from a source that
     /// doesn't run out. The mL taken.</summary>
@@ -58,6 +67,7 @@ public partial class ToolItem
         float ml = Mathf.Min(SpoonCapacityMl, availableMl);
         if (ml < SpoonCapacityMl) Debug.Log($"[계량] {seasoningName}: 남은 {ml:0.#}mL만 떠짐 ({SpoonSizeLabel})");
         loadedSeasoning = seasoningName;
+        LoadedSauce = null;
         LoadedMl = ml;
         transform.localScale = BaseLocalScale * LoadedSpoonScaleBulge;
         ShowSpoonContent(seasoningName);
@@ -70,6 +80,7 @@ public partial class ToolItem
     {
         float ml = IsSpoonLoaded ? LoadedMl : 0f;
         loadedSeasoning = null;
+        LoadedSauce = null;
         LoadedMl = 0f;
         transform.localScale = BaseLocalScale;
         if (spoonContent != null) Destroy(spoonContent);

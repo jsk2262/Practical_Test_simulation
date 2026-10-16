@@ -4,7 +4,7 @@ using UnityEngine;
 /// <summary>
 /// 체망 (strainer) - add this (instead of a plain ToolItem) to the strainer
 /// model once it's in the scene. The blanching flow it completes:
-/// 1) Held empty, clicked on a bowl/pot: scoops every ingredient out of it
+/// 1) Held empty, clicked on a bowl/pot: scoops only pieces inside the basket area
 ///    (e.g. the peas off their plate, or blanched peas out of the water); they
 ///    ride along in the basket.
 /// 2) Held full, clicked on a pot boiling on a lit burner: 데치기 - the strainer
@@ -17,7 +17,7 @@ using UnityEngine;
 /// 4) Held full, clicked on a dry bowl/plate: tips them all in there.
 /// Picking it up, carrying and setting it down work like any other tool.
 /// </summary>
-public class Strainer : ToolItem
+public partial class Strainer : ToolItem
 {
     /// <summary>How the scooped pieces are spread inside the strainer (world units).</summary>
     [SerializeField] private float contentSpread = 0.12f;
@@ -37,24 +37,7 @@ public class Strainer : ToolItem
 
     public void ScoopFrom(MovableBowl vessel)
     {
-        if (HasContents) return;
-
-        vessel.TakeIngredients(contents);
-        for (int i = 0; i < contents.Count; i++)
-        {
-            IngredientItem ing = contents[i];
-
-            // Quiet while riding in the strainer, so clicks go past them.
-            foreach (Collider c in ing.GetComponentsInChildren<Collider>())
-            {
-                if (!c.enabled) continue;
-                c.enabled = false;
-                contentColliders.Add(c);
-            }
-
-            ing.transform.SetParent(transform, true);
-        }
-        LayoutContents();
+        BeginLocalScoop(vessel);
     }
 
     /// <summary>The pieces spread in the basket (not at the pivot, which is the

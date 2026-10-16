@@ -180,6 +180,19 @@ public class BatterCoating : MonoBehaviour
         if (MixDone && !wasDone) Debug.Log($"[버무리기] {meat.IngredientName}: 손으로 버무림 완료 (질감 {TextureWord} - 기록만)");
     }
 
+    /// <summary>반죽 조각 하나 덜어내기 (기름 온도 확인용 - BowlMixInteraction): 모든
+    /// 재료를 비율대로 ml만큼 줄인다. 그만큼 없으면 아무것도 바꾸지 않고 false.</summary>
+    public bool TakeMl(float ml)
+    {
+        float total = BatterMl;
+        if (!(ml > 0f) || total < ml) return false;
+        float keep = (total - ml) / total;
+        foreach (string k in new List<string>(parts.Keys)) parts[k] *= keep;
+        Debug.Log($"[튀김옷] {meat.IngredientName}: 반죽 조각 {ml:0.#}mL 덜어냄 - 남은 튀김옷 {BatterMl:0.#}mL");
+        Refresh();
+        return true;
+    }
+
     /// <summary>A piece taken off on its own (IngredientItem.SplitOffPiece): its
     /// share of the batter (by weight) goes with it - moved, not copied, so the
     /// total stays the same - and it's as mixed as the rest.</summary>
@@ -376,6 +389,8 @@ public class BatterCoating : MonoBehaviour
     {
         foreach (GameObject g in shown) if (g != null) Destroy(g);
         shown.Clear();
+        foreach (Mesh m in coatMeshes) if (m != null) Destroy(m);
+        coatMeshes.Clear();
         List<Renderer> pieces = PieceRenderers();
         shownPieces = pieces.Count;
         if (!HasAny) return;
@@ -397,27 +412,28 @@ public class BatterCoating : MonoBehaviour
             if (cover < 0.05f) continue;
 
             float s = 1f + look.maxInflate * thick * cover;
-            Vector3 c = mf.sharedMesh.bounds.center;
+            // 튀김옷 모양: 조각(네모)을 그대로 키운 상자가 아니라, 조각을 감싸는 둥근
+            // 덩어리에 울퉁불퉁한 결 - 튀길수록 더 오돌토돌 (튀김 반죽이 부풀어 굳은 모양)
+            float fry = Fried ? Mathf.Clamp01(FriedSeconds / Mathf.Max(look.fryBrownSeconds, 0.1f)) : 0f;
             var go = new GameObject("BatterCoat");
             go.transform.SetParent(r.transform, false);
-            go.transform.localPosition = c * (1f - s); // (grown round the piece's middle)
-            go.transform.localScale = Vector3.one * s;
-            go.AddComponent<MeshFilter>().sharedMesh = mf.sharedMesh;
+            Mesh coatMesh = CoatMesh(mf.sharedMesh.bounds, s, i * 37 + shownPieces, Mathf.Lerp(0.12f, 0.38f, fry) * (0.6f + 0.4f * cover));
+            coatMeshes.Add(coatMesh);
+            go.AddComponent<MeshFilter>().sharedMesh = coatMesh;
             var mr = go.AddComponent<MeshRenderer>();
-            // (over every part of the piece - a cut piece's cut faces are a part of
-            // their own; with only the first part coated, the strips stayed red)
-            var coatMats = new Material[Mathf.Max(1, mf.sharedMesh.subMeshCount)];
-            for (int m = 0; m < coatMats.Length; m++) coatMats[m] = CoatMaterial();
-            mr.sharedMaterials = coatMats;
+            mr.sharedMaterial = CoatMaterial();
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             // how much it hides the meat: more batter, better mixed - less when runny
             // fried: going golden brown, and only as much of it as stayed on (Retention)
             Color col = Fried ? Color.Lerp(look.batterColor, look.friedColor, Mathf.Clamp01(FriedSeconds / Mathf.Max(look.fryBrownSeconds, 0.1f))) : look.batterColor;
             col.a = Mathf.Clamp01(cover * Mathf.Lerp(0.65f, 0.97f, thick) * (stiff <= look.runnyBelow ? 0.75f : 1f) * (Fried ? Mathf.Lerp(0.3f, 1f, Retention) : 1f));
+            // (튀겨지며 반죽이 굳어 불투명해진다 - 속 고기가 비치지 않게)
+            if (Fried) col.a = Mathf.Lerp(col.a, Mathf.Max(col.a, 0.96f * Retention), fry);
             block.Clear();
             block.SetColor("_BaseColor", col);
             block.SetColor("_Color", col);
-            block.SetFloat("_Smoothness", Mathf.Lerp(0.85f, 0.25f, stiff));
+            // (반죽은 촉촉하게 반짝, 튀기면 바삭하게 - 덜 반짝)
+            block.SetFloat("_Smoothness", Mathf.Lerp(Mathf.Lerp(0.85f, 0.25f, stiff), 0.18f, fry));
             mr.SetPropertyBlock(block);
             shown.Add(go);
 
@@ -446,6 +462,48 @@ public class BatterCoating : MonoBehaviour
         }
         RebuildPool();
     }
+
+    private readonly List<Mesh> coatMeshes = new List<Mesh>();
+    private static Mesh sphereTemplate;
+
+    /// <summary>튀김옷 한 조각의 모양 (조각 메쉬 공간): 조각 상자(lb)를 감싸는 모서리가
+    /// 둥근 덩어리(초타원체 - 네모 조각의 모서리까지 덮으면서 둥글게), inflate만큼
+    /// 두툼하게, rough만큼 울퉁불퉁 (조각마다 seed로 다른 결). 보이는 모양만.</summary>
+    private static Mesh CoatMesh(Bounds lb, float inflate, int seed, float rough)
+    {
+        if (sphereTemplate == null)
+        {
+            GameObject tmp = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            sphereTemplate = tmp.GetComponent<MeshFilter>().sharedMesh;
+            Destroy(tmp);
+        }
+        Vector3[] src = sphereTemplate.vertices;
+        var v = new Vector3[src.Length];
+        Vector3 e = lb.extents;
+        float minE = Mathf.Max(Mathf.Min(e.x, Mathf.Min(e.y, e.z)), 1e-4f);
+        float pad = minE * (inflate - 1f) * 1.6f + minE * 0.12f; // (두께: 조각의 가는 쪽 기준)
+        float ph = seed * 1.618f;
+        for (int k = 0; k < src.Length; k++)
+        {
+            Vector3 d = src[k].normalized;
+            // 둥근 상자: 방향 성분을 0.55제곱 - 1이면 구, 0에 가까울수록 상자
+            Vector3 p = new Vector3(Sp(d.x) * e.x, Sp(d.y) * e.y, Sp(d.z) * e.z);
+            // 울퉁불퉁한 결 (큰 혹 + 잔 결) - 방향이 아니라 실제 자리(가는 쪽 굵기 단위)로
+            // 계산해서 긴 조각에서도 길게 늘어지지 않고 고르게. 같은 조각은 늘 같은 모양
+            Vector3 q = p / minE;
+            float n = Mathf.Sin(q.x * 2.3f + ph) * Mathf.Sin(q.y * 2.1f + ph * 1.7f) * Mathf.Sin(q.z * 2.5f + ph * 0.6f)
+                    + 0.55f * Mathf.Sin(q.x * 5.3f + q.z * 1.7f + ph * 2.3f) * Mathf.Sin(q.y * 4.9f - q.z * 3.1f - ph)
+                    + 0.3f * Mathf.Sin((q.x + q.y * 1.3f - q.z * 0.8f) * 9.7f + ph * 3.1f);
+            float bump = pad + minE * rough * n;
+            v[k] = lb.center + p + d * Mathf.Max(minE * 0.05f, bump);
+        }
+        var m = new Mesh { name = "BatterCoatMesh", vertices = v, triangles = sphereTemplate.triangles, uv = sphereTemplate.uv };
+        m.RecalculateNormals();
+        m.RecalculateBounds();
+        return m;
+    }
+
+    private static float Sp(float x) => Mathf.Sign(x) * Mathf.Pow(Mathf.Abs(x), 0.55f);
 
     /// <summary>Batter that doesn't cling - left at the bottom of the bowl when
     /// it's runny (and more of it the more there is).</summary>
@@ -479,6 +537,7 @@ public class BatterCoating : MonoBehaviour
     void OnDestroy()
     {
         foreach (GameObject g in shown) if (g != null) Destroy(g);
+        foreach (Mesh m in coatMeshes) if (m != null) Destroy(m);
         if (pool != null) Destroy(pool);
         if (coatMat != null) Destroy(coatMat);
     }

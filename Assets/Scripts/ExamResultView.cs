@@ -52,16 +52,20 @@ public class ExamResultView : MonoBehaviour
             backing.SetPixel(0, 0, new Color(0.1f, 0.1f, 0.12f, 0.96f));
             backing.Apply();
         }
-        float w = Mathf.Min(860f, Screen.width - 40f), h = Mathf.Min(700f, Screen.height - 40f);
-        Rect r = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
+        Matrix4x4 previousMatrix = GUI.matrix;
+        float uiScale = Mathf.Min(Screen.width / 1280f, Screen.height / 800f);
+        GUI.matrix = Matrix4x4.TRS(new Vector3((Screen.width - 1280f * uiScale) * 0.5f,
+            (Screen.height - 800f * uiScale) * 0.5f, 0f), Quaternion.identity, Vector3.one * uiScale);
+        float w = 1120f, h = 750f;
+        Rect r = new Rect((1280f - w) / 2f, (800f - h) / 2f, w, h);
         GUI.DrawTexture(r, backing);
         GUILayout.BeginArea(new Rect(r.x + 18f, r.y + 14f, r.width - 36f, r.height - 28f));
         GUILayout.Label("최종 평가 결과", head);
         if (PassFail.Decided)
         {
-            if (verdict == null) verdict = new GUIStyle(GUI.skin.label) { fontSize = 34, fontStyle = FontStyle.Bold };
+            if (verdict == null) verdict = new GUIStyle(GUI.skin.label) { fontSize = 54, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             verdict.normal.textColor = PassFail.Passed ? new Color(0.45f, 0.9f, 0.5f) : new Color(1f, 0.4f, 0.35f);
-            GUILayout.Label(PassFail.Passed ? "합격" : "불합격", verdict);
+            GUILayout.Label($"{PassFail.Score:0.#}점   ·   {(PassFail.Passed ? "합격" : "불합격")}", verdict);
             if (SpeedMode.EverOn)
                 GUILayout.Label("※ 빠른 모드로 진행한 연습 결과 - 시간·탐 관련 평가는 생략되어 실제 판정과 다를 수 있어요", line);
             GUILayout.Label($"점수 {PassFail.Score:0.#} / {ExamScoring.Current.totalScore:0} (합격 {ExamScoring.Current.passScore:0}점 이상 · 세부 배점 적용 전 임시 판정)", small);
@@ -122,5 +126,6 @@ public class ExamResultView : MonoBehaviour
         GUILayout.EndScrollView();
         if (GUILayout.Button("닫기", GUILayout.Height(34f))) Destroy(gameObject);
         GUILayout.EndArea();
+        GUI.matrix = previousMatrix;
     }
 }

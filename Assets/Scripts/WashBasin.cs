@@ -134,21 +134,31 @@ public class WashBasin : Interactable
         // middle of the sink), with the tap's water falling onto it.
         // The hand where hands are washed (HandWashSequence's WashOrigin, right
         // under the tap), the item held in it there.
-        Vector3 handAt = WashSpot(stream);
+        // 화면에서 보이는 물체의 중심을 배수구보다 위쪽에 맞춘다.
+        // 손잡이/피벗 위치가 달라도 팬 몸통과 칼날이 개수대 밖으로 벗어나지 않는다.
+        item.transform.rotation = item.HandRotation;
+        Vector3 target = ItemWashTarget(stream);
+        Vector3 visibleCenter = item is MovableBowl dish
+            ? dish.BodyCenterWorld() : ItemBounds(item).center;
+        Vector3 centerFromHand = visibleCenter - item.transform.position + item.HandHoldOffset;
+        Vector3 handAt = target - centerFromHand;
         if (hc != null) hc.GoTo(new Vector3(handAt.x, handAt.y, hc.transform.position.z), null);
         yield return new WaitForSeconds(0.4f);
         t?.SetRunning(true);
 
         Vector3 axis = LongAxis(item);
+        // (들 때 이미 돌려 둔 자세 - 뜰채를 세우고 뒤집은 것 등 - 위에 얹어서 돌린다;
+        // 헹군 뒤에도 그 자세로 돌아오게)
+        Quaternion baseTurn = item.HoldTurn;
         for (int side = 0; side < (flip ? 2 : 1); side++)
         {
-            Quaternion turn = side == 0 ? Quaternion.identity : Quaternion.AngleAxis(180f, axis);
+            Quaternion turn = (side == 0 ? Quaternion.identity : Quaternion.AngleAxis(180f, axis)) * baseTurn;
             if (side == 1)
             {
                 // turned over (about its own length) to wash the other face
                 for (float k = 0f; k < 0.5f; k += Time.deltaTime)
                 {
-                    item.SetHoldTurn(Quaternion.AngleAxis(180f * Mathf.SmoothStep(0f, 1f, k / 0.5f), axis));
+                    item.SetHoldTurn(Quaternion.AngleAxis(180f * Mathf.SmoothStep(0f, 1f, k / 0.5f), axis) * baseTurn);
                     yield return null;
                 }
                 item.SetHoldTurn(turn);
@@ -160,11 +170,11 @@ public class WashBasin : Interactable
         {
             for (float k = 0f; k < 0.4f; k += Time.deltaTime)
             {
-                item.SetHoldTurn(Quaternion.AngleAxis(180f * (1f - Mathf.SmoothStep(0f, 1f, k / 0.4f)), axis));
+                item.SetHoldTurn(Quaternion.AngleAxis(180f * (1f - Mathf.SmoothStep(0f, 1f, k / 0.4f)), axis) * baseTurn);
                 yield return null;
             }
         }
-        item.SetHoldTurn(Quaternion.identity);
+        item.SetHoldTurn(baseTurn);
         if (!wasOn) t?.SetRunning(false);
         SupportHandController.Instance?.Hide();
         done?.Invoke();
@@ -285,6 +295,12 @@ public class WashBasin : Interactable
         return root;
     }
 
+    // 손 씻기 원점은 유지하고, 물건만 화면 위쪽으로 올린다.
+    private Vector3 ItemWashTarget(Vector3 stream)
+    {
+        Vector3 origin = WashSpot(stream);
+        return new Vector3(BasinCenter().x, origin.y + 0.65f, origin.z);
+    }
     /// <summary>Where hands are washed: the hand-wash routine's origin, else just under the tap.</summary>
     private Vector3 WashSpot(Vector3 stream)
     {

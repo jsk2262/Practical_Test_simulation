@@ -312,9 +312,51 @@ public static class EggPartChooser
     /// bowlRadius) - the bowl itself left showing in the open middle.</summary>
     public static void Show(Vector3 worldPos, float bowlRadius, string title, Action<EggContents.Part> callback)
     {
-        if (panel != null) UnityEngine.Object.Destroy(panel); // (sized to each bowl)
-        Build(bowlRadius, title);
+        // 흰자만 on the left, 노른자만 at the top, 전체 on the right
+        var options = new[]
+        {
+            new Option(Name(EggContents.Part.White), new Color(0.98f, 0.97f, 0.92f, 0.97f), true, () => Choose(EggContents.Part.White)),
+            new Option(Name(EggContents.Part.Yolk), new Color(1f, 0.82f, 0.4f, 0.97f), true, () => Choose(EggContents.Part.Yolk), 18),
+            new Option("전체\n(전란)", new Color(1f, 0.92f, 0.7f, 0.97f), true, () => Choose(EggContents.Part.All)),
+        };
+        Open(worldPos, bowlRadius, title, options); // (Choose가 창을 닫고 onChosen을 부른다)
         onChosen = callback;
+    }
+
+    /// <summary>선택창의 버튼 하나: 글자, 색, 누를 수 있는지(아니면 회색, 눌러도 무시), 눌렀을 때.</summary>
+    public struct Option
+    {
+        public string label;
+        public Color color;
+        public bool enabled;
+        public Action act;
+        public int fontSize;
+        public Option(string label, Color color, bool enabled, Action act, int fontSize = 20)
+        {
+            this.label = label; this.color = color; this.enabled = enabled; this.act = act; this.fontSize = fontSize;
+        }
+    }
+
+    /// <summary>계란 사용과 같은 모양·입력의 선택창에 아무 버튼이나 (그릇 위 반원,
+    /// 왼쪽부터) - 버무리기 끝난 그릇의 '반죽 조각 / 고기 한 점 / 닫기' 등.
+    /// 버튼을 누르면 창이 닫히고 그 동작. 창 밖을 누르면 닫힘 (ClickDetector).</summary>
+    public static void ShowOptions(Vector3 worldPos, float bowlRadius, string title, Option[] options)
+    {
+        var wrapped = new Option[options.Length];
+        for (int i = 0; i < options.Length; i++)
+        {
+            wrapped[i] = options[i];
+            Action act = options[i].act;
+            wrapped[i].act = () => { Close(); act?.Invoke(); };
+        }
+        Open(worldPos, bowlRadius, title, wrapped);
+    }
+
+    private static void Open(Vector3 worldPos, float bowlRadius, string title, Option[] options)
+    {
+        if (panel != null) UnityEngine.Object.Destroy(panel); // (sized to each bowl)
+        Build(bowlRadius, title, options);
+        onChosen = null;
         panel.transform.position = worldPos;
         panel.SetActive(true);
     }
@@ -342,7 +384,7 @@ public static class EggPartChooser
 
     private const float ButtonRadius = 0.62f;
 
-    private static void Build(float bowlRadius, string title)
+    private static void Build(float bowlRadius, string title, Option[] options)
     {
         panel = new GameObject("EggPartChooser");
         // the half ring (like the cut menu's ring), the bowl showing inside it
@@ -358,23 +400,24 @@ public static class EggPartChooser
         ring.AddComponent<MeshCollider>().sharedMesh = arc; // (a click on the ring itself does nothing)
         Label(panel.transform, title, new Vector3(0f, outer + 0.32f, -0.08f), 24);
 
-        // 흰자만 on the left, 노른자만 at the top, 전체 on the right
-        EggContents.Part[] parts = { EggContents.Part.White, EggContents.Part.Yolk, EggContents.Part.All };
-        float[] angles = { 155f, 90f, 25f };
-        Color[] colors = { new Color(0.98f, 0.97f, 0.92f, 0.97f), new Color(1f, 0.82f, 0.4f, 0.97f), new Color(1f, 0.92f, 0.7f, 0.97f) };
-        for (int i = 0; i < parts.Length; i++)
+        // 왼쪽부터 반원을 따라 고르게 (3개면 155° · 90° · 25°)
+        int n = options.Length;
+        for (int i = 0; i < n; i++)
         {
-            EggContents.Part p = parts[i];
-            GameObject btn = new GameObject("Btn_" + Name(p));
+            Option o = options[i];
+            float deg = n == 1 ? 90f : Mathf.Lerp(155f, 25f, i / (float)(n - 1));
+            GameObject btn = new GameObject("Btn_" + o.label.Replace("\n", " "));
             btn.transform.SetParent(panel.transform, false);
-            float a = angles[i] * Mathf.Deg2Rad;
+            float a = deg * Mathf.Deg2Rad;
             btn.transform.localPosition = new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0f) * orbit + new Vector3(0f, 0f, -0.1f);
             Mesh disc = Disc(ButtonRadius, 40);
             btn.AddComponent<MeshFilter>().sharedMesh = disc;
-            btn.AddComponent<MeshRenderer>().sharedMaterial = Mat(colors[i]);
+            // (누를 수 없는 버튼은 흐린 회색 - 창 위라 눌러도 창은 닫히지 않고 아무 일도 없음)
+            btn.AddComponent<MeshRenderer>().sharedMaterial = Mat(o.enabled ? o.color : new Color(0.72f, 0.72f, 0.72f, 0.6f));
             btn.AddComponent<MeshCollider>().sharedMesh = disc;
-            btn.AddComponent<SimpleActionButton>().Init(() => Choose(p));
-            Label(btn.transform, p == EggContents.Part.All ? "전체\n(전란)" : Name(p), new Vector3(0f, 0f, -0.05f), p == EggContents.Part.Yolk ? 18 : 20);
+            if (o.enabled) btn.AddComponent<SimpleActionButton>().Init(o.act);
+            TextMesh tm = Label(btn.transform, o.label, new Vector3(0f, 0f, -0.05f), o.fontSize);
+            if (!o.enabled) tm.color = new Color(0f, 0f, 0f, 0.35f);
         }
         panel.SetActive(false);
     }

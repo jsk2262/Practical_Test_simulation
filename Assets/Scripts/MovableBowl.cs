@@ -39,6 +39,14 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     /// <summary>Seconds on a strong flame for the wok's ~1 L of frying oil to
     /// reach frying heat (test: a drop of starch batter comes straight back up).</summary>
     [SerializeField] private float timeToHeatOil = 420f;
+    [Header("반죽 온도시험 (게임 연출 설정)")]
+    [SerializeField, Min(0.5f)] private float batterProbeSecondsAt175 = 2f;
+    [SerializeField, Range(0.1f, 0.9f)] private float batterProbeDepthAt175 = 0.45f;
+    // Existing oilHeat is a heating-progress model, not a measured temperature.
+    // Match the existing food simulation: full heat corresponds to 175 C.
+    public float OilTemperatureC => HasFryingOil
+        ? 20f + 155f * Mathf.Clamp(oilHeat / Mathf.Max(timeToHeatOil, 0.01f), 0f, 1.5f)
+        : 20f;
     private float oilHeat;
     private GameObject oilSurface;
 
@@ -119,6 +127,18 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     /// (in mL - 큰술 1T 15 mL, 작은술 1t 5 mL)
     private readonly Dictionary<string, float> appliedSeasonings = new Dictionary<string, float>();
     public IReadOnlyDictionary<string, float> AppliedSeasonings => appliedSeasonings;
+
+    public void AddSaucePortion(SaucePortion portion)
+    {
+        if (portion == null || portion.Amount <= 0f) return;
+        foreach (var part in portion.parts)
+        {
+            appliedSeasonings.TryGetValue(part.Key, out float had);
+            appliedSeasonings[part.Key] = had + part.Value * ToolItem.TablespoonMl;
+        }
+        MarkUsed();
+        PanSauce.Of(this, true).Put(portion);
+    }
 
     public void AddSeasoning(string seasoningName, float ml = ToolItem.TablespoonMl)
     {
@@ -231,7 +251,10 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         return inside;
     }
 
-    public bool IsFull => occupied.Count >= capacity;
+    public bool IsFull => occupied.Count >= (HasFryingOil ? Mathf.Max(capacity, fryingCapacity) : capacity);
+
+    [Tooltip("튀김 기름이 든 팬/웍에 한 조각씩 넣을 수 있는 개수 (조각 하나하나가 따로 들어감).")]
+    [SerializeField] private int fryingCapacity = 30;
 
     /// <summary>Everything resting in/on it.</summary>
     public IEnumerable<Carryable> Contents => occupied.Keys;
@@ -272,6 +295,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
 
     private void MarkUsed()
     {
+        if (IsWet) SetWet(false); // (물방울이 음식 밑에 남아 보이지 않게)
         IsDirty = true;
         IsWashed = false;
     }
@@ -286,7 +310,9 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         if (CleanupMode.IsOn && IsPlateOrBowl && occupied.Count == 0 && HasPortion) GetComponent<PortionedCondiment>().Remove();
         // (a pan that's had oil or a sauce in it is dirty too, whatever put it
         // there; and in clean-up anything can be washed - a pan or pot as well)
-        bool hadSauce = PanSauce.Of(this, false) != null;
+        // (다 씻은 뒤에도 빈 PanSauce 컴포넌트는 남아 있다 - 씻은 뒤로는 실제로
+        // 기름·소스가 다시 들어 있어야 더러운 것)
+        bool hadSauce = PanSauce.Of(this, false) is PanSauce had && (had.Amount > 0.001f || !IsWashed);
         if (!IsEmpty || (!IsDirty && !hadSauce && !CleanupMode.IsOn)) return false;
 
         // What's left of a sauce or the oil goes with the washing - recorded if
@@ -300,7 +326,91 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         IsDirty = false;
         IsWashed = true;
         appliedSeasonings.Clear();
+        SetWet(true);
         return true;
+    }
+
+    // ---- 물기 (씻은 뒤 키친타월로 닦기) ----
+
+    /// <summary>씻고 나서 아직 물기를 안 닦음 - 물방울이 맺혀 보인다.</summary>
+    public bool IsWet { get; private set; }
+    private GameObject wetDrops;
+    private static Material wetDropMaterial;
+
+    private void SetWet(bool wet)
+    {
+        IsWet = wet;
+        if (!wet) { if (wetDrops != null) Destroy(wetDrops); wetDrops = null; return; }
+        if (wetDrops != null) return;
+
+        if (wetDropMaterial == null)
+        {
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit");
+            wetDropMaterial = new Material(lit != null ? lit : Shader.Find("Standard"));
+            Color c = new Color(0.55f, 0.78f, 0.98f);
+            wetDropMaterial.color = c;
+            if (wetDropMaterial.HasProperty("_BaseColor")) wetDropMaterial.SetColor("_BaseColor", c);
+            if (wetDropMaterial.HasProperty("_Smoothness")) wetDropMaterial.SetFloat("_Smoothness", 0.95f);
+        }
+        // 안쪽 바닥에 물방울 몇 개 (그릇을 따라 움직이도록 자식으로)
+        Interior inside = GetInterior();
+        Vector3 a = Vector3.Cross(inside.up, Vector3.forward);
+        if (a.sqrMagnitude < 1e-4f) a = Vector3.Cross(inside.up, Vector3.right);
+        a.Normalize();
+        Vector3 b = Vector3.Cross(inside.up, a).normalized;
+        wetDrops = new GameObject("WetDrops");
+        wetDrops.transform.SetParent(transform, true);
+        float scale = Mathf.Max(Mathf.Abs(transform.lossyScale.x), 1e-4f);
+        const int count = 9;
+        for (int i = 0; i < count; i++)
+        {
+            float ang = i * 2.39996f, d = inside.radius * 0.8f * Mathf.Sqrt((i + 0.5f) / count);
+            GameObject drop = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            drop.name = "Drop";
+            Destroy(drop.GetComponent<Collider>());
+            drop.GetComponent<Renderer>().sharedMaterial = wetDropMaterial;
+            drop.transform.SetParent(wetDrops.transform, true);
+            drop.transform.position = inside.floorCenter + (a * Mathf.Cos(ang) + b * Mathf.Sin(ang)) * d + inside.up * inside.rim * 0.15f;
+            float s = inside.radius * Random.Range(0.13f, 0.2f);
+            drop.transform.rotation = Quaternion.FromToRotation(Vector3.up, inside.up);
+            drop.transform.localScale = new Vector3(s, s * 0.45f, s) / scale;
+        }
+    }
+
+    /// <summary>키친타월로 물기 닦기: 손에 든 타월이 그릇 안쪽을 두 바퀴 훑고,
+    /// 물방울이 사라진다. 타월은 손에 남는다 (다 쓴 것은 일반쓰레기로).</summary>
+    private IEnumerator TowelWipe(ToolItem towel)
+    {
+        HandController hand = HandController.Instance;
+        HandCarry carry = HandCarry.Instance;
+        if (carry != null) carry.IsLocked = true;
+        Interior inside = GetInterior();
+        Vector3 center = BodyCenterWorld();
+        Vector3 reach = hand != null ? hand.GestureOffset : Vector3.zero;
+        const float seconds = 1.4f;
+        for (float t = 0f; t < seconds && hand != null; t += Time.deltaTime)
+        {
+            float ang = t / seconds * Mathf.PI * 4f; // 두 바퀴
+            Vector3 circle = new Vector3(Mathf.Cos(ang), Mathf.Sin(ang) * 0.6f, 0f) * inside.radius * 0.45f;
+            Renderer tr = towel.GetComponentInChildren<Renderer>();
+            Vector3 towelAt = tr != null ? tr.bounds.center : towel.transform.position;
+            Vector3 err = center + circle - towelAt;
+            err.z = 0f;
+            reach += err * Mathf.Clamp01(Time.deltaTime * 12f);
+            hand.SetGestureOffset(reach);
+            // 닦을수록 물방울이 줄어든다
+            if (wetDrops != null)
+            {
+                int left = Mathf.CeilToInt(wetDrops.transform.childCount * (1f - t / seconds));
+                for (int i = 0; i < wetDrops.transform.childCount; i++) wetDrops.transform.GetChild(i).gameObject.SetActive(i < left);
+            }
+            yield return null;
+        }
+        hand?.SetGestureOffset(Vector3.zero);
+        SetWet(false);
+        ProcessStageManager.Instance?.MarkWiped();
+        Debug.Log($"[설거지] {name}: 키친타월로 물기 닦음");
+        if (carry != null) carry.IsLocked = false;
     }
 
     /// <summary>The burner this vessel is currently sitting on, if any - set by
@@ -588,6 +698,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         Renderer bodyRend = GetComponent<Renderer>();
         if (bodyRend == null || HasFryingOil) return;
         HasFryingOil = true;
+        if (GetComponent<FryBubbles>() == null) gameObject.AddComponent<FryBubbles>(); // (튀길 때 거품)
 
         Bounds lb = bodyRend.localBounds;
         Vector3 size = lb.size;
@@ -620,6 +731,24 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         rend.material = lit != null ? new Material(lit) : new Material(rend.sharedMaterial);
         rend.material.color = oilColor;
         if (rend.material.HasProperty("_Smoothness")) rend.material.SetFloat("_Smoothness", 0.92f);
+        MakeSeeThrough(rend.material); // (기름 속에 가라앉은 조각이 비쳐 보이게)
+    }
+
+    [Tooltip("튀김 기름의 불투명도 (1 = 불투명 - 속에 든 조각이 안 보임).")]
+    [SerializeField, Range(0.2f, 1f)] private float oilOpacity = 0.75f;
+
+    /// <summary>URP Lit을 반투명으로 (알파 블렌딩).</summary>
+    private static void MakeSeeThrough(Material m)
+    {
+        if (!m.HasProperty("_Surface")) return;
+        m.SetFloat("_Surface", 1f);
+        m.SetFloat("_Blend", 0f);
+        m.SetOverrideTag("RenderType", "Transparent");
+        m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        m.SetFloat("_ZWrite", 0f);
+        m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
     }
 
     protected override void Awake()
@@ -669,7 +798,32 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         Color hot = Color.Lerp(oilColor, new Color(0.78f, 0.5f, 0.1f), 0.5f);
         Color c = Color.Lerp(oilColor, hot, OilHeat01);
         if (IsOilHot) c = Color.Lerp(c, Color.white, (Mathf.Sin(Time.time * 9f) * 0.5f + 0.5f) * 0.08f);
+        c.a = oilOpacity;
         r.material.color = c;
+    }
+
+    /// <summary>튀김 기름 표면의 높이 (그릇 안쪽 바닥에서 위로, 월드 거리). 기름이 없으면 0.</summary>
+    public float OilSurfaceHeight
+    {
+        get
+        {
+            if (!HasFryingOil || oilSurface == null) return 0f;
+            Interior i = GetInterior();
+            return Mathf.Max(0f, Vector3.Dot(oilSurface.transform.position - i.floorCenter, i.up));
+        }
+    }
+
+    /// <summary>튀김젓가락·국자로 기름 속을 건드리기: 도구 끝을 그 자리로 가져가고,
+    /// 근처 조각들을 밀어내며 서로 붙은 것(아직 굳기 전)을 떼어 놓는다.</summary>
+    public void PokeAt(Vector3 world)
+    {
+        Interior inside = GetInterior();
+        float radius = inside.radius * 0.35f;
+        foreach (Carryable c in occupied.Keys)
+            if (c.GetComponent<FoodPieceGroup>() is FoodPieceGroup g) g.Poke(world, radius);
+        HandController hc = HandController.Instance;
+        if (hc != null && HandCarry.Instance != null && HandCarry.Instance.Current is ToolItem tool)
+            hc.SetGestureOffset(hc.GestureOffset + ToolItem.TowardSpoonHead(tool, world, Time.deltaTime));
     }
 
     /// <summary>기름 온도 확인: a little starch batter dropped in the oil. Hot
@@ -678,47 +832,91 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     public void DropBatterTest()
     {
         if (!HasFryingOil || oilSurface == null) return;
-        StartCoroutine(BatterTest());
+        StartCoroutine(BatterTest(OilDropPointFromPointer(GetInterior().floorCenter)));
     }
 
-    private System.Collections.IEnumerator BatterTest()
+    private System.Collections.IEnumerator BatterTest(Vector3 dropPoint)
     {
-        bool hot = IsOilHot;
-        Transform surf = oilSurface.transform;
-        Vector3 up = surf.up.normalized;
-        if (Vector3.Dot(up, new Vector3(0f, 0.6f, -1f)) < 0f) up = -up;
-        float r = surf.TransformVector(Vector3.right * 0.5f).magnitude;
-        Vector3 at = surf.position + surf.TransformVector(new Vector3(0.18f, 0f, -0.12f));
-
+        Interior inside = GetInterior();
+        float radius = Mathf.Max(inside.radius * 0.055f, 0.005f);
+        Vector3 offsetLocal = transform.InverseTransformVector(Vector3.ProjectOnPlane(ClampOilDropPoint(dropPoint, radius) - inside.floorCenter, inside.up));
         GameObject blob = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         blob.name = "BatterDrop";
+        blob.transform.SetParent(transform, true);
         Destroy(blob.GetComponent<Collider>());
-        blob.transform.localScale = Vector3.one * r * 0.16f;
-        var mr = blob.GetComponent<Renderer>();
-        Shader lit = Shader.Find("Universal Render Pipeline/Lit");
-        if (lit != null) mr.material = new Material(lit);
-        mr.material.color = new Color(0.97f, 0.96f, 0.9f);
-
-        Vector3 under = at - up * r * 0.25f;   // below the surface (hidden)
-        Vector3 floating = at + up * r * 0.04f;
-        float sink = hot ? 0.12f : 0.4f, rise = hot ? 0.18f : 4f;
-        for (float t = 0f; t < sink; t += Time.deltaTime) { blob.transform.position = Vector3.Lerp(floating + up * r * 0.2f, under, t / sink); yield return null; }
-        if (!hot) yield return new WaitForSeconds(1.5f);
-        for (float t = 0f; t < rise; t += Time.deltaTime) { blob.transform.position = Vector3.Lerp(under, floating, t / rise); yield return null; }
-        Debug.Log(hot ? "기름 온도 확인: 바로 떠오름 - 튀길 수 있어요" : "기름 온도 확인: 가라앉았다 천천히 올라옴 - 아직 덜 달궈졌어요");
-        // Sizzling a moment (hot: a jittery bob, going golden), then gone.
-        for (float t = 0f; t < 2.5f; t += Time.deltaTime)
+        // World-sized visual, even when the vessel has non-uniform scale.
+        Vector3 scale = transform.lossyScale;
+        blob.transform.localScale = new Vector3(
+            radius * 2f / Mathf.Max(Mathf.Abs(scale.x), 0.0001f),
+            radius * 2f / Mathf.Max(Mathf.Abs(scale.y), 0.0001f),
+            radius * 2f / Mathf.Max(Mathf.Abs(scale.z), 0.0001f));
+        Renderer renderer = blob.GetComponent<Renderer>();
+        // Reuse the existing material; a property block avoids leaked instances.
+        renderer.sharedMaterial = oilSurface.GetComponent<Renderer>().sharedMaterial;
+        var properties = new MaterialPropertyBlock();
+        float age = 0f, cooked = 0f, riseProgress = 0f;
+        float depth = 0f;
+        float sinkSeconds = 0.4f;
+        bool floating = false;
+        try
         {
-            if (hot)
+            while (blob != null && HasFryingOil && oilSurface != null)
             {
-                blob.transform.position = floating + Random.insideUnitSphere * r * 0.01f;
-                mr.material.color = Color.Lerp(new Color(0.97f, 0.96f, 0.9f), new Color(0.9f, 0.7f, 0.35f), t / 2.5f);
+                float dt = Mathf.Min(Time.deltaTime, 0.05f); // readable in fast mode too
+                age += dt;
+                inside = GetInterior();
+                float availableDepth = Mathf.Max(0f, OilSurfaceHeight - radius);
+                float temperature = OilTemperatureC;
+                float fraction = Mathf.Lerp(0.95f, batterProbeDepthAt175,
+                    Mathf.InverseLerp(120f, 175f, temperature));
+                fraction = Mathf.Lerp(fraction, 0.12f, Mathf.InverseLerp(175f, 205f, temperature));
+                if (age <= sinkSeconds)
+                {
+                    depth = Mathf.Lerp(-radius * 2f, availableDepth * fraction,
+                        Mathf.Clamp01(age / sinkSeconds));
+                }
+                else if (!floating)
+                {
+                    // Accumulate heat rather than snapshotting IsOilHot on entry.
+                    float rate = BatterProbeRiseRate(temperature, batterProbeSecondsAt175);
+                    riseProgress = Mathf.Clamp01(riseProgress + rate * dt);
+                    float target = riseProgress > 0f ? -radius * 0.3f : availableDepth * fraction;
+                    float speed = riseProgress > 0f
+                        ? (availableDepth + radius) * rate
+                        : availableDepth * 0.4f;
+                    depth = Mathf.MoveTowards(depth, target, speed * dt);
+                    floating = riseProgress >= 1f && depth <= 0f;
+                }
+                else
+                    depth = -radius * (0.3f + Mathf.Sin(age * 5f) * 0.1f);
+
+                Vector3 at = inside.floorCenter + transform.TransformVector(offsetLocal);
+                blob.transform.position = at + inside.up * (OilSurfaceHeight - depth);
+                cooked += Mathf.InverseLerp(130f, 205f, temperature) * dt * 0.025f;
+                Color color = Color.Lerp(new Color(0.97f, 0.96f, 0.9f),
+                    new Color(0.65f, 0.38f, 0.12f), Mathf.Clamp01(cooked));
+                properties.SetColor("_BaseColor", color);
+                properties.SetColor("_Color", color);
+                renderer.SetPropertyBlock(properties);
+                yield return null;
             }
-            yield return null;
         }
-        Destroy(blob);
+        finally
+        {
+            if (blob != null) Destroy(blob);
+        }
     }
 
+    // Tuning curve for a standardized small sample, not a cooking thermometer.
+    // 175 C: 0.4 s descent + 1.6 s rise with the default setting.
+    public static float BatterProbeRiseRate(float temperatureC, float secondsAt175)
+    {
+        float thermal = Mathf.InverseLerp(100f, 175f, temperatureC);
+        float factor = thermal * thermal * thermal;
+        if (temperatureC > 175f)
+            factor = Mathf.Lerp(1f, 2.5f, Mathf.InverseLerp(175f, 205f, temperatureC));
+        return factor / Mathf.Max(0.1f, secondsAt175 - 0.4f);
+    }
     /// <summary>Eases the water shader's heat (burner glow, first small bubbles)
     /// and boil (full rolling bubbles) toward the vessel's actual state, so the
     /// water visibly warms up and calms down again instead of snapping.</summary>
@@ -827,8 +1025,16 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     // (a plate with starch portioned into it can be carried too - to the sink to pour the water off)
     private bool DishMovableNow => CleanupMode.IsOn || (ExamBriefing.IsPlaying && movableDuringBriefing) || HasPortion;
 
+    /// <summary>요리를 담은 완성 접시 (PlatingDestination, 아직 제출 전): 요리째
+    /// 통째로 들어서 제출대(SubmitShelf)로 옮긴다 - 음식을 하나씩 집지 않는다.</summary>
+    public bool CarriesAsServed =>
+        GetComponent<PlatingDestination>() is PlatingDestination d && !d.Submitted
+        && (HasIngredients || (PanSauce.Of(this, false) is PanSauce s && s.Amount > 0.01f));
+
     protected override bool OnClickedWhileHandEmpty()
     {
+        if (CarriesAsServed) return false; // (접시째 든다)
+
         // Dishes only move in clean-up mode (the 정리 tab) - or during the opening check.
         if (isDish && !DishMovableNow)
         {
@@ -847,6 +1053,12 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         if (!IsCookingVessel && MeatKneader.HasMeatToKnead(this))
         {
             MeatKneader.Begin(this);
+            return true;
+        }
+        // 다 버무린 그릇: 더 버무리지 않고 [반죽 조각 / 고기 한 점 / 닫기] 선택창 (BowlMixInteraction)
+        if (!IsCookingVessel && BowlMixInteraction.For(this).ShowsChooser())
+        {
+            BowlMixInteraction.For(this).OpenChooser();
             return true;
         }
         // 깬 달걀: 계란 사용 - which part to pour (picked up once chosen). Beaten
@@ -1032,6 +1244,15 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             return;
         }
 
+        // 기름 온도 확인: 버무린 그릇에서 집은 반죽 조각을 튀김 기름에 (BowlMixInteraction)
+        if (HasFryingOil && BowlMixInteraction.IsBatterPiece(held))
+        {
+            HandCarry.Instance.Detach();
+            Destroy(held.gameObject);
+            DropBatterTest();
+            return;
+        }
+
         // 기름 온도 확인: a little starch (앙금녹말/감자전분) off the spoon into the frying oil.
         if (HasFryingOil && held is ToolItem testSpoon && testSpoon.Kind == ToolKind.MeasuringSpoon
             && (testSpoon.LoadedSeasoning == PortionedCondiment.SettledStarch || testSpoon.LoadedSeasoning == PortionedCondiment.Starch))
@@ -1139,8 +1360,10 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         if (held is ToolItem spoon && spoon.Kind == ToolKind.MeasuringSpoon && spoon.IsSpoonLoaded)
         {
             string what = spoon.LoadedSeasoning;
+            SaucePortion spoonPortion = spoon.LoadedSauce;
             float ml = spoon.ConsumeSeasoning();
-            if (!IsCookingVessel && BatterTarget() is IngredientItem meat) meat.AddFromSpoon(what, ml);
+            if (spoonPortion != null) AddSaucePortion(spoonPortion);
+            else if (!IsCookingVessel && BatterTarget() is IngredientItem meat) meat.AddFromSpoon(what, ml);
             else AddSeasoning(what, ml);
             StartCoroutine(SpoonDip(spoon));
             Debug.Log($"[계량] {name}: {what} {ml:0}mL 넣음");
@@ -1155,8 +1378,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         {
             string what = keptOil.LiquidName;
             // (PanSauce counts in 큰술, 15 mL each)
-            if (!oilSpoon.TryLoadUpTo(what, keptOil.LiquidAmount * ToolItem.TablespoonMl)) return;
-            keptOil.Take(oilSpoon.LoadedMl / ToolItem.TablespoonMl, true);
+            if (!oilSpoon.TryLoadSauce(keptOil)) return;
             StartCoroutine(SpoonDip(oilSpoon));
             Debug.Log($"[계량] {name}: {what} {oilSpoon.LoadedMl:0}mL (남은 양 {keptOil.LiquidAmount * ToolItem.TablespoonMl:0.#}mL)");
             return;
@@ -1202,6 +1424,13 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             {
                 SetFilledWithWater(false);
                 ProcessStageManager.Instance?.MarkWiped();
+                return;
+            }
+
+            // 씻은 그릇·팬의 물기: 키친타월로 닦는다 (깔개로 펼치지 않고)
+            if (IsWet && !towel.IsWrapping)
+            {
+                StartCoroutine(TowelWipe(towel));
                 return;
             }
 
@@ -1447,13 +1676,33 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         HandController hand = HandController.Instance;
         if (hand == null) yield break;
         Interior inside = GetInterior();
+        ToolItem tool = HandCarry.Instance != null ? HandCarry.Instance.Current as ToolItem : null;
+        if (tool == null)
+        {
+            for (float t = 0f; t < 0.45f; t += Time.deltaTime)
+            {
+                float a = t / 0.45f * Mathf.PI * 2f;
+                hand.SetGestureOffset(new Vector3(Mathf.Cos(a), Mathf.Sin(a) * 0.6f, 0f) * inside.radius * 0.5f);
+                yield return null;
+            }
+            hand.SetGestureOffset(Vector3.zero);
+            stirRoutine = null;
+            yield break;
+        }
+        // 국자·주걱의 머리(손에서 먼 끝)가 팬 몸통 가운데서 원을 그리게 - 손만
+        // 원을 그리면 손잡이 끝이 팬 위에 있고 머리는 팬 밖으로 나가 있었다.
+        Vector3 center = BodyCenterWorld();
+        Vector3 reach = hand.GestureOffset;
         for (float t = 0f; t < 0.45f; t += Time.deltaTime)
         {
             float a = t / 0.45f * Mathf.PI * 2f;
-            hand.SetGestureOffset(new Vector3(Mathf.Cos(a), Mathf.Sin(a) * 0.6f, 0f) * inside.radius * 0.5f);
+            Vector3 circle = new Vector3(Mathf.Cos(a), Mathf.Sin(a) * 0.6f, 0f) * inside.radius * 0.5f;
+            reach += ToolItem.TowardSpoonHead(tool, center + circle, Time.deltaTime);
+            hand.SetGestureOffset(reach);
             yield return null;
         }
-        hand.SetGestureOffset(Vector3.zero);
+        // (머리는 팬 안에 둔 채 - 다음 손 이동(GoTo)에서 원래대로)
+        hand.SetGestureOffset(reach);
         stirRoutine = null;
     }
 
@@ -1581,12 +1830,18 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             if (item is IngredientItem cut && cut.CurrentState == IngredientItem.State.Cut)
                 cut.GatherPieces(Mathf.Min(InsideRadius(), inside.radius * 0.45f));
             // What shows of it (cut slices lie off to one side of the pivot) goes on the spot.
-            Vector3 want = FreeSlot(item, inside);
+            // (튀김 기름: 정해진 자리가 아니라 커서로 가리킨 곳에 - 한 조각씩 팬 가장자리
+            // 여기저기 따로 넣을 수 있게. 겹치면 바로 옆 빈 곳)
+            Vector3 want = HasFryingOil && item is IngredientItem ? OilDropSpot(item, inside, worldDropPosition) : FreeSlot(item, inside);
             Vector3 shown = VisibleCenter(item);
-            item.transform.position += new Vector3(want.x - shown.x, want.y - shown.y, 0f);
+            item.transform.position += HasFryingOil && item is IngredientItem
+                ? want - shown : new Vector3(want.x - shown.x, want.y - shown.y, 0f);
         }
-        RestOnSurface(item);
-        SinkIntoWater(item);
+        if (!(HasFryingOil && item is IngredientItem))
+        {
+            RestOnSurface(item);
+            SinkIntoWater(item);
+        }
 
         // Into the wok/frying pan without having drained on a paper towel first
         // (blanching tofu in the pot beforehand is fine - that comes before drying).
@@ -1639,8 +1894,68 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         return best;
     }
 
+    // 기름 표면에 마우스 광선이 닿는 곳. 손 모델의 위치와 분리한다.
+    public Vector3 OilDropPointFromPointer(Vector3 fallback)
+    {
+        Camera cam = Camera.main;
+        if (cam == null || UnityEngine.InputSystem.Mouse.current == null)
+            return ClampOilDropPoint(fallback, 0f);
+        return OilDropPointFromRay(
+            cam.ScreenPointToRay(UnityEngine.InputSystem.Mouse.current.position.ReadValue()), fallback);
+    }
+
+    public Vector3 OilDropPointFromRay(Ray ray, Vector3 fallback)
+    {
+        Interior inside = GetInterior();
+        Vector3 surface = inside.floorCenter + inside.up * OilSurfaceHeight;
+        float distance;
+        Vector3 point = new Plane(inside.up, surface).Raycast(ray, out distance)
+            ? ray.GetPoint(distance) : fallback;
+        return ClampOilDropPoint(point, 0f);
+    }
+
+    public Vector3 ClampOilDropPoint(Vector3 point, float clearance)
+    {
+        Interior inside = GetInterior();
+        Vector3 surface = inside.floorCenter + inside.up * OilSurfaceHeight;
+        float radius = inside.radius;
+        if (oilSurface != null)
+        {
+            float oilRadius = Mathf.Min(
+                oilSurface.transform.TransformVector(Vector3.right).magnitude,
+                oilSurface.transform.TransformVector(Vector3.forward).magnitude) * 0.5f;
+            if (oilRadius > 0.001f) radius = Mathf.Min(radius, oilRadius);
+        }
+        Vector3 offset = Vector3.ProjectOnPlane(point - surface, inside.up);
+        return surface + Vector3.ClampMagnitude(offset, Mathf.Max(0f, radius - clearance));
+    }
+
+    private Vector3 OilDropSpot(Carryable item, Interior inside, Vector3 requestedPoint)
+    {
+        float clearance = inside.radius * 0.055f;
+        FoodPieceGroup group = item.GetComponent<FoodPieceGroup>();
+        if (group != null && group.Count > 0)
+        {
+            Vector3 center = VisibleCenter(item);
+            foreach (FoodPiece piece in group.Pieces)
+                if (piece != null)
+                    clearance = Mathf.Max(clearance,
+                        Vector3.ProjectOnPlane(piece.transform.position - center, inside.up).magnitude
+                        + piece.Radius);
+        }
+        // 겹친다고 다른 빈자리로 옮기지 않는다. 넣은 뒤의 충돌/붙음은 조각 시뮬레이션이 처리.
+        return ClampOilDropPoint(requestedPoint, clearance) + inside.up * clearance;
+    }
     private static Vector3 VisibleCenter(Carryable c)
     {
+        // (조각으로 나뉜 것: 조각들의 실제 자리 가운데)
+        if (c.GetComponent<FoodPieceGroup>() is FoodPieceGroup g && g.Count > 0)
+        {
+            Vector3 sum = Vector3.zero;
+            int n = 0;
+            foreach (FoodPiece p in g.Pieces) if (p != null) { sum += p.transform.position; n++; }
+            if (n > 0) return sum / n;
+        }
         if (c is IngredientItem ing) return ing.VisibleBounds.center;
         Bounds b = new Bounds(c.transform.position, Vector3.zero);
         bool any = false;

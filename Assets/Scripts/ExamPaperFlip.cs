@@ -47,6 +47,8 @@ public class ExamPaperFlip : MonoBehaviour, IClickable
         switch (state)
         {
             case ViewState.Small:
+                // (크게 펼친 시험지는 전체 화면 기준 자리 - 확대 중이면 먼저 전체 보기로)
+                if (KitchenCamera.IsZoomed) { KitchenCamera.Instance.ShowOverview(); return; }
                 state = ViewState.ZoomedFront;
                 SetFace(false);
                 StopAllCoroutines();

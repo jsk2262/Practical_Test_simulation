@@ -22,7 +22,8 @@ public static class ExamFlow
         Current = Phase.Cleaning;
         DishEvaluation.EvaluateDishes();
         foreach (PlatingDestination d in PlatingDestination.All) if (d != null) d.LockSubmitted();
-        if (!CleanupMode.IsOn) CleanupMode.Toggle();
+        CleanupMode.Set(true);
+        KitchenCamera.Instance?.ShowOverview();
         Debug.Log("[제출] 요리 제출 - 마무리 정리 후 '정리 완료'를 누르세요");
         Changed?.Invoke();
     }

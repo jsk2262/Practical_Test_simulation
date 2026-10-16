@@ -242,6 +242,37 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4424204}
   m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &26453222
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 26453223}
+  m_Layer: 0
+  m_Name: Slot1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &26453223
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 26453222}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.0618436, z: -0.3}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1793914931}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &29699053
 GameObject:
   m_ObjectHideFlags: 0
@@ -420,6 +451,10 @@ MonoBehaviour:
   diceSlowness: 1.2
   meatTrimLengthCm: 4
   meatCutStepMode: 0
+  poStrokeCm: 5
+  poStrokeSeconds: 0.7
+  poAdvanceCmPerSecond: 2.2
+  poBladeAimFromTip: 0.3
 --- !u!23 &44293803
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1225,6 +1260,10 @@ MonoBehaviour:
   diceSlowness: 1.2
   meatTrimLengthCm: 4
   meatCutStepMode: 0
+  poStrokeCm: 5
+  poStrokeSeconds: 0.7
+  poAdvanceCmPerSecond: 2.2
+  poBladeAimFromTip: 0.3
 --- !u!65 &142872492
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1911,6 +1950,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 0}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -1921,12 +1962,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.36, y: 0.36}
   minSeparation: {x: 0.22, y: 0.22}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!4 &186573553 stripped
 Transform:
@@ -2146,10 +2189,13 @@ MonoBehaviour:
   showSpoonLabel: 0
   kind: 5
   gripLocalDir: {x: 0, y: -1, z: 0}
+  strainerFlipInHand: 1
   flipChopUpright: 0
   chopLift: 0.25
   chopTiltZ: 25
   scrapSweepRadius: 0.4
+  flatDepthTurnDegrees: -90
+  flatDepthGripAdjust: {x: 0, y: 0, z: 0}
 --- !u!65 &212558446
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -2390,6 +2436,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 0}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -2400,12 +2448,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.18, y: 0.18}
   minSeparation: {x: 0.11, y: 0.11}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!4 &236198149 stripped
 Transform:
@@ -2727,11 +2777,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3247581087658072822, guid: 4c31d70b845844c4aaaab5064222a259, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -6.02
+      value: -5.95
       objectReference: {fileID: 0}
     - target: {fileID: 3247581087658072822, guid: 4c31d70b845844c4aaaab5064222a259, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 7.36
+      value: 7.29
       objectReference: {fileID: 0}
     - target: {fileID: 3247581087658072822, guid: 4c31d70b845844c4aaaab5064222a259, type: 3}
       propertyPath: m_LocalRotation.w
@@ -3414,6 +3464,7 @@ GameObject:
   - component: {fileID: 330585544}
   - component: {fileID: 330585547}
   - component: {fileID: 330585548}
+  - component: {fileID: 330585549}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -3556,6 +3607,51 @@ MonoBehaviour:
   dragThreshold: 6
   holdSeconds: 0.4
   stirPixelsPerStroke: 140
+--- !u!114 &330585549
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b51ce2bfe8a9fe438a291e9faaaf3fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KitchenCamera
+  usableWidth: 0.62
+  usableHeight: 0.9
+  boardNeighborReach: 1.2
+  burnerNeighborReach: 1.6
+  burnerBoxMin: {x: -1.3, y: -1.1}
+  burnerBoxMax: {x: 2, y: 1.1}
+  minZoomSize: 1.6
+  maxBurnerSize: 2
+  maxBoardSize: 3.8
+  panSensitivity: 1
+  dragMovesContent: 1
+  panBounds:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 0
+    height: 0
+  transitionSeconds: 0.35
+  doubleClickSeconds: 0.32
+  doubleClickPixels: 14
+  hudNames:
+  - RecipesSauce
+  - Label_Timer
+  - Label_HygieneCount
+  - Label_SpecInfoButton
+  - Label_HintButton
+  - Label_SauceInfoButton
+  - CutSpecification
+  - Hint
+  - CleanupTab
+  - Label_CleanupTab
+  - SubmitButton
+  - SpeedModeButton
 --- !u!1 &331421514
 GameObject:
   m_ObjectHideFlags: 0
@@ -3679,6 +3775,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 2485276936549234680, guid: a500764f1a0d3654db7718249e73c3d3, type: 3}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -3689,12 +3787,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.14, y: 0.14}
   minSeparation: {x: 0.09, y: 0.09}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!65 &335917318
 BoxCollider:
@@ -3961,6 +4061,10 @@ MonoBehaviour:
   diceSlowness: 1.2
   meatTrimLengthCm: 4
   meatCutStepMode: 0
+  poStrokeCm: 5
+  poStrokeSeconds: 0.7
+  poAdvanceCmPerSecond: 2.2
+  poBladeAimFromTip: 0.3
 --- !u!23 &346684372
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -4070,11 +4174,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -3.789
+      value: -3.7010002
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 3.81
+      value: 3.738
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalRotation.w
@@ -4152,6 +4256,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 2485276936549234680, guid: a500764f1a0d3654db7718249e73c3d3, type: 3}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -4162,12 +4268,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.28, y: 0.28}
   minSeparation: {x: 0.17, y: 0.17}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!65 &350598074
 BoxCollider:
@@ -5030,11 +5138,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -3.851
+      value: -3.7630002
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 3.859
+      value: 3.787
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalRotation.w
@@ -5112,6 +5220,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 2485276936549234680, guid: a500764f1a0d3654db7718249e73c3d3, type: 3}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -5122,12 +5232,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.28, y: 0.28}
   minSeparation: {x: 0.17, y: 0.17}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!65 &412573631
 BoxCollider:
@@ -5800,6 +5912,10 @@ MonoBehaviour:
   diceSlowness: 1.2
   meatTrimLengthCm: 4
   meatCutStepMode: 0
+  poStrokeCm: 5
+  poStrokeSeconds: 0.7
+  poAdvanceCmPerSecond: 2.2
+  poBladeAimFromTip: 0.3
 --- !u!23 &487071335
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -6184,6 +6300,10 @@ MonoBehaviour:
   diceSlowness: 1.2
   meatTrimLengthCm: 4
   meatCutStepMode: 0
+  poStrokeCm: 5
+  poStrokeSeconds: 0.7
+  poAdvanceCmPerSecond: 2.2
+  poBladeAimFromTip: 0.3
 --- !u!23 &500012921
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -7178,6 +7298,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 2485276936549234680, guid: a500764f1a0d3654db7718249e73c3d3, type: 3}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -7188,12 +7310,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.28, y: 0.28}
   minSeparation: {x: 0.17, y: 0.17}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 1
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!65 &555049421
 BoxCollider:
@@ -7319,7 +7443,7 @@ Transform:
   m_GameObject: {fileID: 562413125}
   serializedVersion: 2
   m_LocalRotation: {x: -0.13255304, y: -0.0000001216703, z: 0.000000083252495, w: 0.991176}
-  m_LocalPosition: {x: 10.02, y: 2.13, z: 5.76}
+  m_LocalPosition: {x: 10.02, y: 5.23, z: 4.92}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -7353,6 +7477,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 0}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -7363,12 +7489,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.36, y: 0.36}
   minSeparation: {x: 0.22, y: 0.22}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!64 &569441734
 MeshCollider:
@@ -7992,6 +8120,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 2485276936549234680, guid: a500764f1a0d3654db7718249e73c3d3, type: 3}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -8002,12 +8132,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.8, y: 0.3}
   minSeparation: {x: 0.4, y: 0.15}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!65 &597719592
 BoxCollider:
@@ -8063,6 +8195,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 0}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -8073,12 +8207,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.18, y: 0.18}
   minSeparation: {x: 0.11, y: 0.11}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!64 &600491228
 MeshCollider:
@@ -8140,6 +8276,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 0}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -8150,12 +8288,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.8, y: 0.3}
   minSeparation: {x: 0.4, y: 0.15}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!64 &621185943
 MeshCollider:
@@ -8359,6 +8499,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 0}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -8369,12 +8511,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.18, y: 0.18}
   minSeparation: {x: 0.11, y: 0.11}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!1 &630343357
 GameObject:
@@ -8436,6 +8580,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 0}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -8446,12 +8592,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.38, y: 0.11}
   minSeparation: {x: 0.26, y: 0.18}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!23 &630343360
 MeshRenderer:
@@ -9215,7 +9363,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 100000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_Name
-      value: bowlSize2
+      value: bowlSize2x3
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalScale.x
@@ -9223,7 +9371,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalScale.y
-      value: 2
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalScale.z
@@ -9235,11 +9383,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -3.929
+      value: -3.841
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 3.876
+      value: 3.804
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
       propertyPath: m_LocalRotation.w
@@ -10583,6 +10731,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 0}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -10593,12 +10743,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.92, y: 0.6}
   minSeparation: {x: 0.32, y: 0.2}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 0
 --- !u!23 &799384735
 MeshRenderer:
@@ -10985,6 +11137,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 0}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -10995,12 +11149,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.8, y: 0.3}
   minSeparation: {x: 0.4, y: 0.15}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 1
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!65 &821572701
 BoxCollider:
@@ -11115,6 +11271,10 @@ MonoBehaviour:
   diceSlowness: 2
   meatTrimLengthCm: 4
   meatCutStepMode: 0
+  poStrokeCm: 5
+  poStrokeSeconds: 0.7
+  poAdvanceCmPerSecond: 2.2
+  poBladeAimFromTip: 0.3
 --- !u!23 &831288902
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -11604,10 +11764,13 @@ MonoBehaviour:
   showSpoonLabel: 0
   kind: 4
   gripLocalDir: {x: 0, y: -1, z: 0}
+  strainerFlipInHand: 1
   flipChopUpright: 0
   chopLift: 0.25
   chopTiltZ: 15
   scrapSweepRadius: 0.4
+  flatDepthTurnDegrees: -90
+  flatDepthGripAdjust: {x: 0, y: 0, z: 0}
 --- !u!65 &851177449
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -12372,6 +12535,10 @@ MonoBehaviour:
   diceSlowness: 1.2
   meatTrimLengthCm: 4
   meatCutStepMode: 0
+  poStrokeCm: 5
+  poStrokeSeconds: 0.7
+  poAdvanceCmPerSecond: 2.2
+  poBladeAimFromTip: 0.3
 --- !u!23 &946831478
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -13187,10 +13354,13 @@ MonoBehaviour:
   showSpoonLabel: 0
   kind: 5
   gripLocalDir: {x: 0, y: -1, z: 0}
+  strainerFlipInHand: 1
   flipChopUpright: 0
   chopLift: 0.25
   chopTiltZ: 15
   scrapSweepRadius: 0.4
+  flatDepthTurnDegrees: -90
+  flatDepthGripAdjust: {x: 0, y: 0, z: 0}
 --- !u!65 &994279607
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -14319,6 +14489,8 @@ MonoBehaviour:
   foldedSize: {x: 0.42, y: 0.34}
   foldedThickness: 0.05
   clothColor: {r: 0.97, g: 0.97, b: 0.95, a: 1}
+  dropHeight: 0.28
+  dropEvery: 0.05
 --- !u!23 &1100621184
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -14785,6 +14957,10 @@ MonoBehaviour:
   diceSlowness: 2
   meatTrimLengthCm: 4
   meatCutStepMode: 0
+  poStrokeCm: 5
+  poStrokeSeconds: 0.7
+  poAdvanceCmPerSecond: 2.2
+  poBladeAimFromTip: 0.3
 --- !u!23 &1144338913
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -14864,6 +15040,110 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 0.9746188, z: 1.0240722}
   m_Center: {x: 0, y: -0.0007905215, z: -0.0009072423}
+--- !u!1 &1149634846
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1149634847}
+  - component: {fileID: 1149634849}
+  - component: {fileID: 1149634848}
+  m_Layer: 0
+  m_Name: Label
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1149634847
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1149634846}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 2.673687, z: -0.1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1793914931}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!102 &1149634848
+TextMesh:
+  serializedVersion: 3
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1149634846}
+  m_Text: "\uC81C\uCD9C\uB300"
+  m_OffsetZ: 0
+  m_CharacterSize: 0.08
+  m_LineSpacing: 1
+  m_Anchor: 4
+  m_Alignment: 1
+  m_TabSize: 4
+  m_FontSize: 60
+  m_FontStyle: 0
+  m_RichText: 1
+  m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Color:
+    serializedVersion: 2
+    rgba: 4280690214
+--- !u!23 &1149634849
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1149634846}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10100, guid: 0000000000000000e000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!1 &1160345793
 GameObject:
   m_ObjectHideFlags: 0
@@ -14896,6 +15176,84 @@ Transform:
   - {fileID: 1523005968}
   m_Father: {fileID: 596888273}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1176529007
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1176529008}
+  - component: {fileID: 1176529011}
+  - component: {fileID: 1176529010}
+  - component: {fileID: 1176529009}
+  m_Layer: 0
+  m_Name: Burner1_FloorArea
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1176529008
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1176529007}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.000000015308052, y: 0.9366722, z: -0.3502074, w: -0.00000004094324}
+  m_LocalPosition: {x: 5.54976, y: 1.1958442, z: 5.1590095}
+  m_LocalScale: {x: 1.85, y: 0.02, z: 1.85}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1438658940}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1176529009
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1176529007}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 873c5a03d5259124a82704ec1a584e0a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BurnerFloorDirt
+  burner: {fileID: 1520197024}
+  grate: {fileID: 1973823889}
+  secondsPerStain: 8
+  firstStainSeconds: 2
+  maxStains: 8
+  ringRadius: {x: 0.62, y: 0.9}
+  cleanThreshold: 0.25
+  deductionCategory: "\uC704\uC0DD"
+  deductionReason: "\uD654\uAD6C \uBC1B\uCE68 \uC544\uB798 \uCCAD\uC18C \uBBF8\uC644\uB8CC"
+--- !u!114 &1176529010
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1176529007}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a7838ba84cdb2743a686e5e06934f02, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WipeableSurface
+  testStains: 0
+  stainRadius: {x: 0.12, y: 0.24}
+  edgeInset: 0.04
+--- !u!33 &1176529011
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1176529007}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &1176613669
 GameObject:
   m_ObjectHideFlags: 0
@@ -14928,6 +15286,96 @@ Transform:
   - {fileID: 1949165483}
   m_Father: {fileID: 1349288640}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1232950571
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1232950572}
+  - component: {fileID: 1232950574}
+  - component: {fileID: 1232950573}
+  m_Layer: 0
+  m_Name: Ledge2
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1232950572
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1232950571}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -2.9986868, z: -0.1}
+  m_LocalScale: {x: 3.496, y: 0.08, z: 0.3}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1793914931}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &1232950573
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1232950571}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 82d879eb5c287834d8f57c891f3bc6e2, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1232950574
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1232950571}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &1240447898
 GameObject:
   m_ObjectHideFlags: 0
@@ -15677,6 +16125,8 @@ MonoBehaviour:
   foldedSize: {x: 0.42, y: 0.34}
   foldedThickness: 0.05
   clothColor: {r: 0.97, g: 0.97, b: 0.95, a: 1}
+  dropHeight: 0.28
+  dropEvery: 0.05
 --- !u!23 &1303671187
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -15951,10 +16401,13 @@ MonoBehaviour:
   showSpoonLabel: 0
   kind: 15
   gripLocalDir: {x: 0, y: -1, z: 0}
+  strainerFlipInHand: 1
   flipChopUpright: 0
   chopLift: 0.25
   chopTiltZ: 15
   scrapSweepRadius: 0.4
+  flatDepthTurnDegrees: -90
+  flatDepthGripAdjust: {x: 0, y: 0, z: 0}
 --- !u!65 &1308135734
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -16009,6 +16462,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 0}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -16019,12 +16474,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.8, y: 0.3}
   minSeparation: {x: 0.4, y: 0.15}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!65 &1309451717
 BoxCollider:
@@ -16294,6 +16751,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 0}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -16304,12 +16763,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.18, y: 0.18}
   minSeparation: {x: 0.11, y: 0.11}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!4 &1317680243 stripped
 Transform:
@@ -17468,6 +17929,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 2485276936549234680, guid: a500764f1a0d3654db7718249e73c3d3, type: 3}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -17478,12 +17941,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.14, y: 0.14}
   minSeparation: {x: 0.09, y: 0.09}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!65 &1410127210
 BoxCollider:
@@ -17592,6 +18057,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 0}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -17602,12 +18069,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.36, y: 0.36}
   minSeparation: {x: 0.22, y: 0.22}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!4 &1426974306 stripped
 Transform:
@@ -17790,6 +18259,96 @@ Transform:
   - {fileID: 1587567625}
   m_Father: {fileID: 1635868813}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1437799688
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1437799689}
+  - component: {fileID: 1437799691}
+  - component: {fileID: 1437799690}
+  m_Layer: 0
+  m_Name: FrameTop
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1437799689
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1437799688}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 2.948687, z: -0.05}
+  m_LocalScale: {x: 3.68, y: 0.1, z: 0.12}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1793914931}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &1437799690
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1437799688}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: ac4c91881065bfe4884995fc20075acc, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1437799691
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1437799688}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &1438658939
 GameObject:
   m_ObjectHideFlags: 0
@@ -17830,6 +18389,8 @@ Transform:
   - {fileID: 1581463456}
   - {fileID: 1255737221}
   - {fileID: 1590783488}
+  - {fileID: 1973823890}
+  - {fileID: 1176529008}
   m_Father: {fileID: 2037192393}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1441685859
@@ -18408,6 +18969,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 2485276936549234680, guid: a500764f1a0d3654db7718249e73c3d3, type: 3}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -18418,12 +18981,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.14, y: 0.14}
   minSeparation: {x: 0.09, y: 0.09}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!65 &1480482416
 BoxCollider:
@@ -18504,10 +19069,13 @@ MonoBehaviour:
   showSpoonLabel: 0
   kind: 14
   gripLocalDir: {x: 0, y: -1, z: 0}
+  strainerFlipInHand: 1
   flipChopUpright: 0
   chopLift: 0.25
   chopTiltZ: 25
   scrapSweepRadius: 0.4
+  flatDepthTurnDegrees: -90
+  flatDepthGripAdjust: {x: 0, y: 0, z: 0}
 --- !u!65 &1497894070
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -18872,6 +19440,37 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &1521435308
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1521435309}
+  m_Layer: 0
+  m_Name: Slot2
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1521435309
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1521435308}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -1.6118433, z: -0.3}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1793914931}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1523005967
 GameObject:
   m_ObjectHideFlags: 0
@@ -18932,10 +19531,13 @@ MonoBehaviour:
   showSpoonLabel: 0
   kind: 5
   gripLocalDir: {x: 0, y: -1, z: 0}
+  strainerFlipInHand: 1
   flipChopUpright: 0
   chopLift: 0.25
   chopTiltZ: 25
   scrapSweepRadius: 0.4
+  flatDepthTurnDegrees: -90
+  flatDepthGripAdjust: {x: 0, y: 0, z: 0}
 --- !u!65 &1532289628
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -20138,6 +20740,10 @@ MonoBehaviour:
   diceSlowness: 1.2
   meatTrimLengthCm: 4
   meatCutStepMode: 0
+  poStrokeCm: 5
+  poStrokeSeconds: 0.7
+  poAdvanceCmPerSecond: 2.2
+  poBladeAimFromTip: 0.3
 --- !u!23 &1685849052
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -20388,6 +20994,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 0}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -20398,12 +21006,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.8, y: 0.3}
   minSeparation: {x: 0.4, y: 0.15}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 0
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!65 &1698839846
 BoxCollider:
@@ -20519,6 +21129,10 @@ MonoBehaviour:
   diceSlowness: 2
   meatTrimLengthCm: 4
   meatCutStepMode: 0
+  poStrokeCm: 5
+  poStrokeSeconds: 0.7
+  poAdvanceCmPerSecond: 2.2
+  poBladeAimFromTip: 0.3
 --- !u!23 &1707098222
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -20891,6 +21505,10 @@ MonoBehaviour:
   diceSlowness: 1.2
   meatTrimLengthCm: 4
   meatCutStepMode: 0
+  poStrokeCm: 5
+  poStrokeSeconds: 0.7
+  poAdvanceCmPerSecond: 2.2
+  poBladeAimFromTip: 0.3
 --- !u!65 &1716209914
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -21011,6 +21629,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 0}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -21021,12 +21641,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.27, y: 0.27}
   minSeparation: {x: 0.16, y: 0.16}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!64 &1723122564
 MeshCollider:
@@ -21659,6 +22281,115 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 2.755469, y: 1.6461222, z: 0.25866517}
   m_Center: {x: -0.00000013026835, y: -0.4769392, z: -0.0000038124736}
+--- !u!1 &1784314148
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1784314149}
+  m_Layer: 0
+  m_Name: Burner1_GrateAside
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1784314149
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1784314148}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -8.29976, y: -0.48562026, z: 0.36074686}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1973823890}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1793914930
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1793914931}
+  - component: {fileID: 1793914933}
+  - component: {fileID: 1793914932}
+  m_Layer: 0
+  m_Name: SubmitShelf
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1793914931
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1793914930}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 9.63, y: -0.18131304, z: 5.6}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1992607385}
+  - {fileID: 1437799689}
+  - {fileID: 1974047540}
+  - {fileID: 26453223}
+  - {fileID: 1232950572}
+  - {fileID: 1521435309}
+  - {fileID: 1149634847}
+  m_Father: {fileID: 1865786201}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1793914932
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1793914930}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cf799130824fa074d9757e984550ea11, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SubmitShelf
+  handOffset: {x: 0, y: 0, z: -0.55}
+  slots:
+  - {fileID: 26453223}
+  - {fileID: 1521435309}
+  surfaceGap: 0.05
+--- !u!65 &1793914933
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1793914930}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 3.68, y: 5.897374, z: 0.2}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1794782066
 GameObject:
   m_ObjectHideFlags: 0
@@ -22484,6 +23215,10 @@ MonoBehaviour:
   diceSlowness: 2
   meatTrimLengthCm: 4
   meatCutStepMode: 0
+  poStrokeCm: 5
+  poStrokeSeconds: 0.7
+  poAdvanceCmPerSecond: 2.2
+  poBladeAimFromTip: 0.3
 --- !u!23 &1825894896
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -22667,6 +23402,156 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1001 &1835155550
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 1927539385}
+    m_Modifications:
+    - target: {fileID: 100000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_Name
+      value: bowlSize2x3_1
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -3.51
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -3.903
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 3.855
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: -0.9415618
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0.33684042
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.00000013638655
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0.000000055976297
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 320.631
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 100000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1835155554}
+    - targetCorrespondingSourceObject: {fileID: 100000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1835155553}
+  m_SourcePrefab: {fileID: 100100000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+--- !u!4 &1835155551 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 400000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+  m_PrefabInstance: {fileID: 1835155550}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1835155552 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 100000, guid: abe0f3cb09164c048b3cba749efab044, type: 3}
+  m_PrefabInstance: {fileID: 1835155550}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1835155553
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1835155552}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: afe4f00ab6b5d834e8899145bf89eabd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MovableBowl
+  handOffset: {x: 0, y: 0, z: -0.55}
+  handHoldOffset: {x: 0, y: 0.35, z: -0.25}
+  holdByHandle: 0
+  accepts: 1
+  capacity: 10
+  canHoldWater: 1
+  spoonOfWater: 0.1
+  waterCapacityMl: 0
+  timeToBoilNoLid: 300
+  timeToBoilWithLid: 210
+  timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
+  bubbleEffectPrefab: {fileID: 2485276936549234680, guid: a500764f1a0d3654db7718249e73c3d3, type: 3}
+  waterMaterial: {fileID: 0}
+  waterInnerRatio: 0.86
+  fullWaterLevel: 0.5
+  secondsToFill: 3
+  waterLocalOffset: {x: 0, y: 0, z: 0}
+  waterLookSpeed: 0.6
+  idleSlosh: 0.2
+  placementExtents: {x: 0.28, y: 0.28}
+  minSeparation: {x: 0.17, y: 0.17}
+  fryingCapacity: 30
+  starchSettleMinutes: 5
+  oilForFrying: 0
+  oilLevel: 0.5
+  oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
+  isDish: 0
+  strainerRest: 1
+  oilOpacity: 0.6
+  movableDuringBriefing: 1
+--- !u!65 &1835155554
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1835155552}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.3935827, y: 0.106321044, z: 0.39647347}
+  m_Center: {x: 0.000000022351742, y: 0.053160522, z: 0.00000008195639}
 --- !u!1 &1864572731
 GameObject:
   m_ObjectHideFlags: 0
@@ -22742,6 +23627,7 @@ Transform:
   - {fileID: 1880896718}
   - {fileID: 778515430}
   - {fileID: 1735382949}
+  - {fileID: 1793914931}
   m_Father: {fileID: 2037192393}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1873945799
@@ -23113,6 +23999,10 @@ MonoBehaviour:
   diceSlowness: 2
   meatTrimLengthCm: 4
   meatCutStepMode: 0
+  poStrokeCm: 5
+  poStrokeSeconds: 0.7
+  poAdvanceCmPerSecond: 2.2
+  poBladeAimFromTip: 0.3
 --- !u!23 &1889413068
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -23385,10 +24275,13 @@ MonoBehaviour:
   showSpoonLabel: 0
   kind: 0
   gripLocalDir: {x: 0, y: -1, z: 0}
+  strainerFlipInHand: 1
   flipChopUpright: 0
   chopLift: 0.25
   chopTiltZ: 25
   scrapSweepRadius: 0.4
+  flatDepthTurnDegrees: -90
+  flatDepthGripAdjust: {x: 0, y: 0, z: 0}
 --- !u!114 &1906059973
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -23451,10 +24344,13 @@ MonoBehaviour:
   showSpoonLabel: 0
   kind: 16
   gripLocalDir: {x: 0, y: -1, z: 0}
+  strainerFlipInHand: 1
   flipChopUpright: 0
   chopLift: 0.25
   chopTiltZ: 15
   scrapSweepRadius: 0.4
+  flatDepthTurnDegrees: -90
+  flatDepthGripAdjust: {x: 0, y: 0, z: 0}
 --- !u!65 &1916550471
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -23630,6 +24526,7 @@ Transform:
   - {fileID: 1480482414}
   - {fileID: 335917321}
   - {fileID: 555049424}
+  - {fileID: 1835155551}
   - {fileID: 350598071}
   - {fileID: 412573628}
   - {fileID: 1723122567}
@@ -24080,6 +24977,151 @@ Transform:
   - {fileID: 330537623259087159}
   m_Father: {fileID: 2037192393}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1973823888
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1973823890}
+  - component: {fileID: 1973823889}
+  m_Layer: 0
+  m_Name: Burner1_Grate
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1973823889
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1973823888}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b3997a6ab6f54044885303a5720f6c62, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BurnerGrate
+  parts:
+  - {fileID: 7073456778033115418}
+  - {fileID: 7058834975835114529}
+  - {fileID: 3538338527941759489}
+  - {fileID: 254482432517739326}
+  - {fileID: 3624145891180543574}
+  burner: {fileID: 1520197024}
+  asideSpot: {fileID: 1784314149}
+  dropRadius: 0.8
+  highlight: {r: 0.95, g: 0.8, b: 0.35, a: 1}
+--- !u!4 &1973823890
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1973823888}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 5.54976, y: 1.6856203, z: 4.7332535}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1784314149}
+  m_Father: {fileID: 1438658940}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1974047539
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1974047540}
+  - component: {fileID: 1974047542}
+  - component: {fileID: 1974047541}
+  m_Layer: 0
+  m_Name: Ledge1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1974047540
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1974047539}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -0.32499987, z: -0.1}
+  m_LocalScale: {x: 3.496, y: 0.08, z: 0.3}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1793914931}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &1974047541
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1974047539}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 82d879eb5c287834d8f57c891f3bc6e2, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1974047542
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1974047539}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &1975980091
 GameObject:
   m_ObjectHideFlags: 0
@@ -24369,6 +25411,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 0}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -24379,18 +25423,110 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.36, y: 0.36}
   minSeparation: {x: 0.22, y: 0.22}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!4 &1990129705 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 400000, guid: 20293085696677d40a2cc969adbb2e12, type: 3}
   m_PrefabInstance: {fileID: 1990129699}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1992607384
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1992607385}
+  - component: {fileID: 1992607387}
+  - component: {fileID: 1992607386}
+  m_Layer: 0
+  m_Name: Board
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1992607385
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1992607384}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0.05}
+  m_LocalScale: {x: 3.68, y: 5.897374, z: 0.1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1793914931}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &1992607386
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1992607384}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: e6d23dffc95bdef4c98b3ca2f02976fd, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1992607387
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1992607384}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &1993633488
 GameObject:
   m_ObjectHideFlags: 0
@@ -24698,6 +25834,10 @@ MonoBehaviour:
   diceSlowness: 1.2
   meatTrimLengthCm: 4
   meatCutStepMode: 0
+  poStrokeCm: 5
+  poStrokeSeconds: 0.7
+  poAdvanceCmPerSecond: 2.2
+  poBladeAimFromTip: 0.3
 --- !u!23 &2026281814
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -25143,6 +26283,8 @@ MonoBehaviour:
   timeToBoilNoLid: 300
   timeToBoilWithLid: 210
   timeToHeatOil: 420
+  batterProbeSecondsAt175: 2
+  batterProbeDepthAt175: 0.45
   bubbleEffectPrefab: {fileID: 0}
   waterMaterial: {fileID: 0}
   waterInnerRatio: 0.86
@@ -25153,12 +26295,14 @@ MonoBehaviour:
   idleSlosh: 0.2
   placementExtents: {x: 0.8, y: 0.3}
   minSeparation: {x: 0.4, y: 0.15}
+  fryingCapacity: 30
   starchSettleMinutes: 5
   oilForFrying: 0
   oilLevel: 0.5
   oilColor: {r: 0.86, g: 0.66, b: 0.18, a: 1}
   isDish: 1
   strainerRest: 0
+  oilOpacity: 0.6
   movableDuringBriefing: 1
 --- !u!64 &2037600608
 MeshCollider:
@@ -25281,6 +26425,10 @@ MonoBehaviour:
   diceSlowness: 1.2
   meatTrimLengthCm: 4
   meatCutStepMode: 0
+  poStrokeCm: 5
+  poStrokeSeconds: 0.7
+  poAdvanceCmPerSecond: 2.2
+  poBladeAimFromTip: 0.3
 --- !u!23 &2049755734
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -25720,6 +26868,10 @@ MonoBehaviour:
   diceSlowness: 1.2
   meatTrimLengthCm: 4
   meatCutStepMode: 0
+  poStrokeCm: 5
+  poStrokeSeconds: 0.7
+  poAdvanceCmPerSecond: 2.2
+  poBladeAimFromTip: 0.3
 --- !u!23 &2088319040
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -29297,10 +30449,13 @@ MonoBehaviour:
   showSpoonLabel: 0
   kind: 0
   gripLocalDir: {x: 0, y: -1, z: 0}
+  strainerFlipInHand: 1
   flipChopUpright: 0
   chopLift: 0.25
   chopTiltZ: 25
   scrapSweepRadius: 0.4
+  flatDepthTurnDegrees: -90
+  flatDepthGripAdjust: {x: 0, y: 0, z: 0}
   contentSpread: 0.12
   drainSeconds: 4
 --- !u!65 &2390767099079631931
@@ -31370,6 +32525,8 @@ GameObject:
   - component: {fileID: 7073456778033115418}
   - component: {fileID: 1827956586460623346}
   - component: {fileID: 3028098873650234475}
+  - component: {fileID: 7073456778033115420}
+  - component: {fileID: 7073456778033115419}
   m_Layer: 0
   m_Name: Burner1_Prong0
   m_TagString: Untagged
@@ -32043,6 +33200,8 @@ GameObject:
   - component: {fileID: 3538338527941759489}
   - component: {fileID: 8914920076314043329}
   - component: {fileID: 1338782541119821203}
+  - component: {fileID: 8914920076314043331}
+  - component: {fileID: 8914920076314043330}
   m_Layer: 0
   m_Name: Burner1_Prong2
   m_TagString: Untagged
@@ -33809,6 +34968,8 @@ GameObject:
   - component: {fileID: 254482432517739326}
   - component: {fileID: 4716267584368863129}
   - component: {fileID: 5147556132733363511}
+  - component: {fileID: 6340995699709391505}
+  - component: {fileID: 6340995699709391504}
   m_Layer: 0
   m_Name: Burner1_Prong3
   m_TagString: Untagged
@@ -33816,6 +34977,40 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!114 &6340995699709391504
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6340995699709391503}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1822ccc478bc6094eaaf41d006bac918, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BurnerGratePart
+  grate: {fileID: 1973823889}
+--- !u!65 &6340995699709391505
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6340995699709391503}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.06660672, y: 0.065897234, z: 0.06660675}
+  m_Center: {x: -0.484416, y: 0.89794874, z: -0.03558397}
 --- !u!1 &6385769579460363164
 GameObject:
   m_ObjectHideFlags: 0
@@ -33863,6 +35058,8 @@ GameObject:
   - component: {fileID: 7058834975835114529}
   - component: {fileID: 5612185773703408557}
   - component: {fileID: 3464959633039317179}
+  - component: {fileID: 7058834975835114531}
+  - component: {fileID: 7058834975835114530}
   m_Layer: 0
   m_Name: Burner1_Prong1
   m_TagString: Untagged
@@ -34668,6 +35865,40 @@ Transform:
   m_Children: []
   m_Father: {fileID: 8055220465210339978}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7058834975835114530
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6427159925363767275}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1822ccc478bc6094eaaf41d006bac918, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BurnerGratePart
+  grate: {fileID: 1973823889}
+--- !u!65 &7058834975835114531
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6427159925363767275}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.06660672, y: 0.065897234, z: 0.06660675}
+  m_Center: {x: -0.35558385, y: 0.89794874, z: -0.16441612}
 --- !u!4 &7073456778033115418
 Transform:
   m_ObjectHideFlags: 0
@@ -34683,6 +35914,40 @@ Transform:
   m_Children: []
   m_Father: {fileID: 8055220465210339978}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7073456778033115419
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4166259199087669055}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1822ccc478bc6094eaaf41d006bac918, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BurnerGratePart
+  grate: {fileID: 1973823889}
+--- !u!65 &7073456778033115420
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4166259199087669055}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.06660672, y: 0.065897234, z: 0.06660675}
+  m_Center: {x: -0.484416, y: 0.89794874, z: -0.16441612}
 --- !u!4 &7134077521826480177
 Transform:
   m_ObjectHideFlags: 0
@@ -34820,6 +36085,8 @@ GameObject:
   - component: {fileID: 3624145891180543574}
   - component: {fileID: 2122233159086512798}
   - component: {fileID: 5306282546342149574}
+  - component: {fileID: 7244024763058851511}
+  - component: {fileID: 7244024763058851510}
   m_Layer: 0
   m_Name: Burner1_Ring
   m_TagString: Untagged
@@ -34827,6 +36094,40 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!114 &7244024763058851510
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7244024763058851509}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1822ccc478bc6094eaaf41d006bac918, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BurnerGratePart
+  grate: {fileID: 1973823889}
+--- !u!65 &7244024763058851511
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7244024763058851509}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.21199997, y: 0.011999967, z: 0.21200003}
+  m_Center: {x: -0.4199999, y: 0.9050001, z: -0.100000046}
 --- !u!33 &7248519700338334750
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -35419,10 +36720,13 @@ MonoBehaviour:
   showSpoonLabel: 0
   kind: 0
   gripLocalDir: {x: 0, y: -1, z: 0}
+  strainerFlipInHand: 1
   flipChopUpright: 0
   chopLift: 0.25
   chopTiltZ: 25
   scrapSweepRadius: 0.4
+  flatDepthTurnDegrees: -90
+  flatDepthGripAdjust: {x: 0, y: 0, z: 0}
   tipLocal: {x: 0, y: 0.9, z: -0.02}
 --- !u!65 &7894865802499852269
 BoxCollider:
@@ -36290,6 +37594,40 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4775590020315211427}
   m_Mesh: {fileID: -2573456231110584255, guid: 47a3deca4bfbdc74cadf95ac8858a18f, type: 3}
+--- !u!114 &8914920076314043330
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4775590020315211427}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1822ccc478bc6094eaaf41d006bac918, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BurnerGratePart
+  grate: {fileID: 1973823889}
+--- !u!65 &8914920076314043331
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4775590020315211427}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.06660672, y: 0.065897234, z: 0.066606745}
+  m_Center: {x: -0.35558385, y: 0.89794874, z: -0.035583965}
 --- !u!33 &8921147548963413890
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -36590,10 +37928,13 @@ MonoBehaviour:
   showSpoonLabel: 0
   kind: 0
   gripLocalDir: {x: 0, y: -1, z: 0}
+  strainerFlipInHand: 1
   flipChopUpright: 0
   chopLift: 0.25
   chopTiltZ: 25
   scrapSweepRadius: 0.4
+  flatDepthTurnDegrees: -90
+  flatDepthGripAdjust: {x: 0, y: 0, z: 0}
   contentSpread: 0.12
   drainSeconds: 4
 --- !u!65 &9080364287152162487

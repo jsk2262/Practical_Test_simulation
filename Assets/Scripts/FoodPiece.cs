@@ -212,6 +212,25 @@ public class FoodPieceGroup : MonoBehaviour
     [Tooltip("Cooked colour of meat (pork goes pale; brown comes from browning, not cooking).")]
     [SerializeField] private Color cookedMeatColor = new Color(0.86f, 0.78f, 0.7f);
 
+    [Header("튀김 기름 속 (뜨기 · 붙기 · 타기) - 모양 조정값, 측정값 아님")]
+    [Tooltip("익은 정도(TimeToCooked 대비)가 이만큼 되면 바닥에서 떠오른다 (뜨거운 기름에서만).")]
+    [SerializeField] private float oilFloatAt = 0.45f;
+    [Tooltip("떠오른 조각의 부력 (중력 대비, 1보다 크면 표면으로 올라옴).")]
+    [SerializeField] private float oilBuoyancy = 1.7f;
+    [SerializeField] private float oilDrag = 4.5f;
+    [Tooltip("뜨거운 기름이 조각을 흔드는 세기 (기포).")]
+    [SerializeField] private float oilBubble = 0.5f;
+    [Tooltip("튀김옷 입힌 조각이 맞닿으면 1초에 붙을 확률 (넣은 직후, 아직 굳기 전).")]
+    [SerializeField] private float stickPerSecond = 0.9f;
+    [Tooltip("익은 정도가 이만큼 되면 튀김옷이 굳는다: 그때까지 붙어 있던 조각은 영영 붙은 채로.")]
+    [SerializeField] private float stickSetAt = 0.35f;
+    [Tooltip("젓가락·국자로 건드릴 때 밀어내는 세기.")]
+    [SerializeField] private float pokeImpulse = 1.4f;
+    [Tooltip("다 익은 뒤에도 (TimeToCooked의 이 배수를 넘겨) 기름에 두면 타기 시작한다.")]
+    [SerializeField] private float overfryAfter = 1.6f;
+    [Tooltip("과하게 튀길 때 1초에 타는 정도 (뜨거운 기름 기준, 0.6이면 '탐').")]
+    [SerializeField] private float oilCharPerSecond = 0.025f;
+
     [Header("General")]
     [SerializeField] private float gravity = 3f;
     [Tooltip("How much the container's own movement (carried, shaken) throws the pieces about.")]
@@ -357,6 +376,9 @@ public class FoodPieceGroup : MonoBehaviour
                 p.Sear = Mathf.Min(1f, p.Sear + dt * Mathf.Max(0f, searRateByTemp.Evaluate(surface)));
                 if (!oil && !SpeedMode.On) p.Char = Mathf.Min(1f, p.Char + dt * Mathf.Max(0f, charRateByTemp.Evaluate(surface)));
             }
+            // 튀김 기름에 너무 오래: 다 익고도 계속 두면 타 들어간다 (기름이 뜨거울수록 빨리)
+            if (oil && !SpeedMode.On && p.Cook > TimeToCooked * overfryAfter)
+                p.Char = Mathf.Min(1f, p.Char + dt * oilCharPerSecond * simBowl.OilHeat01);
         }
     }
 
@@ -434,6 +456,10 @@ public class FoodPieceGroup : MonoBehaviour
         float sauceAvail = sauce != null ? Mathf.Clamp01(sauce.Amount / 3f) : 0f;
         float ttc = cookable != null ? Mathf.Max(cookable.TimeToCooked, 0.01f) : 1f;
         float time = Time.time;
+        // 튀김 기름: 표면 높이 (없으면 0), 뜨거운지
+        float oilLevel = simBowl.HasFryingOil ? simBowl.OilSurfaceHeight : 0f;
+        bool hotOil = oilLevel > 0f && simBowl.IsOilHot;
+        if (oilLevel > 0f) FormBonds(dt);
 
         int steps = Mathf.Clamp(Mathf.CeilToInt(dt / 0.012f), 1, 4);
         float h = dt / steps;
@@ -461,6 +487,26 @@ public class FoodPieceGroup : MonoBehaviour
                     }
                     drag = sub > 0f ? waterDrag : 1.5f;
                 }
+                else if (oilLevel > 0f)
+                {
+                    // 튀김 기름 속: 넣으면 가라앉았다가, 어느 정도 익으면(뜨거운 기름에서)
+                    // 떠올라 표면에 반쯤 잠겨 떠 있다. 식은 기름에선 가라앉은 채.
+                    float sub = Mathf.Clamp01((oilLevel - (p.simPos.y - p.Radius)) / (2f * p.Radius));
+                    bool floats = hotOil && p.Cook / ttc >= oilFloatAt;
+                    if (floats) a.y += gravity * oilBuoyancy * sub;
+                    if (hotOil && sub > 0f)
+                    {
+                        // 기포에 살짝살짝 흔들림
+                        float t = time * 1.3f + p.seed;
+                        float heat = simBowl.OilHeat01;
+                        a.x += (Mathf.PerlinNoise(t, p.seed) - 0.5f) * 2f * oilBubble * heat;
+                        a.z += (Mathf.PerlinNoise(p.seed, t) - 0.5f) * 2f * oilBubble * heat;
+                        p.simSpin += new Vector3(Mathf.PerlinNoise(t, 1.3f) - 0.5f, 0f, Mathf.PerlinNoise(t, 4.7f) - 0.5f) * (2f * heat * h);
+                    }
+                    bool onFloor = p.simPos.y <= p.Radius + 0.01f;
+                    drag = sub > 0f ? oilDrag : 1.5f;
+                    if (onFloor && !floats) drag = Mathf.Max(drag, floorDrag);
+                }
                 else
                 {
                     bool onFloor = p.simPos.y <= p.Radius + 0.01f;
@@ -478,13 +524,14 @@ public class FoodPieceGroup : MonoBehaviour
                     p.simRot = Quaternion.Slerp(p.simRot, Quaternion.LookRotation(fwd, Vector3.up), (inside.liquid ? 1.5f : 8f) * h);
                 Contain(p);
                 // nearly still and nothing moving it: at rest (no endless slow drifting or turning)
-                if (!simBowl.IsHeld && !BeingWorked && p.simVel.sqrMagnitude < 0.0004f && p.simSpin.sqrMagnitude < 0.04f && inside.boil < 0.05f)
+                if (!simBowl.IsHeld && !BeingWorked && !hotOil && p.simVel.sqrMagnitude < 0.0004f && p.simSpin.sqrMagnitude < 0.04f && inside.boil < 0.05f)
                 {
                     p.simVel = Vector3.zero;
                     p.simSpin = Vector3.zero;
                 }
             }
             Separate();
+            if (oilLevel > 0f) HoldBonds();
         }
 
         if (InDryHeat) CookInPan(SpeedMode.Wait(dt));
@@ -590,8 +637,43 @@ public class FoodPieceGroup : MonoBehaviour
                 }
             }
         }
+        // 튀김 기름: 한 조각씩 따로 넣은 다른 재료(다른 묶음)의 조각과도 서로 밀어낸다
+        // (각자 반씩 - 저쪽도 같은 계산을 한다)
+        if (simBowl != null && simBowl.HasFryingOil)
+            foreach (FoodPieceGroup other in Neighbors())
+                foreach (FoodPiece b in other.Pieces)
+                {
+                    if (b == null) continue;
+                    foreach (FoodPiece a in Pieces)
+                    {
+                        Vector3 d = b.simPos - a.simPos;
+                        float min = (a.Radius + b.Radius) * 0.95f;
+                        if (d.sqrMagnitude >= min * min) continue;
+                        float dist = d.magnitude;
+                        Vector3 nrm = dist > 1e-5f ? d / dist : new Vector3(Random.Range(-1f, 1f), 0.3f, Random.Range(-1f, 1f)).normalized;
+                        a.simPos -= nrm * ((min - dist) * 0.5f);
+                        float rel = Vector3.Dot(b.simVel - a.simVel, nrm);
+                        if (rel < 0f) a.simVel += nrm * (rel * 0.5f);
+                    }
+                }
         foreach (FoodPiece p in Pieces) Contain(p);
     }
+
+    /// <summary>같은 그릇 안의 다른 조각 묶음들 (한 프레임에 한 번만 찾는다).</summary>
+    private List<FoodPieceGroup> Neighbors()
+    {
+        if (neighborsFrame != Time.frameCount)
+        {
+            neighborsFrame = Time.frameCount;
+            neighbors.Clear();
+            if (simBowl != null)
+                foreach (FoodPieceGroup g in simBowl.GetComponentsInChildren<FoodPieceGroup>())
+                    if (g != this && g.simBowl == simBowl && g.Count > 0) neighbors.Add(g);
+        }
+        return neighbors;
+    }
+    private readonly List<FoodPieceGroup> neighbors = new List<FoodPieceGroup>();
+    private int neighborsFrame = -1;
 
     /// <summary>One stroke of the spatula through the pan: the pieces are
     /// pushed round and turned over, and the ones touching the sauce take some on.</summary>
@@ -622,6 +704,134 @@ public class FoodPieceGroup : MonoBehaviour
             }
         }
         if (sauce != null) coatSauce.Add(sauce.Take(used * 0.15f));
+        // (튀김 기름에서 휘저으면 아직 안 굳은 붙음은 반쯤 떨어진다)
+        if (simBowl.HasFryingOil) bonds.RemoveAll(x => !x.set && Random.value < 0.5f);
+    }
+
+    // ---- 튀김 기름 속: 서로 붙기 · 떼기 ----
+
+    private float TimeToCooked => cookable != null ? Mathf.Max(cookable.TimeToCooked, 0.01f) : 6f;
+
+    /// <summary>맞닿아 붙은 두 조각. set: 튀김옷이 굳어 더는 뗄 수 없음.</summary>
+    private sealed class Bond { public FoodPiece a, b; public bool set; }
+    private readonly List<Bond> bonds = new List<Bond>();
+    private bool stuckReported;
+
+    /// <summary>지금 서로 붙어 있는 쌍 수 (굳은 것 포함).</summary>
+    public int StuckPairs => bonds.Count;
+
+    [Tooltip("젓가락으로 건드린 조각은 이 시간(초) 동안 다시 붙지 않는다.")]
+    [SerializeField] private float pokeLooseSeconds = 1.5f;
+    // (모든 묶음이 같이 본다 - 다른 묶음 조각과 붙을지 볼 때도)
+    private static readonly Dictionary<FoodPiece, float> pokedAt = new Dictionary<FoodPiece, float>();
+    private bool RecentlyPoked(FoodPiece p) => p != null && pokedAt.TryGetValue(p, out float t) && Time.time - t < pokeLooseSeconds;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetPokes() => pokedAt.Clear();
+
+    private bool Bonded(FoodPiece a, FoodPiece b)
+    {
+        foreach (Bond x in bonds) if ((x.a == a && x.b == b) || (x.a == b && x.b == a)) return true;
+        return false;
+    }
+
+    /// <summary>이 쌍이 이미 다른 묶음 쪽 목록에 붙어 있는지 (두 번 붙지 않게).</summary>
+    private bool OthersHold(FoodPiece a, FoodPiece b)
+    {
+        foreach (FoodPieceGroup g in Neighbors()) if (g.Bonded(a, b)) return true;
+        return false;
+    }
+
+    /// <summary>튀김옷 입힌 조각을 기름에 넣은 직후(아직 안 굳었을 때) 맞닿아 있으면
+    /// 붙는다. 둘 다 stickSetAt만큼 익으면 굳어서 영영 붙은 채 - 한 번 기록.</summary>
+    private void FormBonds(float dt)
+    {
+        bonds.RemoveAll(x => x.a == null || x.b == null);
+        bool coated = ingredient != null && BatterCoating.Of(ingredient, false) is BatterCoating bc && bc.HasAny;
+        float ttc = TimeToCooked;
+        if (coated)
+        {
+            // 짝 후보: 이 묶음 안의 조각끼리 + 따로 넣은 다른 묶음의 조각 (그쪽도 튀김옷이
+            // 있을 때, 한 쌍을 두 번 세지 않게 InstanceID가 작은 쪽 묶음만)
+            var all = new List<FoodPiece>(Pieces);
+            int own = all.Count;
+            foreach (FoodPieceGroup other in Neighbors())
+                if (other.GetInstanceID() > GetInstanceID() && other.ingredient != null
+                    && BatterCoating.Of(other.ingredient, false) is BatterCoating obc && obc.HasAny)
+                    all.AddRange(other.Pieces);
+            for (int i = 0; i < own; i++)
+                for (int j = i + 1; j < all.Count; j++)
+                {
+                    FoodPiece a = all[i], b = all[j];
+                    if (a == null || b == null || OthersHold(a, b)) continue;
+                    float set = Mathf.Max(a.Cook, b.Cook) / ttc / stickSetAt;
+                    if (set >= 1f) continue; // (이미 굳어 가는 건 새로 안 붙음)
+                    // (방금 젓가락으로 떼어 놓은 조각은 잠시 안 붙는다)
+                    if (RecentlyPoked(a) || RecentlyPoked(b)) continue;
+                    // 익어 갈수록(겉이 굳어 갈수록) 잘 안 붙는다
+                    float chance = 1f - Mathf.Exp(-stickPerSecond * (1f - set) * dt);
+                    float touch = (a.Radius + b.Radius) * 1.05f;
+                    if ((b.simPos - a.simPos).sqrMagnitude > touch * touch || Bonded(a, b)) continue;
+                    if (Random.value < chance) bonds.Add(new Bond { a = a, b = b });
+                }
+        }
+        int newlySet = 0;
+        foreach (Bond x in bonds)
+            if (!x.set && x.a.Cook / ttc >= stickSetAt && x.b.Cook / ttc >= stickSetAt) { x.set = true; newlySet++; }
+        if (newlySet > 0 && !stuckReported)
+        {
+            stuckReported = true;
+            string what = ingredient != null ? ingredient.IngredientName : name;
+            ExamDeductions.Add(ExamDeductions.Process, $"{what} 튀김: 기름에서 서로 붙은 채 굳음 (젓가락으로 떼지 않음)");
+            Debug.Log($"[튀김] {what}: 붙은 채 굳음 - 이제 뗄 수 없어요");
+        }
+    }
+
+    /// <summary>붙은 두 조각은 맞닿은 채 같이 움직인다.</summary>
+    private void HoldBonds()
+    {
+        foreach (Bond x in bonds)
+        {
+            if (x.a == null || x.b == null) continue;
+            Vector3 d = x.b.simPos - x.a.simPos;
+            float dist = d.magnitude, want = (x.a.Radius + x.b.Radius) * 0.95f;
+            if (dist > 1e-5f && dist > want)
+            {
+                Vector3 corr = d / dist * ((dist - want) * 0.5f);
+                x.a.simPos += corr;
+                x.b.simPos -= corr;
+            }
+            Vector3 avg = (x.a.simVel + x.b.simVel) * 0.5f;
+            x.a.simVel = Vector3.Lerp(x.a.simVel, avg, 0.6f);
+            x.b.simVel = Vector3.Lerp(x.b.simVel, avg, 0.6f);
+        }
+    }
+
+    /// <summary>튀김젓가락·국자로 건드림 (world: 도구 끝): 가까운 조각을 밀어내고,
+    /// 아직 굳지 않은 붙음은 떼어 놓는다 (굳은 건 같이 밀릴 뿐).</summary>
+    public void Poke(Vector3 world, float radius)
+    {
+        if (simBowl == null || Pieces.Count == 0) return;
+        workedUntil = Time.time + 0.4f;
+        Quaternion inv = Quaternion.Inverse(Frame(out _, out _));
+        Vector3 at = inv * (world - inside.floorCenter);
+        int freed = 0;
+        // 다른 묶음의 조각과 붙은 것도: 둘 중 하나라도 건드린 자리에 있으면 뗀다
+        bool Near(FoodPiece p) { Vector3 d = p.simPos - at; d.y = 0f; return d.magnitude < radius; }
+        freed += bonds.RemoveAll(x => !x.set && x.a != null && x.b != null && (Near(x.a) || Near(x.b)));
+        foreach (FoodPiece p in Pieces)
+        {
+            Vector3 d = p.simPos - at; d.y = 0f;
+            float near = 1f - d.magnitude / Mathf.Max(radius, 0.01f);
+            if (near <= 0f) continue;
+            Vector3 push = d.sqrMagnitude > 1e-6f ? d.normalized : Random.onUnitSphere;
+            push.y = Mathf.Abs(push.y) * 0.3f;
+            p.simVel = Vector3.ClampMagnitude(p.simVel + push * (pokeImpulse * near), 1.5f);
+            p.simSpin += Random.onUnitSphere * (6f * near);
+            pokedAt[p] = Time.time;
+            freed += bonds.RemoveAll(x => !x.set && (x.a == p || x.b == p));
+        }
+        if (freed > 0) Debug.Log($"[튀김] 젓가락으로 붙은 조각 {freed}쌍 떼어냄 (남은 붙음 {bonds.Count})");
     }
 
     /// <summary>One moment of a hand working the meat in the bowl (MeatKneader):
@@ -700,6 +910,12 @@ public class FoodPieceGroup : MonoBehaviour
 /// </summary>
 public class SaucePortion
 {
+    public void Clear()
+    {
+        parts.Clear(); infusion.Clear(); notes.Clear();
+        heat = burn = gel = lumps = evaporatedMl = 0f;
+        temp = 20f;
+    }
     public readonly Dictionary<string, float> parts = new Dictionary<string, float>();
     /// <summary>Per solid: how much of its colour and taste is in the liquid (0..1).</summary>
     public readonly Dictionary<string, float> infusion = new Dictionary<string, float>();
@@ -749,6 +965,7 @@ public class SaucePortion
             parts[key] -= take;
             if (parts[key] <= 1e-5f) parts.Remove(key);
         }
+        if (Amount <= 1e-5f) Clear();
         return p;
     }
 
@@ -950,6 +1167,7 @@ public class PanSauce : MonoBehaviour
 
     public void Add(string seasoning, float spoons = 1f)
     {
+        if (!(spoons > 0f)) return;
         Normalize();
         // what goes in is at room temperature: it cools what's there by its share
         if (Amount + spoons > 0f) sauce.temp = (sauce.temp * Amount + 20f * spoons) / (Amount + spoons);
@@ -1068,6 +1286,17 @@ public class PanSauce : MonoBehaviour
     /// the parts are scaled to match before any are taken or added.</summary>
     private void Normalize()
     {
+        if (Amount <= 1e-5f)
+        {
+            sauce.Clear();
+            Amount = 0f;
+            pendingStarch = pendingSince = 0f;
+            chiliBatch = false;
+            unstirred = BurnRate = 0f;
+            solidTemp = 20f;
+            MixProgress = 0f;
+            return;
+        }
         float sum = sauce.Amount;
         if (sum <= 0f || Mathf.Abs(sum - Amount) < 1e-4f) return;
         float k = Amount / sum;
@@ -1273,6 +1502,8 @@ public class PanSauce : MonoBehaviour
         float r = Amount <= 0.01f ? 0f
                 : level ? inside.radius * Mathf.Lerp(0.55f, 1f, fill)
                 : Mathf.Min(Mathf.Sqrt(Amount) * 0.13f, inside.radius * 0.95f);
+        // 기울여 붓는 중: 입구 쪽 옆면에 모여 고인다 (펼쳐진 것보다 좁게)
+        if (PourLip.HasValue && !level) r = Mathf.Min(r, inside.radius * 0.45f);
         if (r <= 0f)
         {
             if (pool != null) { Destroy(pool); pool = null; poolRadius = -1f; }
@@ -1335,13 +1566,24 @@ public class PanSauce : MonoBehaviour
         Vector3 downhill = Vector3.ProjectOnPlane(-Carryable.CounterUp, inside.up);
         float tilt = Mathf.Clamp01(downhill.magnitude * 3f);
         Vector3 target = level || tilt < 0.05f ? Vector3.zero : downhill.normalized * inside.radius * 0.45f * tilt;
+        if (PourLip.HasValue && !level)
+        {
+            // 붓는 입구 쪽 옆면으로 (가장자리에서 고인 웅덩이 반지름만큼 안쪽)
+            Vector3 toLip = Vector3.ProjectOnPlane(PourLip.Value - inside.floorCenter, inside.up);
+            target = toLip.sqrMagnitude > 1e-6f ? toLip.normalized * Mathf.Max(0f, inside.radius - r * 0.9f) : Vector3.zero;
+        }
         float speed = Mathf.Lerp(6f, 0.25f, Mathf.Clamp01(Thickness));
         poolShift = Vector3.Lerp(poolShift, target, Mathf.Clamp01(Time.deltaTime * speed));
-        float height = level ? inside.rim * fill * 0.92f : 0.004f;
+        // (그릇 안쪽 바닥은 깊이의 약 17% 높이 - 그보다 낮으면 조금 남은 양이
+        // 바닥 속에 묻혀 안 보이므로, 남아 있는 동안은 바닥 위에서 시작한다)
+        float height = level ? inside.rim * Mathf.Lerp(0.22f, 0.92f, fill) : 0.004f;
         pool.transform.SetPositionAndRotation(inside.floorCenter + poolShift + inside.up * Mathf.Max(height, 0.004f), Quaternion.FromToRotation(Vector3.up, inside.up));
     }
 
     private Vector3 poolShift;
+
+    /// <summary>기울여 붓는 중인 입구 (월드) - 그쪽 옆면에 소스가 모여 고인다 (Cheesecloth의 붓기). 아니면 null.</summary>
+    public Vector3? PourLip { get; set; }
 
     /// <summary>A drop off the spatula after a stir: a thin sauce runs straight
     /// off, a thick one hangs a while and falls slowly.</summary>

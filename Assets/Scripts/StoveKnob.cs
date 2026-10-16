@@ -14,6 +14,9 @@ public class StoveKnob : MonoBehaviour, IClickable
     [SerializeField] private StoveBurner burner;
     [SerializeField] private float turnSeconds = 0.2f;
 
+    /// <summary>이 손잡이가 켜고 끄는 화구 (화구 확대 구도에 함께 담는다 - KitchenCamera).</summary>
+    public StoveBurner Burner => burner;
+
     [Header("Split knob (Tools > Kitchen > Split Stove Knob Lever)")]
     /// <summary>Just the lever part of the knob - only it turns; the knob body stays put.</summary>
     [SerializeField] private Transform lever;

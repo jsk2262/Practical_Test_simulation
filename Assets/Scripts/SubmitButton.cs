@@ -20,6 +20,7 @@ public class SubmitButton : MonoBehaviour, IClickable
     }
 
     void Start() => Refresh();
+    private ExamFlow.Phase shownPhase;
 
     private static readonly Color Idle = new Color(0.32f, 0.36f, 0.4f), Confirm = new Color(0.75f, 0.45f, 0.2f), Done = new Color(0.25f, 0.45f, 0.3f);
 
@@ -66,19 +67,34 @@ public class SubmitButton : MonoBehaviour, IClickable
         if (ConfirmDialog.IsOpen) return;
         if (ExamFlow.Current == ExamFlow.Phase.Cooking)
         {
-            // asked once more, with what's on each serving plate
-            var lines = new List<string>();
+            // 제출대에 올린 완성 접시만 제출된다 - 하나도 없으면 안내만
             var plates = new List<PlatingDestination>(PlatingDestination.All);
             plates.RemoveAll(d => d == null || d.Plate == null);
             plates.Sort((a, b) => string.CompareOrdinal(a.Plate.name, b.Plate.name)); // (PlatingPlate1, 2)
-            foreach (PlatingDestination d in plates) lines.Add($"{d.Plate.name}: {PlateText(d.Plate)}");
-            lines.Add("제출하면 요리를 더 고칠 수 없어요.");
-            ConfirmDialog.Show("두 접시 모두 제출하시겠습니까?", lines, "제출", "취소", () => { ExamFlow.SubmitDishes(); Refresh(); });
+            if (SubmitShelf.Instance != null && SubmitShelf.Instance.Count == 0)
+            {
+                ConfirmDialog.Show("제출대가 비어 있어요", new List<string> { "요리를 담은 완성 접시(PlatingPlate1, 2)를", "오른쪽 제출대에 올린 뒤 제출하세요." },
+                    "확인", "닫기", () => { });
+                return;
+            }
+            // asked once more, with what's on each serving plate
+            var lines = new List<string>();
+            foreach (PlatingDestination d in plates)
+            {
+                bool onShelf = SubmitShelf.Instance == null || SubmitShelf.Holds(d.Plate);
+                lines.Add($"{d.Plate.name}: {PlateText(d.Plate)}" + (onShelf ? "" : " - 제출대에 없음 (미제출)"));
+            }
+            lines.Add("제출하면 요리를 더 고칠 수 없어요. 그다음 마무리 정리 후 '정리 완료'를 누르세요.");
+            string title = SubmitShelf.Instance != null && SubmitShelf.Instance.Count < plates.Count
+                ? "제출대에 없는 접시는 미제출이에요. 제출하시겠습니까?" : "두 접시 모두 제출하시겠습니까?";
+            // 제출 → 마무리 정리 → 정리 완료 → 결과 (제출대에 올린 접시가 제출된 것)
+            ExamFlow.SubmitDishes();
+            Refresh();
         }
         else
         {
-            ConfirmDialog.Show("정리를 마치고 시험을 종료하시겠습니까?", new List<string> { "종료하면 정리·위생까지 채점하고 결과가 나와요." },
-                "종료", "취소", () => { ExamFlow.FinishCleanup(); Refresh(); });
+            ExamFlow.FinishCleanup();
+            Refresh();
         }
     }
 
@@ -95,12 +111,14 @@ public class SubmitButton : MonoBehaviour, IClickable
 
     void Update()
     {
+        if (shownPhase != ExamFlow.Current) Refresh();
         if (confirmUntil > 0f && Time.unscaledTime > confirmUntil) { confirmUntil = 0f; Refresh(); }
         if (label != null && ExamFlow.Current == ExamFlow.Phase.Finished && label.text != "결과 보기") Refresh();
     }
 
     private void Refresh()
     {
+        shownPhase = ExamFlow.Current;
         if (label == null) return;
         bool confirming = confirmUntil > 0f;
         switch (ExamFlow.Current)

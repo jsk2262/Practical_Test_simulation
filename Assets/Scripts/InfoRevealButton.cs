@@ -31,6 +31,8 @@ public class InfoRevealButton : MonoBehaviour, IClickable
     {
         if (popup == null) BuildPopup();
         bool willOpen = !popup.activeSelf;
+        // (창은 전체 화면 기준 자리에 뜬다 - 확대 중이면 먼저 전체 보기로, 다시 누르면 열림)
+        if (willOpen && KitchenCamera.IsZoomed) { KitchenCamera.Instance.ShowOverview(); return; }
 
         if (willOpen)
         {

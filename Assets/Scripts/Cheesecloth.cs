@@ -264,17 +264,16 @@ public class Cheesecloth : Carryable
         Vector3 c = Sag(0f);
         MovableBowl.Interior panIn = pan.GetInterior();
 
-        // The pan brought up beside the cloth, to its upper right - steered by
-        // where the pan's body actually is (a pan held by its handle doesn't
-        // sit where the hand's offset says: aimed by that, it ended up on the
-        // bowl's left, pouring away from it).
+        // 팬의 붓는 입구(기울어 낮아지는 왼쪽 가장자리)를 면보 바로 위, 낮게
+        // (dropHeight)로 - 줄기가 위에서 곧게 짧게 떨어지게. 팬 몸통의 실제
+        // 자리로 맞춘다 (손잡이로 든 팬은 손의 오프셋대로 있지 않다).
         Vector3 reach = Vector3.zero;
+        float lipR = panIn.radius * 0.95f;
         if (hc != null)
         {
-            Vector3 want = c + new Vector3(rimR + panIn.radius * 0.8f, rimR + 0.35f, 0f);
             for (float t = 0f; t < 0.5f; t += Time.deltaTime)
             {
-                Vector3 err = want - pan.BodyCenterWorld();
+                Vector3 err = BodyFor(Sag(0.02f), lipR, 0f, dropHeight + 0.12f) - pan.BodyCenterWorld();
                 err.z = 0f;
                 reach += err * Mathf.Clamp01(Time.deltaTime * 10f);
                 hc.SetGestureOffset(reach);
@@ -292,6 +291,16 @@ public class Cheesecloth : Carryable
                 break; // (stopped part way)
             tilt = Mathf.MoveTowards(tilt, maxTilt, maxTilt * Time.deltaTime);
             pan.SetPourTilt(Quaternion.AngleAxis(tilt, Vector3.forward));
+            // 기울면서 입구가 내려가고 옆으로 오므로, 매 프레임 입구가 면보 바로 위에 있도록
+            if (hc != null)
+            {
+                Vector3 err = BodyFor(Sag(0.02f), lipR, tilt, dropHeight) - pan.BodyCenterWorld();
+                err.z = 0f;
+                reach += err * Mathf.Clamp01(Time.deltaTime * 10f);
+                hc.SetGestureOffset(reach);
+            }
+            // 팬 안의 소스는 기운 쪽(입구) 옆면으로 모여 고인다
+            sauce.PourLip = LipOf(pan.BodyCenterWorld(), lipR, tilt);
 
             // The more it's tipped, the faster it runs out - none until it's tipped enough.
             float want = pourRate * Mathf.InverseLerp(20f, maxTilt, tilt) * Time.deltaTime;
@@ -312,13 +321,14 @@ public class Cheesecloth : Carryable
                 poured += poured1.Amount;
                 used = true;
             }
-            ShowStream(pan, panIn, amount / Mathf.Max(Time.deltaTime, 1e-4f), sauce.LiquidColor);
+            ShowStream(LipOf(pan.BodyCenterWorld(), lipR, tilt), amount / Mathf.Max(Time.deltaTime, 1e-4f), sauce.LiquidColor);
 
             if (sauce.Amount <= 0.001f) stop = true;                                        // all out
             else if (room <= 0.001f) { BowlFull = true; Say("그릇이 가득 찼어요"); stop = true; }  // no more fits
             yield return null;
         }
         HideStream();
+        sauce.PourLip = null;
         for (float t = 0f; t < 0.35f; t += Time.deltaTime)
         {
             pan.SetPourTilt(Quaternion.AngleAxis(Mathf.Lerp(tilt, 0f, t / 0.35f), Vector3.forward));
@@ -512,8 +522,30 @@ public class Cheesecloth : Carryable
         Destroy(d);
     }
 
-    /// <summary>The stream from the pan's lip into the cloth, as thick as it runs.</summary>
-    private void ShowStream(MovableBowl pan, MovableBowl.Interior panIn, float rate, Color color)
+    [Tooltip("붓는 입구가 면보 위 이만큼(월드) 높이에 오게 - 낮을수록 줄기가 짧다.")]
+    [SerializeField] private float dropHeight = 0.28f;
+    [Tooltip("줄기를 따라 떨어지는 방울 간격 (초).")]
+    [SerializeField] private float dropEvery = 0.05f;
+
+    /// <summary>팬을 화면 축으로 tilt만큼 기울였을 때 붓는 입구(낮아진 왼쪽 가장자리, 월드).</summary>
+    private static Vector3 LipOf(Vector3 body, float r, float tilt)
+    {
+        float a = tilt * Mathf.Deg2Rad;
+        return body + new Vector3(-r * Mathf.Cos(a), -r * Mathf.Sin(a), -0.1f);
+    }
+
+    /// <summary>입구가 target 바로 위 height에 오려면 팬 몸통이 있어야 할 자리.</summary>
+    private static Vector3 BodyFor(Vector3 target, float r, float tilt, float height)
+    {
+        float a = tilt * Mathf.Deg2Rad;
+        return target + Vector3.up * height + new Vector3(r * Mathf.Cos(a), r * Mathf.Sin(a), 0f);
+    }
+
+    private float nextDrop;
+
+    /// <summary>입구에서 면보로 곧게 떨어지는 짧은 줄기 (흐르는 만큼 굵게) + 줄기를 따라
+    /// 떨어지는 방울 - 액체가 내려오는 게 보이게.</summary>
+    private void ShowStream(Vector3 lip, float rate, Color color)
     {
         if (stream == null)
         {
@@ -528,16 +560,44 @@ public class Cheesecloth : Carryable
         stream.enabled = true;
         stream.material.color = color;
         if (stream.material.HasProperty("_BaseColor")) stream.material.SetColor("_BaseColor", color);
-        Vector3 body = pan.BodyCenterWorld();
         Vector3 into = Sag(0.02f);
-        Vector3 toward = into - body;
-        toward.z = 0f;
-        Vector3 lip = body + toward.normalized * panIn.radius * 0.95f + Vector3.forward * -0.1f;
-        Vector3 end = new Vector3(into.x, into.y, Mathf.Min(into.z, lip.z));
-        stream.SetPosition(0, lip);
-        stream.SetPosition(1, Vector3.Lerp(lip, end, 0.5f) + Vector3.down * 0.05f);
+        // 곧게 아래로: 입구 바로 밑, 면보 높이까지 (앞쪽에 보이게 z는 둘 중 앞)
+        float z = Mathf.Min(into.z, lip.z);
+        Vector3 top = new Vector3(lip.x, lip.y, z);
+        Vector3 end = new Vector3(lip.x, Mathf.Min(into.y, lip.y - 0.02f), z);
+        float flow = Mathf.Clamp01(rate / Mathf.Max(pourRate, 0.01f));
+        stream.SetPosition(0, top);
+        stream.SetPosition(1, Vector3.Lerp(top, end, 0.5f) + Vector3.right * (Mathf.Sin(Time.time * 23f) * 0.004f));
         stream.SetPosition(2, end);
-        stream.widthMultiplier = Mathf.Lerp(0.012f, 0.045f, Mathf.Clamp01(rate / Mathf.Max(pourRate, 0.01f)));
+        // 위는 굵고 아래로 가늘어지게 (떨어지며 가늘어지는 줄기)
+        stream.widthMultiplier = Mathf.Lerp(0.008f, 0.03f, flow);
+        stream.widthCurve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 0.55f));
+        if (Time.time >= nextDrop)
+        {
+            nextDrop = Time.time + dropEvery / Mathf.Max(flow, 0.3f);
+            StartCoroutine(StreamDrop(top, end, color, stream.widthMultiplier));
+        }
+    }
+
+    /// <summary>줄기를 따라 떨어지는 방울 하나 (점점 빨라지며), 면보에 닿으면 사라짐.</summary>
+    private IEnumerator StreamDrop(Vector3 from, Vector3 to, Color color, float width)
+    {
+        GameObject d = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        d.name = "PourDrop";
+        Destroy(d.GetComponent<Collider>());
+        Renderer r = d.GetComponent<Renderer>();
+        r.material = stream.material;
+        float s = width * Random.Range(1.3f, 1.9f);
+        d.transform.localScale = new Vector3(s, s * 1.5f, s);
+        from += Vector3.back * 0.005f; to += Vector3.back * 0.005f;
+        for (float t = 0f; t < 0.16f; t += Time.deltaTime)
+        {
+            if (d == null) yield break;
+            float k = t / 0.16f;
+            d.transform.position = Vector3.Lerp(from, to, k * k);
+            yield return null;
+        }
+        Destroy(d);
     }
 
     private void HideStream()

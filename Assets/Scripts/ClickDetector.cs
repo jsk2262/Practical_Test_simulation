@@ -36,7 +36,7 @@ public class ClickDetector : MonoBehaviour
     /// stays held through use until deliberately held down somewhere.</summary>
     [SerializeField] private float holdSeconds = 0.4f;
 
-    private enum HoldMode { None, PickUpTool, PutDownTool, UnfoldTowel, CrackEgg, FlipSpoon, TakePiece }
+    private enum HoldMode { None, PickUpTool, PutDownTool, UnfoldTowel, CrackEgg, FlipSpoon, TakePiece, PlaceTool }
     private float holdNeeded; // (this hold's length: holdSeconds, or the measuring spoon's own flip hold)
     private HoldMode holdMode;
     private float holdTimer;
@@ -66,7 +66,9 @@ public class ClickDetector : MonoBehaviour
         // (A press on something else puts it away first - ClothWiper runs
         // before this - and is then taken here as usual.)
         // (Likewise the cutting board carried to the sink - BoardSinkWash.)
-        if (ConfirmDialog.IsOpen || ExamResultView.IsOpen || (HandCarry.Instance != null && HandCarry.Instance.IsLocked) || ClothWiper.InputCaptured || BoardSinkWash.InputCaptured || BurnerGrate.InputCaptured || MeatKneader.InputCaptured || LeftHandCarry.IsCarrying)
+        // (카메라 전환·가운데 드래그 이동 중에도 새 집기·놓기·칼질은 시작하지 않는다 - KitchenCamera)
+        if (ConfirmDialog.IsOpen || ExamResultView.IsOpen || (HandCarry.Instance != null && HandCarry.Instance.IsLocked) || ClothWiper.InputCaptured || BoardSinkWash.InputCaptured || BurnerGrate.InputCaptured || MeatKneader.InputCaptured || LeftHandCarry.IsCarrying
+            || KitchenCamera.BlocksWorldInput)
         {
             HoldProgressRing.Hide();
             holdMode = HoldMode.None;
@@ -98,6 +100,16 @@ public class ClickDetector : MonoBehaviour
             && !EggPartChooser.IsOver(targetCamera.ScreenPointToRay(mouse.position.ReadValue())))
         {
             EggPartChooser.Close();
+            pressedTarget = null;
+            isPressing = false;
+            isDragging = false;
+            activeDraggable = null;
+            return;
+        }
+
+        // 확대 중 '작업 위치로'·'전체 보기' 버튼 위의 클릭은 버튼 몫 (밑의 작업장으로 넘기지 않음)
+        if (mouse.leftButton.wasPressedThisFrame && KitchenCamera.IsOverButtons(mouse.position.ReadValue()))
+        {
             pressedTarget = null;
             isPressing = false;
             isDragging = false;
@@ -139,7 +151,9 @@ public class ClickDetector : MonoBehaviour
                 // hold as picking up any other tool.
                 ToolItem tool = pressedTarget.GetComponentInParent<ToolItem>();
                 KitchenTowelDispenser box = pressedTarget.GetComponentInParent<KitchenTowelDispenser>();
-                if (tool != null && !tool.IsHeld) holdTarget = tool;
+                BurnerGratePart gratePart = pressedTarget.GetComponentInParent<BurnerGratePart>();
+                if (CleanupMode.IsOn && gratePart != null) holdTarget = gratePart.HoldAction;
+                else if (tool != null && !tool.IsHeld) holdTarget = tool;
                 else if (box != null) holdTarget = box;
                 else if (HeldVesselTarget(pressedTarget) is MovableBowl vessel) holdTarget = vessel;
                 if (holdTarget != null) holdMode = HoldMode.PickUpTool;
@@ -151,7 +165,7 @@ public class ClickDetector : MonoBehaviour
                 // the battered meat to test the oil, to drop in one by one); a
                 // plain click does what it always did (버무리기, or the lot).
                 if (holdTarget == null && pressedTarget.GetComponentInParent<IngredientItem>() is IngredientItem cut
-                    && !cut.IsHeld && cut.Container is MovableBowl lying && !lying.HasFryingOil
+                    && !cut.IsHeld && cut.Container is MovableBowl lying && !lying.HasFryingOil && !lying.CarriesAsServed
                     && cut.GetComponent<FoodPieceGroup>() is FoodPieceGroup cutPieces && cutPieces.Count >= 2)
                 {
                     pieceSource = cut;
@@ -185,6 +199,16 @@ public class ClickDetector : MonoBehaviour
                 holdMode = HoldMode.FlipSpoon;
                 holdNeeded = measuring.FlipHoldSeconds;
             }
+            // 칼을 도마(재료가 아닌 빈 곳)에 내려놓기: 집을 때처럼 길게 눌러야 - 짧게
+            // 누르면 아무 일도 없다 (칼날에 썬 조각을 실은 칼은 그대로: 누르면 조각을 내려놓음)
+            else if (hand != null && hand.Current is ToolItem knifeInHand && knifeInHand.Kind == ToolKind.Knife
+                     && !(knifeInHand is FryingChopsticks) && knifeInHand.KnifeLoad == null && pressedTarget != null
+                     && pressedTarget.GetComponentInParent<IngredientItem>() == null && pressedTarget.GetComponentInParent<FoodScrap>() == null
+                     && pressedTarget.GetComponentInParent<CuttingBoardController>() is CuttingBoardController knifeBoard)
+            {
+                holdTarget = knifeBoard;
+                holdMode = HoldMode.PlaceTool;
+            }
             else if (hand != null && hand.Current is ToolItem heldTool && heldTool.KnifeLoad == null
                      && (pressedTarget == null || pressedTarget.GetComponentInParent<IClickable>() == null))
             {
@@ -198,7 +222,19 @@ public class ClickDetector : MonoBehaviour
 
             // 젓기: the tool dragged through the food - strokes by the distance
             // it actually moves over the pan/bowl (held still: nothing).
-            if (stirBowl != null)
+            if (stirBowl != null && stirBowl.HasFryingOil)
+            {
+                // 튀김 기름 속: 젓가락·국자 끝이 커서를 따라가며 닿는 조각을 건드린다
+                // (밀어내고, 붙은 것을 뗀다). 조금이라도 움직였으면 클릭이 아님.
+                if (OverBowl(stirBowl, pos) && (pos - lastMousePos).sqrMagnitude > 0.25f)
+                {
+                    stirStrokes++;
+                    stirBowl.PokeAt(CursorInOil(stirBowl, pos));
+                }
+                if (stirStrokes > 0) { holdMode = HoldMode.None; HoldProgressRing.Hide(); }
+                dragChecked = true;
+            }
+            else if (stirBowl != null)
             {
                 if (OverBowl(stirBowl, pos)) stirDist += (pos - lastMousePos).magnitude;
                 while (stirDist >= stirPixelsPerStroke)
@@ -227,7 +263,7 @@ public class ClickDetector : MonoBehaviour
                 {
                     holdDone = true;
                     HoldProgressRing.Hide();
-                    if ((holdMode == HoldMode.PickUpTool || holdMode == HoldMode.UnfoldTowel || holdMode == HoldMode.CrackEgg || holdMode == HoldMode.FlipSpoon) && holdTarget != null) holdTarget.OnClicked();
+                    if ((holdMode == HoldMode.PickUpTool || holdMode == HoldMode.PlaceTool || holdMode == HoldMode.UnfoldTowel || holdMode == HoldMode.CrackEgg || holdMode == HoldMode.FlipSpoon) && holdTarget != null) holdTarget.OnClicked();
                     else if (holdMode == HoldMode.PutDownTool) DropHeldAt(pos);
                     else if (holdMode == HoldMode.TakePiece) TakePieceAt(pos);
                 }
@@ -290,6 +326,12 @@ public class ClickDetector : MonoBehaviour
     /// <summary>What a press lands on: the nearest collider, except that a stove
     /// knob anywhere under the cursor wins - a pot's long handle on the burner
     /// reaches over the knob, and pressing the knob kept grabbing the pot.</summary>
+    // Hints use the same picking rules as actual clicks.
+    public GameObject HintTarget(Vector2 screen)
+    {
+        return targetCamera != null ? PickTarget(targetCamera.ScreenPointToRay(screen)) : null;
+    }
+
     private GameObject PickTarget(Ray ray)
     {
         RaycastHit[] hits = Physics.RaycastAll(ray, maxDistance, raycastMask);
@@ -405,12 +447,24 @@ public class ClickDetector : MonoBehaviour
     /// that has something to stir: that vessel.</summary>
     private static MovableBowl StirTargetFor(HandCarry hand, GameObject pressed)
     {
-        if (hand == null || pressed == null || !(hand.Current is ToolItem tool) || !IsStirTool(tool)) return null;
+        if (hand == null || pressed == null || !(hand.Current is ToolItem tool)) return null;
         MovableBowl b = pressed.GetComponentInParent<MovableBowl>();
         if (b == null && pressed.GetComponentInParent<IngredientItem>() is IngredientItem ing) b = ing.Container;
         if (b == null || b.IsHeld) return null;
+        // (튀김젓가락은 튀김 기름 속에서만 '젓기' - 끌면 건드리고, 그냥 클릭은 집기 그대로)
+        if (!IsStirTool(tool) && !(tool is FryingChopsticks && b.HasFryingOil)) return null;
         bool any = b.HasIngredients || (PanSauce.Of(b, false) is PanSauce s && s.Amount > 0.01f) || b.HasPortion || b.HasEgg;
         return any ? b : null;
+    }
+
+    /// <summary>커서가 가리키는 기름 속 지점 (월드): 화면 광선과 기름 표면 평면의 교점.</summary>
+    private Vector3 CursorInOil(MovableBowl b, Vector2 screen)
+    {
+        MovableBowl.Interior i = b.GetInterior();
+        Vector3 surface = i.floorCenter + i.up * b.OilSurfaceHeight * 0.5f;
+        Ray ray = targetCamera.ScreenPointToRay(screen);
+        Plane plane = new Plane(i.up, surface);
+        return plane.Raycast(ray, out float d) ? ray.GetPoint(d) : surface;
     }
 
     private bool OverBowl(MovableBowl b, Vector2 screen)
@@ -428,7 +482,11 @@ public class ClickDetector : MonoBehaviour
         ToolItem tool = HandCarry.Instance != null ? HandCarry.Instance.Current as ToolItem : null;
         if (!b.IsCookingVessel && b.BatterTarget() is IngredientItem meat && BatterCoating.Of(meat, false) is BatterCoating coat && coat.HasAny)
         {
+            // (도구로 젓기도 그릇의 버무리기 횟수에 들어간다 - 다 버무렸으면 더 섞이지 않음)
+            BowlMixInteraction mix = BowlMixInteraction.For(b);
+            if (mix.IsMixingFinished || coat.Busy) return;
             coat.MixStroke(tool, b);
+            mix.CountCompletedMix();
             return;
         }
         if (b.GetComponent<PortionedCondiment>() is PortionedCondiment pc && pc.TryStir()) return;

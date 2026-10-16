@@ -219,6 +219,7 @@ public class HandCarry : MonoBehaviour
 
         Carryable item = Current;
         item.transform.SetParent(null, true);
+        worldPoint = PlayArea.ClampDrop(worldPoint); // (조리대 밖·벽면이면 가장 가까운 조리대 윗면에)
         if (item is IngredientItem || item is FoodScrap) worldPoint = OnCounter(item, worldPoint);
         item.transform.position = new Vector3(worldPoint.x, worldPoint.y, FreeDropZ(item, worldPoint.y));
         ResetToBaseScale(item);
@@ -264,7 +265,7 @@ public class HandCarry : MonoBehaviour
     /// starting depth instead put an item carried forward (toward the board)
     /// underneath the counter top, where it vanished. Below the counter (the
     /// cabinet shelves) it keeps its own resting depth.</summary>
-    private static float FreeDropZ(Carryable item, float y)
+    public static float FreeDropZ(Carryable item, float y)
     {
         float edge = CounterEdgeY();
         if (y < edge - 0.3f) return item.RestZ;
@@ -308,8 +309,9 @@ public class HandCarry : MonoBehaviour
 
         Carryable item = Current;
         Vector3 dropWorldPos = item.transform.position;
-        bowl.PlaceFree(item, dropWorldPos);
+        if (bowl.HasFryingOil) dropWorldPos = bowl.OilDropPointFromPointer(dropWorldPos);
         ResetToBaseScale(item);
+        bowl.PlaceFree(item, dropWorldPos);
         item.CurrentContainer = bowl;
         Current = null;
         item.OnPlaced();

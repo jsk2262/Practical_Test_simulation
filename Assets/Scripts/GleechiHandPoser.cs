@@ -29,7 +29,7 @@ public class GleechiHandPoser : MonoBehaviour
     /// wrapping a knife handle / the fingertips-tucked hand steadying an
     /// ingredient, which a single shared curl angle can't make (every joint
     /// bent the same way just reads as a fist).</summary>
-    public enum PoseMode { Carry, KnifeGrip, SupportClaw }
+    public enum PoseMode { Carry, KnifeGrip, SupportClaw, ChopstickGrip }
 
     [System.Serializable]
     public class FingerAngles
@@ -58,13 +58,35 @@ public class GleechiHandPoser : MonoBehaviour
     };
     [SerializeField] private float poseResponse = 14f;
     private PoseMode poseMode;
+    private float chopstickClose;
+    private Vector3 visualRestPosition;
+    private Quaternion visualRestRotation;
+    private float utensilWristAngle;
+    private bool wristWasPosed;
+    public void SetUtensilWrist(float degrees) => utensilWristAngle = degrees;
+    public void SetChopstickClose(float value) => chopstickClose = Mathf.Clamp01(value);
+
+    [SerializeField] private FingerAngles[] chopstickGrip = {
+        new FingerAngles(15, 22, 12) { proximal = new Vector3(-15, 25, 15) },
+        new FingerAngles(18, 40, 18), new FingerAngles(28, 48, 25),
+        new FingerAngles(48, 72, 42), new FingerAngles(55, 78, 48)
+    };
 
     public void SetPoseMode(PoseMode mode) { poseMode = mode; }
 
     void LateUpdate()
     {
+        bool wristActive = Mathf.Abs(utensilWristAngle) > 0.01f;
+        if (wristActive || wristWasPosed)
+        {
+            transform.localPosition = visualRestPosition;
+            transform.localRotation = visualRestRotation;
+        }
+        if (wristActive)
+            transform.RotateAround(KnucklePosition, Vector3.forward, utensilWristAngle);
+        wristWasPosed = wristActive;
         if (fingers == null || poseMode == PoseMode.Carry) return;
-        FingerAngles[] angles = poseMode == PoseMode.KnifeGrip ? knifeGrip : supportClaw;
+        FingerAngles[] angles = poseMode == PoseMode.ChopstickGrip ? chopstickGrip : poseMode == PoseMode.KnifeGrip ? knifeGrip : supportClaw;
         if (angles == null || angles.Length != fingers.Length) return;
 
         float blend = 1f - Mathf.Exp(-Mathf.Max(0f, poseResponse) * Time.deltaTime);
@@ -73,8 +95,10 @@ public class GleechiHandPoser : MonoBehaviour
             Finger f = fingers[i];
             FingerAngles a = angles[i];
             if (a == null) continue;
+            Vector3 movingFinger = poseMode == PoseMode.ChopstickGrip && (i == 1 || i == 2)
+                ? new Vector3(0, 0, chopstickClose * 12f) : Vector3.zero;
             f.proximal.localRotation = Quaternion.Slerp(f.proximal.localRotation, f.restProximal * Quaternion.Euler(a.proximal), blend);
-            f.middle.localRotation = Quaternion.Slerp(f.middle.localRotation, f.restMiddle * Quaternion.Euler(a.middle), blend);
+            f.middle.localRotation = Quaternion.Slerp(f.middle.localRotation, f.restMiddle * Quaternion.Euler(a.middle + movingFinger), blend);
             f.distal.localRotation = Quaternion.Slerp(f.distal.localRotation, f.restDistal * Quaternion.Euler(a.distal), blend);
         }
     }
@@ -93,6 +117,8 @@ public class GleechiHandPoser : MonoBehaviour
 
     void Awake()
     {
+        visualRestPosition = transform.localPosition;
+        visualRestRotation = transform.localRotation;
         wrist = transform.Find("GleechiHandRig/Neck/Clavicle_L/Shoulder_L/Elbow_L/Wrist_L");
         if (wrist == null)
         {

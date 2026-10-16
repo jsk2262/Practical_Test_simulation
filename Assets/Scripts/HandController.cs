@@ -143,6 +143,10 @@ public class HandController : MonoBehaviour
     /// <summary>Shifts the hand off its rest spot without turning it - a
     /// scripted reach (the measuring spoon dipping into a bottle). Zero releases.</summary>
     public void SetGestureOffset(Vector3 offset) => rockOffset = offset;
+    public Vector3 GestureOffset => rockOffset;
+
+    /// <summary>쥔 주먹의 가운데 손가락 마디 (월드) - 손잡이를 이 자리에 맞춘다.</summary>
+    public Vector3 KnucklePosition => poser != null ? poser.KnucklePosition : transform.position;
 
     /// <summary>Chop grip aim (world), the 중식도 grip: the hand on the handle's
     /// right, back of the hand up, fingers wrapping round the handle toward
@@ -204,7 +208,11 @@ public class HandController : MonoBehaviour
         curlT = Mathf.MoveTowards(curlT, holding ? 1f : 0f, curlSpeed * Time.deltaTime);
         bool knifeHeld = HandCarry.Instance != null &&
             HandCarry.Instance.Current is ToolItem tool && tool.Kind == ToolKind.Knife;
-        poser.SetPoseMode(knifeHeld ? GleechiHandPoser.PoseMode.KnifeGrip : GleechiHandPoser.PoseMode.Carry);
+        FryingChopsticks chopsticks = HandCarry.Instance != null ? HandCarry.Instance.Current as FryingChopsticks : null;
+        poser.SetPoseMode(chopsticks != null ? GleechiHandPoser.PoseMode.ChopstickGrip : knifeHeld ? GleechiHandPoser.PoseMode.KnifeGrip : GleechiHandPoser.PoseMode.Carry);
+        poser.SetChopstickClose(chopsticks != null ? chopsticks.GripClosure : 0f);
+        bool strainerHeld = HandCarry.Instance != null && HandCarry.Instance.Current is Strainer;
+        poser.SetUtensilWrist(chopsticks != null ? 85f : strainerHeld ? 90f : 0f);
         poser.SetCurl(curlT);
     }
 

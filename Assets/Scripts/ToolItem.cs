@@ -253,6 +253,9 @@ public partial class ToolItem : Carryable
 
     /// <summary>Can go on a HangingRack hook (ladles, spatulas, whisks, spoons, the strainer).</summary>
     public bool IsHangable => IsUtensil || kind == ToolKind.Strainer || this is Strainer;
+
+    [Tooltip("뜰채: 손에 들 때 뒤집어서 바구니의 오목한 안쪽이 위로 오게 (모델이 반대로 만들어졌으면 끄기).")]
+    [SerializeField] private bool strainerFlipInHand = true;
     private bool laidDownInHand;
 
     /// <summary>Utensils stand upright in the holder; carried that way they read
@@ -266,16 +269,30 @@ public partial class ToolItem : Carryable
         EndLiner();
         base.OnPickedUp();
 
-        // Strainers (뜰채) are carried upright: basket at 12 o'clock, held by the
-        // end of the handle below it - however it was resting or hanging.
+        // Strainers are held horizontally: basket left, handle right, held by the
+        // handle end - however they were resting or hanging.
         if (kind == ToolKind.Strainer || this is Strainer)
         {
             Vector3 grip = RestingRotation * gripLocalDir;
             Vector2 g = new Vector2(grip.x, grip.y);
-            Quaternion upright = Quaternion.AngleAxis(g.sqrMagnitude < 1e-4f ? 0f : Vector2.SignedAngle(g, Vector2.down), Vector3.forward);
+            Quaternion upright = Quaternion.AngleAxis(g.sqrMagnitude < 1e-4f ? 0f : Vector2.SignedAngle(g, Vector2.right), Vector3.forward);
+            // 바구니의 오목한 안쪽이 위(카메라 쪽)로: 그대로면 볼록한 바깥면이 보여서
+            // 건진 재료가 바깥면 위에 얹힌 것처럼 보였다 - 손잡이 축(화면 좌우)으로 뒤집는다.
+            if (strainerFlipInHand) upright = Quaternion.AngleAxis(180f, Vector3.right) * upright;
             laidDownInHand = true; // undone on placing, same as the laid-down utensils
             SetTempHoldRotation(upright);
-            SetTempHoldOffset(-GripPointAlong(Vector2.down, upright * RestingRotation));
+            SetTempHoldOffset(-GripPointAlong(Vector2.right, upright * RestingRotation));
+            return;
+        }
+
+        if (this is FryingChopsticks)
+        {
+            Vector3 grip = RestingRotation * gripLocalDir;
+            Vector2 direction = new Vector2(0.65f, 0.76f).normalized;
+            Quaternion turn = Quaternion.AngleAxis(Vector2.SignedAngle(new Vector2(grip.x, grip.y), direction), Vector3.forward);
+            laidDownInHand = true;
+            SetTempHoldRotation(turn);
+            SetTempHoldOffset(-GripPointAlong(direction, turn * RestingRotation) + new Vector3(direction.x, direction.y, 0f) * 0.18f);
             return;
         }
 
@@ -778,7 +795,47 @@ public partial class ToolItem : Carryable
 
     /// <summary>The same, turned over seconds (out of the upright chop stance
     /// first, if it's in it) - a pose change, not a snap.</summary>
-    public IEnumerator TurnFlatBladeLeft(float seconds)
+    public IEnumerator TurnFlatBladeLeft(float seconds) =>
+        TurnFlat(Quaternion.AngleAxis(180f, Carryable.CounterUp), Vector2.right, seconds);
+
+    /// <summary>포 뜨기 (세로): 칼을 눕힌 채 길이 방향이 도마 앞뒤(화면 위아래)가
+    /// 되게 돌린다 - 손잡이는 앞쪽(화면 아래), 칼끝은 뒤쪽, 날은 왼쪽(고기 쪽).
+    /// 오른손은 아래쪽 손잡이를 잡는다.</summary>
+    public IEnumerator TurnFlatAlongDepth(float seconds)
+    {
+        yield return TurnFlat(Quaternion.AngleAxis(flatDepthTurnDegrees, Carryable.CounterUp), Vector2.down, seconds);
+        // 손잡이를 주먹 안에: 바운딩 박스로 어림한 잡는 자리는 칼 자세에 따라
+        // 크게 빗나가므로, 다 돌린 뒤 실제 손잡이 메쉬의 가운데를 손가락 마디에
+        // 맞춘다 (짧게 미끄러지듯).
+        yield return null; // (HandCarry.LateUpdate가 새 회전·위치를 적용한 뒤에 잰다)
+        Renderer handle = HandleRenderer();
+        HandController hc = HandController.Instance;
+        if (handle == null || hc == null) yield break;
+        Vector3 from = TempHoldOffset;
+        Vector3 to = from + (hc.KnucklePosition - handle.bounds.center) + flatDepthGripAdjust;
+        for (float t = 0f; t < 0.12f; t += Time.deltaTime)
+        {
+            SetTempHoldOffset(Vector3.Lerp(from, to, Mathf.SmoothStep(0f, 1f, t / 0.12f)));
+            yield return null;
+        }
+        SetTempHoldOffset(to);
+    }
+
+    /// <summary>손잡이 메쉬 (이름에 Handle이 들어간 자식 렌더러), 없으면 null.</summary>
+    private Renderer HandleRenderer()
+    {
+        foreach (Renderer r in GetComponentsInChildren<Renderer>())
+            if (r.name.IndexOf("Handle", System.StringComparison.OrdinalIgnoreCase) >= 0) return r;
+        return null;
+    }
+
+    [Header("포 뜨기 (칼 세로로 눕히기)")]
+    [Tooltip("포 뜨기 때 칼을 눕혀 도는 각도 (도마 수직축 기준) - 손잡이가 화면 아래로 오게.")]
+    [SerializeField] private float flatDepthTurnDegrees = -90f;
+    [Tooltip("포 뜨기 때 손이 쥐는 자리 보정 (월드, 손잡이 끝에서 잡는 위치에 더함).")]
+    [SerializeField] private Vector3 flatDepthGripAdjust = Vector3.zero;
+
+    private IEnumerator TurnFlat(Quaternion turn, Vector2 gripDir, float seconds, Vector3 gripAdjust = default)
     {
         if (chopMotionRoutine != null)
         {
@@ -787,8 +844,7 @@ public partial class ToolItem : Carryable
             yield return BlendChopPose(0f, seconds * 0.5f);
             HandController.Instance?.SetChopPose(0f, Vector3.zero);
         }
-        Quaternion turn = Quaternion.AngleAxis(180f, Carryable.CounterUp);
-        Vector3 grip = -GripPointAlong(Vector2.right, turn * RestingRotation);
+        Vector3 grip = -GripPointAlong(gripDir, turn * RestingRotation) - gripAdjust;
         for (float t = 0f; t < seconds; t += Time.deltaTime)
         {
             float k = Mathf.SmoothStep(0f, 1f, t / seconds);

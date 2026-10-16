@@ -20,6 +20,7 @@ public class MeatKneader : MonoBehaviour
 {
     private static MeatKneader active;
     public static bool InputCaptured => active != null;
+    public static MovableBowl ActiveBowl => active != null ? active.bowl : null;
     public static bool IsKneading(MovableBowl bowl) => active != null && active.bowl == bowl;
 
     [Tooltip("Seconds for one squeeze (reach in - gather - squeeze - lift - let go).")]
@@ -27,7 +28,7 @@ public class MeatKneader : MonoBehaviour
     [Tooltip("The left hand's squeeze comes this much (of a cycle) after the right's.")]
     [SerializeField] private float leftLag = 0.08f;
     [Tooltip("Squeezes it takes to work new seasoning in (밑간 - the batter's own recipe has its own).")]
-    [SerializeField] private int marinadeStrokes = 6;
+    [SerializeField] private int marinadeStrokes = 5;
     [Tooltip("How hard the hands move the meat about (higher: more tossing and turning).")]
     [SerializeField] private float kneadStrength = 5f;
 
@@ -54,9 +55,10 @@ public class MeatKneader : MonoBehaviour
     /// or seasoning not worked in yet.</summary>
     public static bool HasMeatToKnead(MovableBowl bowl)
     {
-        foreach (IngredientItem m in MeatIn(bowl))
-            if ((BatterCoating.Of(m, false) is BatterCoating b && b.HasAny) || (m.HasMarinade && m.MarinadeMix < 1f)) return true;
-        return false;
+        // (그릇마다 횟수 제한 - 밑간 5회, 튀김옷 10회: 다 버무린 뒤엔 버무리지 않고
+        // 그릇을 누르면 집을 것 선택창 - BowlMixInteraction)
+        BowlMixInteraction mix = BowlMixInteraction.For(bowl);
+        return mix != null && mix.CanMix();
     }
 
     private static System.Collections.Generic.List<IngredientItem> MeatIn(MovableBowl bowl)
@@ -94,13 +96,28 @@ public class MeatKneader : MonoBehaviour
         if (held) cycling = true;
         if (cycling)
         {
-            float before = phase;
             phase += Time.deltaTime / Mathf.Max(cycleSeconds, 0.1f);
-            if (before < 0.5f && phase >= 0.5f) Squeeze();
             if (phase >= 1f)
             {
+                // 한 번의 주무르기가 끝까지 끝났을 때 1회 (중간에 멈추면 세지 않는다)
                 phase -= 1f;
+                Squeeze();
+                if (BowlMixInteraction.For(bowl).CountCompletedMix())
+                {
+                    // 이 단계 마지막 횟수: 더 버무리지 않고 손을 빼고, 집을 것 선택창
+                    MovableBowl done = bowl;
+                    Finish();
+                    BowlMixInteraction.For(done).OpenChooser();
+                    return;
+                }
                 if (!held) { phase = 0f; cycling = false; } // (let go: this one finished, then wait)
+            }
+            // 다 버무려졌고 손을 뗐으면: 양손이 그릇에서 저절로 나온다 (그다음 꾹 누르면 한 조각 집기)
+            if (!cycling && !held && !HasMeatToKnead(bowl))
+            {
+                Debug.Log($"[버무리기] {bowl.name}: 다 버무려짐 - 손을 뺍니다 (꾹 누르면 한 조각씩 집기)");
+                Finish();
+                return;
             }
         }
         Pose();

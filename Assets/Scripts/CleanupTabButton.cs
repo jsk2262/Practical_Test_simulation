@@ -14,7 +14,7 @@ public class CleanupTabButton : MonoBehaviour, IClickable
     /// has no tint to change, so the whole material is swapped).</summary>
     [SerializeField] private Material onMaterial;
 
-    private Material offMaterial;
+    private Material offMaterial, activeGreen;
     private Vector3 baseScale;
     private Coroutine bounce;
 
@@ -22,6 +22,12 @@ public class CleanupTabButton : MonoBehaviour, IClickable
     {
         if (tabRenderer == null) tabRenderer = GetComponent<Renderer>();
         if (tabRenderer != null) offMaterial = tabRenderer.sharedMaterial;
+        if (onMaterial != null || offMaterial != null)
+        {
+            activeGreen = new Material(onMaterial != null ? onMaterial : offMaterial);
+            activeGreen.color = new Color(0.16f, 0.72f, 0.18f);
+            if (activeGreen.HasProperty("_BaseColor")) activeGreen.SetColor("_BaseColor", activeGreen.color);
+        }
         baseScale = transform.localScale;
     }
 
@@ -38,11 +44,17 @@ public class CleanupTabButton : MonoBehaviour, IClickable
         CleanupMode.Blocked -= Nudge;
     }
 
-    public void OnClicked() => CleanupMode.Toggle();
+    public void OnClicked()
+    {
+        if (ExamFlow.Current == ExamFlow.Phase.Cleaning) CleanupMode.Set(true);
+        else if (ExamFlow.Current == ExamFlow.Phase.Cooking) CleanupMode.Toggle();
+    }
+    void LateUpdate() => Refresh(CleanupMode.IsOn);
+    void OnDestroy() { if (activeGreen != null) Destroy(activeGreen); }
 
     private void Refresh(bool on)
     {
-        if (tabRenderer != null && onMaterial != null) tabRenderer.sharedMaterial = on ? onMaterial : offMaterial;
+        if (tabRenderer != null && activeGreen != null) tabRenderer.sharedMaterial = on ? activeGreen : offMaterial;
     }
 
     private void Nudge()

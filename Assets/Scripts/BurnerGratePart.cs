@@ -8,9 +8,16 @@ public class BurnerGratePart : MonoBehaviour, IClickable
     [SerializeField] private BurnerGrate grate;
 
     public BurnerGrate Grate => grate;
+    public IClickable HoldAction => new LiftAction(this);
+    private sealed class LiftAction : IClickable
+    {
+        private readonly BurnerGratePart part;
+        public LiftAction(BurnerGratePart part) { this.part = part; }
+        public void OnClicked() { if (part.grate != null) part.grate.OnPartClicked(); }
+    }
 
     public void OnClicked()
     {
-        if (grate != null) grate.OnPartClicked();
+        // Short clicks intentionally do not lift the grate.
     }
 }
