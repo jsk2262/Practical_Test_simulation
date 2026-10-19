@@ -36,7 +36,7 @@ public class ClickDetector : MonoBehaviour
     /// stays held through use until deliberately held down somewhere.</summary>
     [SerializeField] private float holdSeconds = 0.4f;
 
-    private enum HoldMode { None, PickUpTool, PutDownTool, UnfoldTowel, CrackEgg, FlipSpoon, TakePiece, PlaceTool }
+    private enum HoldMode { None, PickUpTool, PutDownTool, UnfoldTowel, CrackEgg, FlipSpoon, TakePiece, PlaceTool, TearByHand }
     private float holdNeeded; // (this hold's length: holdSeconds, or the measuring spoon's own flip hold)
     private HoldMode holdMode;
     private float holdTimer;
@@ -180,6 +180,14 @@ public class ClickDetector : MonoBehaviour
                     holdTarget = folded.UnfoldAction;
                     holdMode = HoldMode.UnfoldTowel;
                 }
+
+                // 불린 목이버섯: 길게 누르면 손으로 찢어 3등분, 짧게 누르면 그냥 집기
+                if (holdTarget == null && pressedTarget.GetComponentInParent<IngredientItem>() is IngredientItem tearIt && tearIt.CanTearByHand)
+                {
+                    holdTarget = tearIt.TearAction;
+                    holdMode = HoldMode.TearByHand;
+                    shortClickActs = true;
+                }
             }
             // 달걀 in hand held down on a bowl: knocked on its rim and broken
             // into it; a plain click still sets the whole egg in the bowl.
@@ -236,6 +244,14 @@ public class ClickDetector : MonoBehaviour
             }
             else if (stirBowl != null)
             {
+                if (OverBowl(stirBowl, pos) && HandCarry.Instance.Current is ToolItem pressingTool
+                    && (pressingTool.Kind == ToolKind.Spatula || pressingTool.Kind == ToolKind.Ladle
+                        || pressingTool.Kind == ToolKind.Spoon) && stirBowl.IsCookingVessel)
+                {
+                    foreach (var mince in stirBowl.GetComponentsInChildren<FoodPieceGroup>())
+                        if (mince.PressMinceAt(CursorInOil(stirBowl, pos), stirBowl.GetInterior().radius * 0.28f) > 0)
+                            stirStrokes++;
+                }
                 if (OverBowl(stirBowl, pos)) stirDist += (pos - lastMousePos).magnitude;
                 while (stirDist >= stirPixelsPerStroke)
                 {
@@ -263,7 +279,7 @@ public class ClickDetector : MonoBehaviour
                 {
                     holdDone = true;
                     HoldProgressRing.Hide();
-                    if ((holdMode == HoldMode.PickUpTool || holdMode == HoldMode.PlaceTool || holdMode == HoldMode.UnfoldTowel || holdMode == HoldMode.CrackEgg || holdMode == HoldMode.FlipSpoon) && holdTarget != null) holdTarget.OnClicked();
+                    if ((holdMode == HoldMode.PickUpTool || holdMode == HoldMode.PlaceTool || holdMode == HoldMode.UnfoldTowel || holdMode == HoldMode.CrackEgg || holdMode == HoldMode.FlipSpoon || holdMode == HoldMode.TearByHand) && holdTarget != null) holdTarget.OnClicked();
                     else if (holdMode == HoldMode.PutDownTool) DropHeldAt(pos);
                     else if (holdMode == HoldMode.TakePiece) TakePieceAt(pos);
                 }

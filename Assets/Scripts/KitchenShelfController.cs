@@ -58,7 +58,15 @@ public class KitchenShelfController : Interactable, ISlotContainer
         return false;
     }
 
-    public override bool CanAcceptDrop(Carryable item) => IsAllowed(item);
+    public override bool CanAcceptDrop(Carryable item) => IsAllowed(item) || DishShelfHere(item) != null;
+
+    /// <summary>접시 선반(PlateShelf1/2)에는 이 팬 선반과 접시 선반(DishShelfController)이
+    /// 같이 붙어 있다 - 클릭은 먼저 붙은 이쪽이 받으므로, 정리 때 씻은 접시는 접시 선반에 넘긴다.</summary>
+    private DishShelfController DishShelfHere(Carryable item)
+    {
+        DishShelfController dish = GetComponent<DishShelfController>();
+        return dish != null && !IsAllowed(item) && dish.CanAcceptDrop(item) ? dish : null;
+    }
 
     /// <summary>Whether any shelf here takes this item (the pots and pans
     /// that belong under the counter).</summary>
@@ -73,6 +81,7 @@ public class KitchenShelfController : Interactable, ISlotContainer
     {
         HandCarry hand = HandCarry.Instance;
         Carryable item = hand?.Current;
+        if (DishShelfHere(item) is DishShelfController dishShelf) { dishShelf.ForceActivate(); return; }
         if (!IsAllowed(item)) return;
 
         Bounds shelf = ShelfBounds();

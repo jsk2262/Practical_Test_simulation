@@ -38,6 +38,17 @@ public static class ExamDeductions
         Added?.Invoke(key);
     }
 
+    /// <summary>조리 중에 일어난 실격 사유 (예: 젖은 체망을 뜨거운 기름에 넣어 기름이 튐).
+    /// 최종 평가에서 실격 항목이 된다. 같은 사유는 한 번만.</summary>
+    public static readonly List<string> Disqualifications = new List<string>();
+
+    public static void Disqualify(string reason)
+    {
+        if (Disqualifications.Contains(reason)) return;
+        Disqualifications.Add(reason);
+        Debug.Log($"[기록 · 실격 사유] {reason}");
+    }
+
     /// <summary>How many deductions there are so far in a category.</summary>
     public static int CountOf(string category)
     {
@@ -51,6 +62,7 @@ public static class ExamDeductions
     {
         Items.Clear();
         Entries.Clear();
+        Disqualifications.Clear();
         Added = null;
     }
 }

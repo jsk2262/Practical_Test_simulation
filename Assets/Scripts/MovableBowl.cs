@@ -38,10 +38,10 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
 
     /// <summary>Seconds on a strong flame for the wok's ~1 L of frying oil to
     /// reach frying heat (test: a drop of starch batter comes straight back up).</summary>
-    [SerializeField] private float timeToHeatOil = 420f;
+    [SerializeField] private float timeToHeatOil = 180f; // (강불 3분 · 중불 약 4분 17초 · 약불 약 6분 40초 - 지급 식용유 800mL + 웍을 175℃까지, Q=mcΔT 추정과 비슷하게)
     [Header("반죽 온도시험 (게임 연출 설정)")]
-    [SerializeField, Min(0.5f)] private float batterProbeSecondsAt175 = 2f;
-    [SerializeField, Range(0.1f, 0.9f)] private float batterProbeDepthAt175 = 0.45f;
+    [SerializeField, Min(0.5f)] private float batterProbeSecondsAt175 = 3f;
+    [SerializeField, Range(0.1f, 0.9f)] private float batterProbeDepthAt175 = 0.75f;
     // Existing oilHeat is a heating-progress model, not a measured temperature.
     // Match the existing food simulation: full heat corresponds to 175 C.
     public float OilTemperatureC => HasFryingOil
@@ -255,7 +255,28 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     }
 
     // (튀김 기름 그릇과 팬·웍·냄비는 한 조각씩 넣어도 넉넉하게 - 튀긴 조각을 소스 팬에 옮겨 담기 등)
-    public bool IsFull => occupied.Count >= (HasFryingOil || IsCookingVessel ? Mathf.Max(capacity, fryingCapacity) : capacity);
+    public bool IsFull => SlotsUsed >= (HasFryingOil || IsCookingVessel ? Mathf.Max(capacity, fryingCapacity) : capacity);
+
+    /// <summary>찬 칸 수: 같은 재료에서 나뉜 조각들(체망으로 건진 두부 27조각, 튀긴 고기
+    /// 조각들)은 한 재료라 한 칸으로 센다 - 조각마다 한 칸이면 그릇이 금방 차서, 체망에서
+    /// 쏟을 때 10개만 들어가고 나머지는 체망에 남아 더 진행할 수 없었다.</summary>
+    private int SlotsUsed
+    {
+        get
+        {
+            var names = new HashSet<string>();
+            int n = 0;
+            foreach (Carryable c in occupied.Keys)
+            {
+                if (c is IngredientItem ing && !string.IsNullOrEmpty(ing.IngredientName))
+                {
+                    if (names.Add(ing.IngredientName)) n++;
+                }
+                else n++;
+            }
+            return n;
+        }
+    }
 
     [Tooltip("튀김 기름이 든 팬/웍에 한 조각씩 넣을 수 있는 개수 (조각 하나하나가 따로 들어감).")]
     [SerializeField] private int fryingCapacity = 30;
@@ -842,7 +863,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     private System.Collections.IEnumerator BatterTest(Vector3 dropPoint)
     {
         Interior inside = GetInterior();
-        float radius = Mathf.Max(inside.radius * 0.055f, 0.005f);
+        float radius = Mathf.Max(inside.radius * 0.075f, 0.007f); // (조금 크게 - 기름 속에서도 보이게)
         Vector3 offsetLocal = transform.InverseTransformVector(Vector3.ProjectOnPlane(ClampOilDropPoint(dropPoint, radius) - inside.floorCenter, inside.up));
         GameObject blob = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         blob.name = "BatterDrop";
@@ -854,13 +875,14 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             radius * 2f / Mathf.Max(Mathf.Abs(scale.x), 0.0001f),
             radius * 2f / Mathf.Max(Mathf.Abs(scale.y), 0.0001f),
             radius * 2f / Mathf.Max(Mathf.Abs(scale.z), 0.0001f));
+        Vector3 baseScale = blob.transform.localScale;
         Renderer renderer = blob.GetComponent<Renderer>();
         // Reuse the existing material; a property block avoids leaked instances.
         renderer.sharedMaterial = oilSurface.GetComponent<Renderer>().sharedMaterial;
         var properties = new MaterialPropertyBlock();
         float age = 0f, cooked = 0f, riseProgress = 0f;
         float depth = 0f;
-        float sinkSeconds = 0.4f;
+        float sinkSeconds = 0.7f; // (가라앉는 게 눈에 보이게)
         bool floating = false;
         try
         {
@@ -873,7 +895,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
                 float temperature = OilTemperatureC;
                 float fraction = Mathf.Lerp(0.95f, batterProbeDepthAt175,
                     Mathf.InverseLerp(120f, 175f, temperature));
-                fraction = Mathf.Lerp(fraction, 0.12f, Mathf.InverseLerp(175f, 205f, temperature));
+                fraction = Mathf.Lerp(fraction, 0.4f, Mathf.InverseLerp(175f, 205f, temperature)); // (아주 뜨거워도 반쯤은 들어갔다 나옴)
                 if (age <= sinkSeconds)
                 {
                     depth = Mathf.Lerp(-radius * 2f, availableDepth * fraction,
@@ -899,6 +921,11 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
                 cooked += Mathf.InverseLerp(130f, 205f, temperature) * dt * 0.025f;
                 Color color = Color.Lerp(new Color(0.97f, 0.96f, 0.9f),
                     new Color(0.65f, 0.38f, 0.12f), Mathf.Clamp01(cooked));
+                // 위에서 내려다보면 깊이가 안 보여서: 깊이 들어갈수록 기름 색에 묻히고
+                // 작아지며, 떠오르면 다시 밝고 커진다 (가라앉았다 떠오르는 게 보이게)
+                float sub = Mathf.Clamp01(depth / Mathf.Max(availableDepth, 0.0001f));
+                color = Color.Lerp(color, oilColor * 0.8f, sub * 0.75f);
+                blob.transform.localScale = baseScale * Mathf.Lerp(1f, 0.65f, sub);
                 properties.SetColor("_BaseColor", color);
                 properties.SetColor("_Color", color);
                 renderer.SetPropertyBlock(properties);
@@ -912,7 +939,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     }
 
     // Tuning curve for a standardized small sample, not a cooking thermometer.
-    // 175 C: 0.4 s descent + 1.6 s rise with the default setting.
+    // 175 C: 0.7 s descent + 2.3 s rise with the default setting.
     public static float BatterProbeRiseRate(float temperatureC, float secondsAt175)
     {
         float thermal = Mathf.InverseLerp(100f, 175f, temperatureC);
@@ -1851,6 +1878,13 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         {
             RestOnSurface(item);
             SinkIntoWater(item);
+        }
+
+        if (IsCookingVessel && item is IngredientItem minced && minced.IsMincedMeat)
+        {
+            FoodPieceGroup group = minced.GetComponent<FoodPieceGroup>();
+            if (group == null) group = minced.gameObject.AddComponent<FoodPieceGroup>();
+            group.EnsureMincePieces();
         }
 
         // Into the wok/frying pan without having drained on a paper towel first

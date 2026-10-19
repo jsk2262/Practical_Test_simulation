@@ -871,7 +871,7 @@ public static class Station3DSceneBuilder
             var so = new SerializedObject(b);
             so.FindProperty("timeToBoilNoLid").floatValue = 300f;
             so.FindProperty("timeToBoilWithLid").floatValue = 210f;
-            so.FindProperty("timeToHeatOil").floatValue = 420f;
+            so.FindProperty("timeToHeatOil").floatValue = 180f;
             so.ApplyModifiedProperties();
             n++;
         }

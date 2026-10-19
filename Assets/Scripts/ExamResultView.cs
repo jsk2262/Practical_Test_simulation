@@ -65,30 +65,28 @@ public class ExamResultView : MonoBehaviour
         {
             if (verdict == null) verdict = new GUIStyle(GUI.skin.label) { fontSize = 54, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             verdict.normal.textColor = PassFail.Passed ? new Color(0.45f, 0.9f, 0.5f) : new Color(1f, 0.4f, 0.35f);
-            GUILayout.Label($"{PassFail.Score:0.#}점   ·   {(PassFail.Passed ? "합격" : "불합격")}", verdict);
+            GUILayout.Label(PassFail.Disqualified ? "실격 (채점 제외)" : $"{PassFail.Score:0.#}점   ·   {(PassFail.Passed ? "합격" : "불합격")}", verdict);
             if (SpeedMode.EverOn)
                 GUILayout.Label("※ 빠른 모드로 진행한 연습 결과 - 시간·탐 관련 평가는 생략되어 실제 판정과 다를 수 있어요", line);
-            GUILayout.Label($"점수 {PassFail.Score:0.#} / {ExamScoring.Current.totalScore:0} (합격 {ExamScoring.Current.passScore:0}점 이상 · 세부 배점 적용 전 임시 판정)", small);
+            // 영역별 점수 (문제지 배점: 과제마다 위생 5 · 조리기술 30 · 작품 15)
+            string parts = "";
+            foreach (ScoreSheet.Part p in System.Enum.GetValues(typeof(ScoreSheet.Part)))
+                parts += $"{ScoreSheet.Label(p)} {ScoreSheet.Got(p):0.#}/{ScoreSheet.Max(p):0}   ";
+            GUILayout.Label(parts, sub);
+            GUILayout.Label($"점수 {PassFail.Score:0.#} / {ScoreSheet.MaxTotal:0} (합격 {ExamScoring.Current.passScore:0}점 이상{(PassFail.Disqualified ? " · 실격이라 점수는 참고용" : "")}) · 배점 구조는 문제지 기준, 감점 한 건의 크기는 시뮬레이션 기준", small);
             foreach (string reason in PassFail.Reasons) GUILayout.Label("· " + reason, line);
             GUILayout.Space(6f);
         }
 
-        // official vs practice, never mixed
-        float official = 0f;
-        int officialItems = 0, practice = 0, held = 0, dq = 0;
+        // 건수 요약
+        int deducted = 0, held = 0, dq = 0;
         foreach (ExamEvaluation.Item it in ExamEvaluation.Items)
         {
             if (it.status == ExamEvaluation.Status.실격) dq++;
             else if (it.status == ExamEvaluation.Status.평가보류) held++;
-            else if (it.status == ExamEvaluation.Status.감점 && !it.duplicate) // (a duplicate is shown but not counted)
-            {
-                if (it.official && it.points > 0f) { official += it.points; officialItems++; }
-                else practice++;
-            }
+            else if (it.status == ExamEvaluation.Status.감점 && !it.duplicate) deducted++; // (중복은 보여만 줌)
         }
-        string officialText = officialItems > 0 ? $"공식 감점 -{official:0.#}점 ({officialItems}건)" : "공식 점수: 산정 불가 (검증된 공식 배점 없음)";
-        GUILayout.Label(officialText + (dq > 0 ? $" · 실격 {dq}건" : ""), sub);
-        GUILayout.Label($"연습 피드백 감점 {practice}건 (공식 점수 아님) · 평가 보류 {held}건", small);
+        GUILayout.Label($"감점 {deducted}건" + (dq > 0 ? $" · 실격 {dq}건" : "") + $" · 평가 보류 {held}건", sub);
 
         scroll = GUILayout.BeginScrollView(scroll);
         var dishes = new List<string>();

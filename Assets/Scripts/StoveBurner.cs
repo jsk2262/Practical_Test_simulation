@@ -94,6 +94,14 @@ public class StoveBurner : Interactable, ISlotContainer
     /// <summary>Burners lit this session whose lighting is recorded (DishEvaluation's 실격 check reads it).</summary>
     public static readonly System.Collections.Generic.HashSet<string> RecordedLit = new System.Collections.Generic.HashSet<string>();
 
+    /// <summary>이 기록이 어느 화구의 '켬' 기록인지 (최종 평가에서 실격 항목과 겹치지 않게).</summary>
+    public static bool IsLitRecord(string category, string reason)
+    {
+        foreach (StoveBurner b in Object.FindObjectsByType<StoveBurner>(FindObjectsSortMode.None))
+            if (!string.IsNullOrEmpty(b.litRecord) && b.litRecord == reason && b.litRecordCategory == category) return true;
+        return false;
+    }
+
     private void RecordLit()
     {
         if (string.IsNullOrEmpty(litRecord)) return;

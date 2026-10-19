@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class IngredientItem : Carryable
+public partial class IngredientItem : Carryable
 {
     public enum State { Raw, Washed, Cut }
     public enum SoakState { NotNeeded, Dry, Soaking, Soaked }
@@ -81,6 +81,7 @@ public class IngredientItem : Carryable
 
     /// <summary>Comes already minced (다진 돼지고기): 다지기 only goes over it again.</summary>
     [SerializeField] private bool alreadyMinced;
+    public bool IsMincedMeat => Category == IngredientCategory.Meat && alreadyMinced;
 
     /// <summary>고추 다듬기 the way it's done: the green cap cut off, stood up
     /// lengthwise and cut in half, the seeds scraped out with the measuring
@@ -232,7 +233,14 @@ public class IngredientItem : Carryable
                 box.size = r.GetComponent<MeshFilter>().sharedMesh.bounds.size;
             }
             FoodPiece fp = r.gameObject.AddComponent<FoodPiece>();
-            fp.Init(this, grams, 0f, r.bounds.size);
+            Vector3 pieceSize = r.bounds.size;
+            if (ingredientName == "양파")
+            {
+                Vector3 scale = r.transform.lossyScale;
+                pieceSize = Vector3.Scale(r.GetComponent<MeshFilter>().sharedMesh.bounds.size,
+                    new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z)));
+            }
+            fp.Init(this, grams, 0f, pieceSize);
             fp.UseOwnColors = true; // (조각마다 제 색 - 대파 흰·초록 등)
             group.Add(fp);
         }
@@ -405,12 +413,8 @@ public class IngredientItem : Carryable
             return true;
         }
 
-        // Soaked, tear-only ingredients (e.g. wood ear mushroom) skip the knife entirely.
-        if (isSoakable && CurrentSoakState == SoakState.Soaked && CurrentState != State.Cut)
-        {
-            PerformCut(CutMethod.Tear);
-            return true;
-        }
+        // (불린 목이버섯처럼 찢어 쓰는 재료: 길게 누르면 손으로 3등분 - IngredientTear.
+        // 짧게 누르면 다른 재료처럼 그냥 집는다)
 
         return false;
     }
@@ -2585,7 +2589,10 @@ public class IngredientItem : Carryable
             var go = new GameObject($"Piece_{i}");
             go.transform.SetParent(rig, false);
             go.transform.localPosition = new Vector3(x, 0f, 0f);
-            go.AddComponent<MeshFilter>().sharedMesh = HalfMoonMesh(Mathf.Max(r, 0.03f), thick, 4, 14);
+            // 탕수육 양파: 둥근 반달 단면 대신 결 방향의 4 x 1 cm 네모 편.
+            go.AddComponent<MeshFilter>().sharedMesh = ingredientName == "양파"
+                ? OnionPlankMesh(4f * worldPerCm, worldPerCm, Mathf.Min(thick, 0.3f * worldPerCm))
+                : HalfMoonMesh(Mathf.Max(r, 0.03f), thick, 4, 14);
             go.AddComponent<MeshRenderer>().sharedMaterial = new Material(onion);
             go.AddComponent<CutResultPiece>().Init(ingredientName, AppliedCut, spec);
             slices.Add(go.transform);
@@ -2632,12 +2639,58 @@ public class IngredientItem : Carryable
         handCtl?.SlideTo(handBase, 0.15f);
         if (knife != null) knife.ChopHoldSeconds = knifeHoldBefore;
 
-        foreach (Transform s in slices) s.SetParent(transform, true);
+        foreach (Transform s in slices)
+        {
+            s.SetParent(transform, true);
+            if (ingredientName == "양파")
+            {
+                Mesh mesh = s.GetComponent<MeshFilter>().mesh;
+                Vector3 pieceCenter = mesh.bounds.center;
+                Vector3 worldCenter = s.TransformPoint(pieceCenter);
+                Quaternion turn = Quaternion.Euler(0f, 0f, -90f);
+                Vector3[] vertices = mesh.vertices;
+                for (int k = 0; k < vertices.Length; k++) vertices[k] = turn * (vertices[k] - pieceCenter);
+                mesh.vertices = vertices;
+                mesh.RecalculateNormals(); mesh.RecalculateBounds();
+                s.rotation *= Quaternion.Inverse(turn);
+                s.position = worldCenter; // 조각의 중심을 기준으로 회전하고 바닥에 눕게 한다.
+            }
+        }
         Destroy(rig.gameObject);
         ShrinkPieces(0.85f);
         FitColliderToVisible();
         DropScrap("자투리", OwnColor);
         Debug.Log($"{ingredientName}: 반달썰기 완료 ({n}조각, {thick / worldPerCm:0.0} cm)");
+    }
+
+    // X는 얇은 두께, Y는 긴 결, Z는 폭. 얇은 층의 틈이 양파 결을 보여 준다.
+    private static Mesh OnionPlankMesh(float length, float width, float thickness)
+    {
+        var vertices = new List<Vector3>();
+        var triangles = new List<int>();
+        void Face(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 normal)
+        {
+            int i = vertices.Count;
+            vertices.AddRange(new[] { a, b, c, d });
+            if (Vector3.Dot(Vector3.Cross(b - a, c - a), normal) >= 0)
+                triangles.AddRange(new[] { i, i+1, i+2, i, i+2, i+3 });
+            else triangles.AddRange(new[] { i, i+2, i+1, i, i+3, i+2 });
+        }
+        for (int layer = 0; layer < 3; layer++)
+        {
+            float x0 = -thickness * 0.5f + thickness * layer / 3f;
+            float x1 = x0 + thickness * 0.30f;
+            float z0 = -width * 0.5f, z1 = width * 0.5f;
+            Vector3 a = new Vector3(x0, 0, z0), b = new Vector3(x0, length, z0);
+            Vector3 c = new Vector3(x0, length, z1), d = new Vector3(x0, 0, z1);
+            Vector3 offset = Vector3.right * (x1-x0);
+            Face(a,b,c,d,Vector3.left); Face(a+offset,b+offset,c+offset,d+offset,Vector3.right);
+            Face(a,a+offset,b+offset,b,Vector3.back); Face(d,d+offset,c+offset,c,Vector3.forward);
+            Face(a,d,d+offset,a+offset,Vector3.down); Face(b,c,c+offset,b+offset,Vector3.up);
+        }
+        var mesh = new Mesh { name = "Onion_4x1_LayeredPlank" };
+        mesh.SetVertices(vertices); mesh.SetTriangles(triangles,0);
+        mesh.RecalculateNormals(); mesh.RecalculateBounds(); return mesh;
     }
 
     private static Material onionSliceMaterial;
@@ -2710,9 +2763,8 @@ public class IngredientItem : Carryable
     private void FitColliderToVisible()
     {
         Bounds b = VisibleBounds;
-        Collider old = GetComponent<Collider>();
-        if (old != null) Destroy(old);
-        BoxCollider box = gameObject.AddComponent<BoxCollider>();
+        BoxCollider box = GetComponent<BoxCollider>();
+        if (box == null) box = gameObject.AddComponent<BoxCollider>();
         box.center = transform.InverseTransformPoint(b.center);
         Vector3 s = transform.InverseTransformVector(b.size);
         box.size = new Vector3(Mathf.Abs(s.x), Mathf.Abs(s.y), Mathf.Max(Mathf.Abs(s.z), 0.1f));

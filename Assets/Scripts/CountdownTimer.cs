@@ -11,6 +11,9 @@ public class CountdownTimer : MonoBehaviour
     private TextMesh label;
     private bool started;
 
+    /// <summary>시험 시계가 돌기 시작함 (감독관 안내가 끝난 뒤).</summary>
+    public bool Started => started;
+
     void Awake()
     {
         Instance = this;

@@ -2,16 +2,16 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 합격 / 불합격 - for now (the detailed points come later): it fails if a
-/// dish wasn't handed in on a serving plate (미완성), if any item is 실격, or
-/// if the official score (total minus verified official deductions) is under
-/// the pass mark. Practice results (연습 감점) don't count toward it. The
-/// pass mark and total are in ExamScoring.
+/// 합격 / 불합격: 실격 항목이 하나라도 있으면 실격(채점 제외 - 불합격). 아니면
+/// 점수표(ScoreSheet: 위생상태 및 안전관리 · 조리기술 · 작품의 평가)의 점수가
+/// 합격 기준(ExamScoring.passScore, 60점) 이상이면 합격.
 /// </summary>
 public static class PassFail
 {
     public static bool Decided { get; private set; }
     public static bool Passed { get; private set; }
+    /// <summary>실격 - 점수는 참고로만 보여 준다.</summary>
+    public static bool Disqualified { get; private set; }
     public static float Score { get; private set; }
     public static bool TimedOut { get; set; }
     public static readonly List<string> Reasons = new List<string>();
@@ -20,28 +20,24 @@ public static class PassFail
     {
         Reasons.Clear();
         ExamScoring cfg = ExamScoring.Current;
-        float off = 0f;
+        ScoreSheet.Apply();
         bool dq = false;
         foreach (ExamEvaluation.Item it in ExamEvaluation.Items)
-        {
             if (it.status == ExamEvaluation.Status.실격) { dq = true; Reasons.Add($"실격: {it.dish} {it.title} - {it.observed}"); }
-            else if (it.status == ExamEvaluation.Status.감점 && it.official && !it.duplicate) off += it.points;
-        }
-        foreach (string missing in DishEvaluation.MissingDishes)
-            Reasons.Add($"미완성: {missing}을(를) 완성 접시에 담아 제출하지 않음");
         if (TimedOut) Reasons.Add("시험 시간 종료");
-        Score = Mathf.Max(0f, cfg.totalScore - off);
+        Score = ScoreSheet.Total;
         bool scoreOk = Score >= cfg.passScore;
-        if (!scoreOk) Reasons.Add($"점수 {Score:0.#}점 - 합격 기준 {cfg.passScore:0}점 미만");
+        if (!dq && !scoreOk) Reasons.Add($"점수 {Score:0.#}점 - 합격 기준 {cfg.passScore:0}점 미만");
+        Disqualified = dq;
         Passed = !dq && DishEvaluation.MissingDishes.Count == 0 && scoreOk;
         Decided = true;
-        Debug.Log($"[최종 평가] {(Passed ? "합격" : "불합격")} - 점수 {Score:0.#} / {cfg.totalScore:0} {(Reasons.Count > 0 ? "(" + string.Join(", ", Reasons) + ")" : "")}");
+        Debug.Log($"[최종 평가] {(dq ? "실격" : Passed ? "합격" : "불합격")} - 점수 {Score:0.#} / {ScoreSheet.MaxTotal:0} {(Reasons.Count > 0 ? "(" + string.Join(", ", Reasons) + ")" : "")}");
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetForPlay()
     {
-        Decided = Passed = TimedOut = false;
+        Decided = Passed = Disqualified = TimedOut = false;
         Score = 0f;
         Reasons.Clear();
     }

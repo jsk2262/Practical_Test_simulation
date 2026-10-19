@@ -1399,7 +1399,7 @@ public static class HandWashPlayTest
     {
         MovableBowl wok = OilVessel();
         if (wok == null) return;
-        typeof(MovableBowl).GetField("oilHeat", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SetValue(wok, 430f);
+        typeof(MovableBowl).GetField("oilHeat", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SetValue(wok, 185f);
         HandCarry hand = HandCarry.Instance;
         if (hand.Current != ToolItem.MeasuringSpoon) { if (hand.Current != null) hand.PlaceFreeAt(hand.Current.transform.position); hand.PickUp(ToolItem.MeasuringSpoon); }
         ToolItem.MeasuringSpoon?.LoadSeasoning("앙금녹말");

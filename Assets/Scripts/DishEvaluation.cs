@@ -27,6 +27,9 @@ public static class DishEvaluation
 
     private static bool dishesDone;
 
+    /// <summary>완성 소스의 탄 정도가 이 이상이면 실격 (작품 특성에서 벗어날 만큼 탐).</summary>
+    public const float SauceBurntDisqualify = 0.5f;
+
     /// <summary>The dishes not handed in on a serving plate (미완성).</summary>
     public static readonly List<string> MissingDishes = new List<string>();
 
@@ -82,11 +85,11 @@ public static class DishEvaluation
             MissingDishes.Add(dish);
             ExamEvaluation.Add(new ExamEvaluation.Item
             {
-                ruleId = $"{id}.submitted", dish = dish, title = "완성품 제출", status = ExamEvaluation.Status.감점,
+                ruleId = $"{id}.submitted", dish = dish, title = "완성품 제출 (실격 기준)", status = ExamEvaluation.Status.실격,
                 observed = notShelved != null ? "완성 접시에 담았지만 제출대에 올리지 않음" : "완성 접시(PlatingPlate)에 담아 제출하지 않음",
                 cause = notShelved != null ? $"기록: {notShelved.Container.name}이(가) 제출대에 없음"
                       : anywhere != null && anywhere.Container != null ? $"기록: {anywhere.Container.name}에 남아 있음" : "",
-                tip = "팬에서 완성 접시로 옮겨 담은 뒤 제출하세요.", pointsText = "미완성 - 불합격 사유",
+                tip = "팬에서 완성 접시로 옮겨 담은 뒤 제출하세요.", pointsText = "실격 - 시험시간 내 과제 미제출", official = true,
             });
             return;
         }
@@ -109,6 +112,18 @@ public static class DishEvaluation
         ExamEvaluation.Add(ExamEvaluation.Judge($"{id}.doneness", dish, $"{onPlate.IngredientName} 익힘", done,
             "알맞게 익음", seen, ck != null ? $"기록: 익힘 진행 {ck.CookProgress:0}/{ck.TimeToCooked:0}" : "",
             "가운데까지 익을 때까지 가열하고, 바닥에 눌어붙지 않게 저어 주세요."));
+        // 실격: 불을 사용한 작품이 작품 특성에서 벗어날 만큼 익지 않았거나 탄 경우 (문제지 유의사항 6-바)
+        if (ck != null && (ck.CurrentStage == CookableItem.Stage.Raw || ck.CurrentStage == CookableItem.Stage.Burnt))
+        {
+            // (같은 문제의 익힘 감점은 보여만 주고 점수엔 안 넣음)
+            foreach (ExamEvaluation.Item same in ExamEvaluation.Items)
+                if (same.ruleId == $"{id}.doneness") same.duplicate = true;
+            ExamEvaluation.Add(new ExamEvaluation.Item
+            {
+                ruleId = $"dq.{id}.doneness", dish = dish, title = "익지 않음 · 탐 (실격 기준)", status = ExamEvaluation.Status.실격, official = true,
+                observed = seen, pointsText = "실격 - 작품 특성에서 벗어남", cause = "근거: 문제지 수험자 유의사항 6) 바)",
+            });
+        }
     }
 
     // ---- 완성 그릇 ----
@@ -172,6 +187,14 @@ public static class DishEvaluation
             s.Burn >= 0.3f ? "소스가 탄 색을 띰" : "소스 색이 지나치게 어두움",
             colorCause,
             "간장·장류 양과 가열 시간을 확인하세요."));
+        // 실격: 소스가 작품 특성에서 벗어날 만큼 탐 (문제지 유의사항 6-바)
+        if (s.Burn >= SauceBurntDisqualify)
+            ExamEvaluation.Add(new ExamEvaluation.Item
+            {
+                ruleId = $"dq.{id}.sauce.burnt", dish = dish, title = "소스가 탐 (실격 기준)", status = ExamEvaluation.Status.실격, official = true,
+                observed = $"완성 소스가 타 버림 (탄 정도 {s.Burn * 100f:0}%)", pointsText = "실격 - 작품 특성에서 벗어남",
+                cause = "근거: 문제지 수험자 유의사항 6) 바)",
+            });
 
         s.TasteEstimate(out float sweet, out float sour, out float salty);
         // (no verified reference yet: shown as an estimate, 평가 보류 - ExamScoring rule without a range)
@@ -297,6 +320,20 @@ public static class DishEvaluation
             "조리대가 깨끗함", $"얼룩이 남은 채 제출 (얼룩 {stains}곳)",
             stains > 0 ? "기록: 조리 중 생긴 얼룩(물·자투리·기름)을 다 닦지 않음" : "",
             "정리 때 행주로 조리대와 개수대 주변을 닦으세요."));
+
+        // 마지막 손씻기: 정리 단계까지 갔으면 정리하며 손을 씻었는지 (시간 초과로 정리 전에 끝나면 판단 안 함)
+        if (ExamFlow.Current != ExamFlow.Phase.Cooking || CleanupMode.IsOn)
+        {
+            bool washed = HandHygiene.WashedInCleanup;
+            ExamEvaluation.Add(new ExamEvaluation.Item
+            {
+                ruleId = "cleanup.handwash.final", dish = Cleanup, title = "정리 후 손씻기",
+                status = washed ? ExamEvaluation.Status.적정 : ExamEvaluation.Status.감점,
+                observed = washed ? "정리하며 손을 씻음" : "정리를 마치고 손을 씻지 않음",
+                tip = washed ? "" : "설거지·정리가 끝나면 개수대에서 손을 씻으세요.",
+                pointsText = washed ? "충족" : "",
+            });
+        }
     }
 
     /// <summary>What was recorded while cooking (위생·조리과정): each once, as a practice result
@@ -314,6 +351,8 @@ public static class DishEvaluation
     {
         string id = $"record.{category}.{reason}";
         if (!seen.Add(id)) return;
+        // (위쪽 화구를 켠 기록은 실격 항목으로 따로 나온다 - 감점으로 또 넣지 않음)
+        if (StoveBurner.IsLitRecord(category, reason)) return;
         // (a repeat of the same thing - "... (2회째)" - goes by the same rule)
         ScoringRule rule = ExamScoring.Current.Rule(id)
             ?? ExamScoring.Current.Rule(System.Text.RegularExpressions.Regex.Replace(id, @" \(\d+회째\)$", ""));
@@ -334,10 +373,32 @@ public static class DishEvaluation
 
     private static void CheckDisqualify()
     {
+        // 조리 중에 기록된 실격 사유 (예: 젖은 체망을 뜨거운 기름에 넣어 기름이 튐)
+        int n = 0;
+        foreach (string reason in ExamDeductions.Disqualifications)
+            ExamEvaluation.Add(new ExamEvaluation.Item
+            {
+                ruleId = "dq.record." + n++, dish = Cleanup, title = "안전사고 (실격 기준)", status = ExamEvaluation.Status.실격,
+                official = true, pointsText = "실격", observed = reason,
+                cause = "근거: 시설·장비 사용 중 위해 (문제지 유의사항 6) 차)",
+                tip = "체망·국자 등은 물기를 완전히 털고 마른 뒤에 기름에 넣으세요.",
+            });
+
+        // 위쪽(1번) 화구를 켬 - 화구는 아래 두 개만 사용 (문제지 유의사항 6-자)
+        if (StoveBurner.RecordedLit.Count > 0)
+            ExamEvaluation.Add(new ExamEvaluation.Item
+            {
+                ruleId = "dq.upper_burner", dish = Cleanup, title = "사용 금지 화구 사용 (실격 기준)", status = ExamEvaluation.Status.실격,
+                official = true, pointsText = "실격", observed = "위쪽(1번) 화구에 불을 켬",
+                cause = "근거: 가스레인지 화구 사용 제한 (문제지 유의사항 6) 자)",
+                tip = "아래쪽 두 화구만 사용하세요.",
+            });
+
         int active = 0;
         foreach (DisqualifyRule r in ExamScoring.Current.disqualifyRules)
         {
             if (r == null || !r.Active) continue;
+            if (r.conditionKey == "upper_burner_lit") continue; // (위에서 늘 검사함)
             active++;
             if (!Met(r, out string seen)) continue;
             ExamEvaluation.Add(new ExamEvaluation.Item
@@ -346,8 +407,6 @@ public static class DishEvaluation
                 official = true, pointsText = "공식 실격", observed = seen, cause = "근거: " + r.evidence,
             });
         }
-        if (active == 0)
-            ExamEvaluation.Report(BatterEvaluation.SetupSection, "dq.off", "실격 판정: 비활성 (검증된 실격 규칙 없음)");
     }
 
     private static bool Met(DisqualifyRule r, out string seen)
