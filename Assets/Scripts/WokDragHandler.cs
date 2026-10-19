@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// Lets the player shake the wok by holding and dragging the mouse over it.
@@ -61,7 +61,8 @@ public class WokDragHandler : MonoBehaviour, IDraggable
 
         ShakeSpeed = Mathf.Lerp(ShakeSpeed, 0f, Time.deltaTime * decaySpeed);
 
-        HandController.Instance?.SetHandShake(ShakeSpeed, 300f);
+        // 우클릭 흔들기는 왼손이 손잡이를 잡고 흔든다 - 오른손(주걱 · 소스 그릇)은 흔들리지 않게
+        HandController.Instance?.SetHandShake(buttonShaking ? 0f : ShakeSpeed, 300f);
     }
 
     // ---- 우클릭(또는 휠 버튼)으로 흔들기 ----
@@ -131,11 +132,26 @@ public class WokDragHandler : MonoBehaviour, IDraggable
     {
         if (deltaTime <= 0f) return;
 
+        vessel.GetComponent<PanSauce>()?.Agitate(mouseDelta);
         ShakeSpeed = mouseDelta.magnitude / deltaTime;
 
         Vector3 worldDelta = new Vector3(mouseDelta.x, mouseDelta.y, 0f) * 0.002f * wobbleStrength;
         currentOffset = Vector3.ClampMagnitude(currentOffset + worldDelta, 0.35f);
+
+        // 팬 안의 재료가 흔드는 대로 쏠리고 튀어 오른다
+        if (vessel == null) return;
+        vessel.GetComponentsInChildren(tossGroups); // 재사용 리스트에 담기 (흔드는 매 프레임 새 배열 안 만듦)
+        foreach (FoodPieceGroup g in tossGroups) g.Toss(mouseDelta); // 재료 묶음마다 흔든 만큼 쏠리게
+        // 소스도 흔들어 섞인다 (젓는 것처럼 - 바닥에 눌어붙지 않게)
+        if (ShakeSpeed > 200f && Time.time >= nextSauceMix && PanSauce.Of(vessel, false) is PanSauce sauce && sauce.Amount > 0.01f)
+        {
+            sauce.Stir();
+            nextSauceMix = Time.time + 0.4f;
+        }
     }
+
+    private float nextSauceMix;
+    private readonly System.Collections.Generic.List<FoodPieceGroup> tossGroups = new System.Collections.Generic.List<FoodPieceGroup>(); // 재료 묶음 찾기용 재사용 리스트
 
     public void OnDragEnd()
     {

@@ -1,4 +1,4 @@
-﻿# Line endings: text files normalized, Unity's YAML kept as is
+# Line endings: text files normalized, Unity's YAML kept as is
 * text=auto eol=lf
 *.cs text diff=csharp
 *.shader text

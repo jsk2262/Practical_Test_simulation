@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -333,6 +333,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         // not - a bowl's leftover water just gets poured out first.
         if (CleanupMode.IsOn && IsPlateOrBowl && occupied.Count == 0 && WaterAmount > 0f) SetWaterAmount(0f);
         if (CleanupMode.IsOn && IsPlateOrBowl && occupied.Count == 0 && HasPortion) GetComponent<PortionedCondiment>().Remove();
+        if (CleanupMode.IsOn && IsPlateOrBowl && occupied.Count == 0 && HasEgg) EggContents.Of(this, false).Clear(); // 정리 때: 남은 달걀도 비우고 설거지
         // (a pan that's had oil or a sauce in it is dirty too, whatever put it
         // there; and in clean-up anything can be washed - a pan or pot as well)
         // (다 씻은 뒤에도 빈 PanSauce 컴포넌트는 남아 있다 - 씻은 뒤로는 실제로
@@ -816,6 +817,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         bool heating = !IsHeld && CurrentBurner != null && CurrentBurner.IsOn;
         oilHeat = heating ? Mathf.Min(oilHeat + SpeedMode.Wait(Time.deltaTime) * FlameRate, timeToHeatOil * 1.5f)
                           : Mathf.Max(0f, oilHeat - Time.deltaTime * 0.3f);
+        if (heating && SpeedMode.On) oilHeat = Mathf.Max(oilHeat, timeToHeatOil); // 빠른 모드: 불에 올리면 바로 튀김 온도 (물이 바로 끓는 것과 같게)
         // Frying oil hot on the flame spatters the burner's floor (under its grate).
         if (heating && OilHeat01 > 0.5f) BurnerFloorDirt.Soil(CurrentBurner, BurnerFloorDirt.SoilKind.Oil, Time.deltaTime);
         if (oilSurface == null) return;
@@ -844,6 +846,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     {
         Interior inside = GetInterior();
         float radius = inside.radius * 0.35f;
+        PanSauce.Of(this, false)?.Sweep(world, world, radius);
         foreach (Carryable c in occupied.Keys)
             if (c.GetComponent<FoodPieceGroup>() is FoodPieceGroup g) g.Poke(world, radius);
         HandController hc = HandController.Instance;
@@ -851,12 +854,26 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             hc.SetGestureOffset(hc.GestureOffset + ToolItem.TowardSpoonHead(tool, world, Time.deltaTime));
     }
 
+    /// <summary>기름 속에 앙금 조각(온도 확인용)이 떠 있음 - 체망으로 건질 수 있게.</summary>
+    public bool HasBatterDrops
+    {
+        get
+        {
+            foreach (Transform t in transform) if (t.name == "BatterDrop") return true;
+            return false;
+        }
+    }
+
     /// <summary>기름 온도 확인: a little starch batter dropped in the oil. Hot
     /// enough, it bobs straight back up and sizzles; too cold, it sinks and
     /// only drifts up slowly.</summary>
+    /// <summary>반죽 조각으로 기름 온도를 확인한 횟수 (체크리스트용).</summary>
+    public static int BatterTestCount { get; private set; }
+
     public void DropBatterTest()
     {
         if (!HasFryingOil || oilSurface == null) return;
+        BatterTestCount++; // 온도 확인 한 번 함
         StartCoroutine(BatterTest(OilDropPointFromPointer(GetInterior().floorCenter)));
     }
 
@@ -1728,11 +1745,15 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         // 원을 그리면 손잡이 끝이 팬 위에 있고 머리는 팬 밖으로 나가 있었다.
         Vector3 center = BodyCenterWorld();
         Vector3 reach = hand.GestureOffset;
+        Vector3 lastSpoon = center + Vector3.right * inside.radius * 0.5f;
         for (float t = 0f; t < 0.45f; t += Time.deltaTime)
         {
             float a = t / 0.45f * Mathf.PI * 2f;
             Vector3 circle = new Vector3(Mathf.Cos(a), Mathf.Sin(a) * 0.6f, 0f) * inside.radius * 0.5f;
-            reach += ToolItem.TowardSpoonHead(tool, center + circle, Time.deltaTime);
+            Vector3 spoon = center + circle;
+            PanSauce.Of(this, false)?.Sweep(lastSpoon, spoon, inside.radius * 0.22f);
+            lastSpoon = spoon;
+            reach += ToolItem.TowardSpoonHead(tool, spoon, Time.deltaTime);
             hand.SetGestureOffset(reach);
             yield return null;
         }
@@ -1753,7 +1774,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
 
     public override bool CanAcceptDrop(Carryable item)
     {
-        if (item is Strainer strainer) return CanRestStrainer || (strainer.HasContents ? !IsFull : occupied.Count > 0);
+        if (item is Strainer strainer) return CanRestStrainer || (strainer.HasContents ? !IsFull : occupied.Count > 0 || HasBatterDrops);
         if (item is ToolItem knife && knife.Kind == ToolKind.Knife) return CanScoopFromBoard();
         if (item is ToolItem spatula && spatula.Kind == ToolKind.Spatula) return occupied.Count > 0;
         if (item is MovableBowl from && (object)from != this && !IsDish && from.GetComponent<FryingPanPlating>() == null
@@ -1865,13 +1886,16 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             // 썬 채소가 팬·웍·냄비에 들어가면: 조각마다 따로 익고·타고·저으면 움직이게
             if (IsCookingVessel && item is IngredientItem toCook) toCook.EnsurePieceGroup();
             if (item is IngredientItem cut && cut.CurrentState == IngredientItem.State.Cut)
-                cut.GatherPieces(Mathf.Min(InsideRadius(), inside.radius * 0.45f));
+                cut.GatherPieces(IsDeepBowl ? inside.radius * 0.7f // 깊은 볼: 바닥에 넓게 골고루 펼침
+                                            : Mathf.Min(InsideRadius(), inside.radius * 0.45f)); // 그 외: 예전처럼 모아 담기
             // What shows of it (cut slices lie off to one side of the pivot) goes on the spot.
             // (튀김 기름: 정해진 자리가 아니라 커서로 가리킨 곳에 - 한 조각씩 팬 가장자리
             // 여기저기 따로 넣을 수 있게. 겹치면 바로 옆 빈 곳)
             Vector3 want = HasFryingOil && item is IngredientItem ? OilDropSpot(item, inside, worldDropPosition) : FreeSlot(item, inside);
             Vector3 shown = VisibleCenter(item);
-            item.transform.position += HasFryingOil && item is IngredientItem
+            // (팬 · 웍 · 냄비: 깊이(z)까지 맞춘다 - 화면 가로세로만 옮기면 도마에 있던
+            // 깊이 그대로라, 기울어진 화구 위 팬에서는 앞쪽 벽 밑으로 들어가 안 보였다)
+            item.transform.position += (HasFryingOil || IsCookingVessel || IsDeepBowl) && item is IngredientItem // 조리 그릇 · 깊은 볼은 깊이까지 맞춤
                 ? want - shown : new Vector3(want.x - shown.x, want.y - shown.y, 0f);
         }
         if (!(HasFryingOil && item is IngredientItem))
@@ -1893,6 +1917,16 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         {
             string what = ing.DrainOnTowel == IngredientItem.DrainNeed.Blood ? "핏물" : "물기";
             ExamDeductions.Add($"{ing.IngredientName}: 키친타올로 {what} 제거 없이 조리");
+        }
+    }
+
+    /// <summary>깊은 볼(bowlSize2x3 등, 접시가 아닌 오목한 그릇): 내용물을 바닥에 넓게 담는다.</summary>
+    private bool IsDeepBowl
+    {
+        get
+        {
+            Interior i = GetInterior(); // 그릇 안쪽 모양
+            return !IsCookingVessel && i.rim > i.radius * 0.35f; // 조리 그릇이 아니고 벽이 높으면 깊은 볼
         }
     }
 
@@ -2023,6 +2057,16 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         Vector3 up = dish.transform.TransformDirection(Vector3.up).normalized;
         if (Vector3.Dot(up, new Vector3(0f, 0.6f, -1f)) < 0f) up = -up;
         Vector3 plane = dish.bounds.center;
+        // 팬 · 웍 · 냄비: 모델 전체(손잡이 · 벽까지)의 가운데는 안쪽 바닥보다 한참 위라,
+        // 그 높이에 맞춰 화면 깊이로 밀면 재료가 앞쪽 벽 밑으로 들어가 안 보였다 -
+        // 안쪽 바닥 기준으로, 바닥의 위쪽 방향으로만 올린다
+        bool cooking = (IsCookingVessel || IsDeepBowl) && item is IngredientItem; // 조리 그릇 · 깊은 볼(두부 · 튀김 담는 볼)은 안쪽 바닥 기준
+        if (cooking)
+        {
+            Interior inside = GetInterior();
+            up = inside.up;
+            plane = inside.floorCenter;
+        }
 
         float lowest = float.MaxValue;
         foreach (MeshFilter mf in item.GetComponentsInChildren<MeshFilter>())
@@ -2037,7 +2081,8 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         // Along the camera's line of sight, not the dish's up: the piece stays on
         // screen right where it was set down (moving along up slid it up the plate).
         float need = 0.01f - lowest;
-        if (Mathf.Abs(up.z) > 0.3f) item.transform.position += new Vector3(0f, 0f, need / up.z);
+        if (cooking) item.transform.position += up * need;
+        else if (Mathf.Abs(up.z) > 0.3f) item.transform.position += new Vector3(0f, 0f, need / up.z);
         else item.transform.position += up * need;
     }
 

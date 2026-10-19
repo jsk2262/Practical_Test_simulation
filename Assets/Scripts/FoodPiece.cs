@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -154,7 +154,7 @@ public class FoodPiece : MonoBehaviour
             Color c = new Color(Mathf.Clamp01(own.r * ratio.r), Mathf.Clamp01(own.g * ratio.g), Mathf.Clamp01(own.b * ratio.b), own.a);
             c = Color.Lerp(c, SearBrown, Sear * 0.8f);
             c = Color.Lerp(c, CharBlack, Char);
-            c = Color.Lerp(c, CoatColor, Coat * 0.85f);
+            c = Color.Lerp(c, CoatColor, Coat * 0.45f);
             block.Clear();
             block.SetColor("_BaseColor", c);
             block.SetColor("_Color", c);
@@ -169,7 +169,7 @@ public class FoodPiece : MonoBehaviour
         if (rend == null) return;
         cooked = Color.Lerp(cooked, SearBrown, Sear * 0.8f);
         cooked = Color.Lerp(cooked, CharBlack, Char);
-        Color c = Color.Lerp(cooked, CoatColor, Coat * 0.85f);
+        Color c = Color.Lerp(cooked, CoatColor, Coat * 0.45f);
         float s = Mathf.Lerp(0.2f, 0.85f, Coat * Mathf.Lerp(0.35f, 1f, CoatViscosity));
         if (Mathf.Abs(s - shownSmooth) < 0.005f && Approximately(c, shownColor)) return;
         shownColor = c;
@@ -203,7 +203,7 @@ public class FoodPiece : MonoBehaviour
 /// own shape instead.
 /// </summary>
 [RequireComponent(typeof(IngredientItem))]
-public class FoodPieceGroup : MonoBehaviour
+public partial class FoodPieceGroup : MonoBehaviour
 {
     [Header("In water")]
     [Tooltip("Buoyancy against gravity when raw (1 = hovers) and once cooked (more = floats higher).")]
@@ -245,7 +245,7 @@ public class FoodPieceGroup : MonoBehaviour
     [Tooltip("익은 정도(TimeToCooked 대비)가 이만큼 되면 바닥에서 떠오른다 (뜨거운 기름에서만).")]
     [SerializeField] private float oilFloatAt = 0.45f;
     [Tooltip("떠오른 조각의 부력 (중력 대비, 1보다 크면 표면으로 올라옴).")]
-    [SerializeField] private float oilBuoyancy = 1.7f;
+    [SerializeField] private float oilBuoyancy = 2f; // 2 = 딱 절반 잠겨 뜸 (1.7은 60% 잠겨 뜬 게 잘 안 보였다)
     [SerializeField] private float oilDrag = 4.5f;
     [Tooltip("뜨거운 기름이 조각을 흔드는 세기 (기포).")]
     [SerializeField] private float oilBubble = 0.5f;
@@ -272,6 +272,14 @@ public class FoodPieceGroup : MonoBehaviour
     /// piece's Coat is only how it looks. Pan sauce + this = all of it.</summary>
     private readonly SaucePortion coatSauce = new SaucePortion();
     public float CoatSauceMl => coatSauce.Amount * 15f;
+    private void TakeCoating(PanSauce source, float requested)
+    {
+        float grams = 0f;
+        foreach (FoodPiece piece in Pieces) if (piece != null) grams += piece.Grams;
+        // A film of sauce: chopping into 40 pieces must not absorb the whole pan.
+        float capacity = Mathf.Max(0f, grams) * 0.12f / 15f;
+        coatSauce.Add(source.Take(Mathf.Min(requested, Mathf.Max(0f, capacity - coatSauce.Amount))));
+    }
 
     /// <summary>A share of the sauce on the pieces moved to another ingredient's
     /// (a piece split off with its coat) - moved, not copied.</summary>
@@ -517,6 +525,13 @@ public class FoodPieceGroup : MonoBehaviour
             foreach (FoodPiece p in Pieces)
             {
                 Vector3 a = g + shove;
+                // Curved wok sides guide food back down onto the cooking base.
+                if (simBowl.IsCookingVessel && !simBowl.IsHeld && !inside.liquid && !simBowl.HasFryingOil)
+                {
+                    Vector3 radial = new Vector3(p.simPos.x, 0f, p.simPos.z);
+                    float edge = Mathf.InverseLerp(inside.radius * 0.4f, inside.radius * 0.9f, radial.magnitude);
+                    a -= radial.normalized * edge * 2.8f;
+                }
                 float drag;
                 if (inside.liquid)
                 {
@@ -599,7 +614,7 @@ public class FoodPieceGroup : MonoBehaviour
                 p.AddCoat(take, sauce.Color, cling);
                 used += take;
             }
-            coatSauce.Add(sauce.Take(used * 0.15f)); // (moved onto the pieces - not lost, not counted twice)
+            TakeCoating(sauce, used * 0.15f); // (moved onto the pieces - not lost, not counted twice)
         }
         foreach (FoodPiece p in Pieces) if (sauce == null || sauceAvail <= 0f) p.DripCoat(dt);
 
@@ -737,7 +752,8 @@ public class FoodPieceGroup : MonoBehaviour
         {
             Vector3 tangent = new Vector3(-p.simPos.z, 0f, p.simPos.x);
             tangent = tangent.sqrMagnitude > 1e-6f ? tangent.normalized * dir : Vector3.right;
-            p.simVel += tangent * stirImpulse * Random.Range(0.5f, 1.2f)
+            Vector3 inward = new Vector3(-p.simPos.x, 0f, -p.simPos.z);
+            p.simVel += (tangent * 0.45f + inward * 1.8f) * stirImpulse * Random.Range(0.5f, 1.2f)
                       + new Vector3(Random.Range(-0.3f, 0.3f), Random.Range(0.4f, 1f), Random.Range(-0.3f, 0.3f)) * stirImpulse;
             p.simSpin += Random.onUnitSphere * Random.Range(4f, 10f);
             // a soft piece (두부) wears with every stroke - more once it's hot and soft
@@ -752,7 +768,7 @@ public class FoodPieceGroup : MonoBehaviour
                 used += take;
             }
         }
-        if (sauce != null) coatSauce.Add(sauce.Take(used * 0.15f));
+        if (sauce != null) TakeCoating(sauce, used * 0.15f);
         // (튀김 기름에서 휘저으면 아직 안 굳은 붙음은 반쯤 떨어진다)
         if (simBowl.HasFryingOil) bonds.RemoveAll(x => !x.set && Random.value < 0.5f);
     }
@@ -1072,11 +1088,12 @@ public class SaucePortion
             foreach (var kv in parts)
             {
                 if (IsSolid(kv.Key)) continue;
-                if (kv.Key == Condiments.Water) { water += kv.Value; continue; }
+                if (kv.Key == Condiments.Water || kv.Key == "식초" || kv.Key == "청주") { water += kv.Value; continue; }
                 c += Condiments.Get(kv.Key).color * kv.Value; w += kv.Value;
             }
-            Color pale = new Color(0.93f, 0.9f, 0.84f);
-            Color liquid = w > 0f ? c / w : water > 0f ? pale : new Color(0.95f, 0.82f, 0.35f);
+            bool chiliTint = parts.ContainsKey("두반장") || parts.ContainsKey("고추기름") || InfusionOf("고춧가루") > 0.1f;
+            Color pale = chiliTint ? new Color(0.92f, 0.28f, 0.08f) : new Color(0.95f, 0.62f, 0.28f);
+            Color liquid = w > 0f ? c / w : water > 0f ? new Color(0.93f, 0.9f, 0.84f) : new Color(0.95f, 0.82f, 0.35f);
             if (w > 0f && water > 0f)
             {
                 // diluted: strongly coloured liquids (soy) still show through a lot of water
@@ -1180,6 +1197,7 @@ public class PanSauce : MonoBehaviour
     public void Stir()
     {
         stirUntil = Time.time + 1.5f;
+        Agitate(new Vector2(Mathf.Cos(Time.time * 4f), Mathf.Sin(Time.time * 4f)) * 16f);
         pendingStarch = 0f;                       // (the starch just added: stirred through in time)
         if (Lumps > 0f) Lumps = Mathf.Max(0f, Lumps - 0.04f); // a few clumps broken up
         MixProgress = Mathf.Min(1f, MixProgress + mixPerStir);
@@ -1279,8 +1297,15 @@ public class PanSauce : MonoBehaviour
 
     /// <summary>How thick the finished sauce is, 0 thin .. 1 set - its pastes
     /// plus the starch that's thickened it (look tuning, not a rheology model).</summary>
-    public float Thickness =>
-        Mathf.Clamp01(Viscosity * 0.6f + Gel * thickenStrength * StarchSpoons / Mathf.Max(LiquidAmount, 0.5f));
+    public float Thickness => EvaluateThickness(Viscosity, Gel, StarchSpoons, LiquidAmount);
+
+    // 게임의 시각/움직임 조절값: 조리시험의 합격 기준이나 물성 측정값은 아니다.
+    public static float EvaluateThickness(float baseViscosity, float gel, float starch, float liquid)
+    {
+        float concentration = Mathf.Max(0f, starch) / Mathf.Max(liquid, 0.5f);
+        float thickened = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.01f, 0.14f, concentration));
+        return Mathf.Clamp01(baseViscosity * 0.25f + Mathf.Clamp01(gel) * thickened);
+    }
 
     private void AddLumps(float share, string cause)
     {
@@ -1390,7 +1415,7 @@ public class PanSauce : MonoBehaviour
             pendingStarch = 0f;
         }
         // hot, the starch thickens the sauce
-        if (sauce.heat >= 0.5f && Gel < 1f && sauce.parts.Keys.Count > 0)
+        if (sauce.temp >= 65f && Gel < 1f && sauce.parts.Keys.Count > 0)
         {
             bool anyStarch = false;
             foreach (string k in sauce.parts.Keys) if (IsStarch(k)) { anyStarch = true; break; }
@@ -1398,7 +1423,8 @@ public class PanSauce : MonoBehaviour
             {
                 float was = Gel;
                 // (only as far as it's mixed through - unmixed starch sits in clumps)
-                Gel = Mathf.Min(1f, Gel + dt * sauce.heat * Mathf.Lerp(0.2f, 1f, MixProgress) / Mathf.Max(gelSeconds, 0.1f));
+                float activation = Mathf.InverseLerp(60f, 95f, sauce.temp);
+                Gel = Mathf.Min(1f, Gel + dt * activation * Mathf.Lerp(0.2f, 1f, MixProgress) / Mathf.Max(gelSeconds, 0.1f));
                 if (Mathf.FloorToInt(Gel * 10f) != Mathf.FloorToInt(was * 10f)) Recompute();
             }
         }
@@ -1525,6 +1551,9 @@ public class PanSauce : MonoBehaviour
             // Powders color less than pastes and liquids do; a liquid shows as
             // the liquid it's become (oil gone red).
             float weight = kv.Value * (info.form == CondimentForm.Powder ? 0.5f : 1f);
+            if ((kv.Key == "설탕" || kv.Key == "소금") && sauce.LiquidAmount > 0.01f) weight = 0f;
+            // 전분이 익으면 흰 가루색이 걷히며 원래 소스색이 드러난다.
+            if (IsStarch(kv.Key)) weight *= Mathf.Lerp(1f, 0.03f, Gel);
             // a solid fried too hot goes brown, then black - not just a deeper red
             Color own = info.form == CondimentForm.Powder ? BurntSolid(info.color, sauce.burn) : info.color;
             c += (info.form == CondimentForm.Liquid ? liquid : own) * weight;
@@ -1545,12 +1574,17 @@ public class PanSauce : MonoBehaviour
     {
         if (bowl == null) return;
         MovableBowl.Interior inside = bowl.GetInterior();
+        if (bowl.IsCookingVessel || bowl.GetComponent<PlatingDestination>() != null)
+        {
+            UpdateParticleSurface(inside);
+            return;
+        }
         // A deep bowl (not a pan) shows the liquid's surface at its level.
         bool level = !bowl.IsCookingVessel && inside.rim > inside.radius * 0.35f;
         float fill = level ? Mathf.Clamp01(Amount / CapacityOf(bowl)) : 0f;
         float r = Amount <= 0.01f ? 0f
                 : level ? inside.radius * Mathf.Lerp(0.55f, 1f, fill)
-                : Mathf.Min(Mathf.Sqrt(Amount) * 0.13f, inside.radius * 0.95f);
+                : Mathf.Min(Mathf.Sqrt(Amount) * 0.19f, inside.radius * 0.95f);
         // 기울여 붓는 중: 입구 쪽 옆면에 모여 고인다 (펼쳐진 것보다 좁게)
         if (PourLip.HasValue && !level) r = Mathf.Min(r, inside.radius * 0.45f);
         if (r <= 0f)
@@ -1560,7 +1594,7 @@ public class PanSauce : MonoBehaviour
         }
         int lumpCount = Mathf.RoundToInt(Lumps * 10f);
         bool thick = Thickness > 0.55f;
-        bool tooThick = Thickness > 0.85f;
+        bool tooThick = Thickness > 0.85f && StarchSpoons / Mathf.Max(LiquidAmount, 0.5f) > 0.2f;
         int burnStep = Mathf.FloorToInt(sauce.burn * 10f) + (tooThick ? 100 : 0);
         if (pool == null || Mathf.Abs(r - poolRadius) > poolRadius * 0.08f || !SameColor(poolColor, Color) || lumpCount != poolLumps || thick != poolThick
             || burnStep != poolBurnStep)
@@ -1570,7 +1604,8 @@ public class PanSauce : MonoBehaviour
             pool = new GameObject("PanSauce");
             pool.transform.SetParent(transform, true);
             Condiments.BuildContent(pool.transform, Vector3.zero, Vector3.up, r,
-                thick ? CondimentForm.Paste : CondimentForm.Liquid, Color, "Pool");
+                tooThick ? CondimentForm.Paste : CondimentForm.Liquid, Color, "Pool");
+            pool.AddComponent<SauceSurfaceWaves>().Initialize(r);
             // the paste's dollop flattened into a spread-out sauce
             foreach (Transform t in pool.GetComponentsInChildren<Transform>())
                 if (t.name != "PanSauce" && t.name != "Pool") t.localScale = Vector3.Scale(t.localScale, new Vector3(1f, 0.25f, 1f));
@@ -1614,22 +1649,66 @@ public class PanSauce : MonoBehaviour
         // thick, hardly at all when it's set (a look, not a fluid simulation).
         Vector3 downhill = Vector3.ProjectOnPlane(-Carryable.CounterUp, inside.up);
         float tilt = Mathf.Clamp01(downhill.magnitude * 3f);
-        Vector3 target = level || tilt < 0.05f ? Vector3.zero : downhill.normalized * inside.radius * 0.45f * tilt;
+        Vector3 target = level || !bowl.IsHeld || tilt < 0.05f ? Vector3.zero : downhill.normalized * inside.radius * 0.45f * tilt;
         if (PourLip.HasValue && !level)
         {
             // 붓는 입구 쪽 옆면으로 (가장자리에서 고인 웅덩이 반지름만큼 안쪽)
             Vector3 toLip = Vector3.ProjectOnPlane(PourLip.Value - inside.floorCenter, inside.up);
             target = toLip.sqrMagnitude > 1e-6f ? toLip.normalized * Mathf.Max(0f, inside.radius - r * 0.9f) : Vector3.zero;
         }
-        float speed = Mathf.Lerp(6f, 0.25f, Mathf.Clamp01(Thickness));
+        slosh *= Mathf.Exp(-Time.deltaTime * Mathf.Lerp(3.5f, 6f, Thickness));
+        ripple = Mathf.MoveTowards(ripple, 0f, Time.deltaTime * 1.2f);
+        if (!PourLip.HasValue && !level)
+            target = Vector3.ClampMagnitude(target + slosh, Mathf.Max(0f, inside.radius - r));
+        pool.GetComponent<SauceSurfaceWaves>().Motion = ripple * Mathf.Lerp(1f, 0.35f, Thickness);
+        float speed = Mathf.Lerp(9f, 3f, Mathf.Clamp01(Thickness));
         poolShift = Vector3.Lerp(poolShift, target, Mathf.Clamp01(Time.deltaTime * speed));
         // (그릇 안쪽 바닥은 깊이의 약 17% 높이 - 그보다 낮으면 조금 남은 양이
         // 바닥 속에 묻혀 안 보이므로, 남아 있는 동안은 바닥 위에서 시작한다)
-        float height = level ? inside.rim * Mathf.Lerp(0.22f, 0.92f, fill) : 0.004f;
+        float height = level ? inside.rim * Mathf.Lerp(0.22f, 0.92f, fill) : Mathf.Min(inside.rim * 0.25f, 0.012f + Amount * 0.0015f);
         pool.transform.SetPositionAndRotation(inside.floorCenter + poolShift + inside.up * Mathf.Max(height, 0.004f), Quaternion.FromToRotation(Vector3.up, inside.up));
     }
 
+    private SauceParticleSurface particleSurface;
+    private void UpdateParticleSurface(MovableBowl.Interior inside)
+    {
+        if (Amount <= 0.01f)
+        {
+            if (pool != null) Destroy(pool);
+            pool = null;
+            particleSurface = null;
+            return;
+        }
+        if (particleSurface == null)
+        {
+            if (pool != null) Destroy(pool);
+            pool = new GameObject("PanSauce particles");
+            pool.transform.SetParent(transform, true);
+            particleSurface = pool.AddComponent<SauceParticleSurface>();
+        }
+        // The pan frame stays fixed: actual parcels move, rather than translating a disk.
+        pool.transform.SetPositionAndRotation(inside.floorCenter + inside.up * 0.006f,
+            Quaternion.FromToRotation(Vector3.up, inside.up));
+        float visibleRadius = Mathf.Min(Mathf.Sqrt(Amount) * 0.19f, inside.radius * 0.91f);
+        particleSurface.Configure(this, bowl, visibleRadius);
+    }
+
+    public void Sweep(Vector3 from, Vector3 to, float reach)
+    {
+        particleSurface?.Sweep(from, to, reach);
+    }
+
     private Vector3 poolShift;
+    private Vector3 slosh;
+    private float ripple;
+    public void Agitate(Vector2 delta)
+    {
+        if (bowl == null || Amount <= 0f) return;
+        particleSurface?.Impulse(new Vector3(delta.x, delta.y, 0f) * 0.018f);
+        Vector3 force = Vector3.ProjectOnPlane(new Vector3(delta.x, delta.y, 0f), bowl.GetInterior().up);
+        slosh = Vector3.ClampMagnitude(slosh + force * 0.003f, bowl.GetInterior().radius * 0.12f);
+        ripple = Mathf.Min(1f, ripple + delta.magnitude * 0.025f);
+    }
 
     /// <summary>기울여 붓는 중인 입구 (월드) - 그쪽 옆면에 소스가 모여 고인다 (Cheesecloth의 붓기). 아니면 null.</summary>
     public Vector3? PourLip { get; set; }

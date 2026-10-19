@@ -210,7 +210,9 @@ public partial class IngredientItem : Carryable
     /// (CookableItem)이 없던 재료면 채소용으로 붙인다. 이미 있으면 아무것도 안 함.</summary>
     public void EnsurePieceGroup()
     {
-        if (CurrentState != State.Cut || GetComponent<FoodPieceGroup>() != null) return;
+        if (GetComponent<FoodPieceGroup>() != null) return;
+        // 썰지 않고 통째로 넣는 재료(완두콩 · 안 찢은 목이버섯)는 통째로 한 조각
+        if (CurrentState != State.Cut && !MakeWholePiece()) return;
         var pieces = new List<Renderer>();
         foreach (Renderer r in GetComponentsInChildren<Renderer>())
             if (r.name.StartsWith("Piece_") && r.GetComponent<MeshFilter>() != null && r.GetComponent<FoodPiece>() == null) pieces.Add(r);
@@ -245,6 +247,23 @@ public partial class IngredientItem : Carryable
             group.Add(fp);
         }
         Debug.Log($"[{ingredientName}] 조각 {pieces.Count}개를 따로 익고 움직이게 함 (팬·냄비에 들어감)");
+    }
+
+    /// <summary>통째로 쓰는 재료(완두콩 · 목이버섯)를 팬에 넣을 때: 겉모양을 조각(Piece_0)
+    /// 하나로 옮겨, 썬 채소처럼 저으면 움직이고 소스 · 열을 받게 한다.</summary>
+    private bool MakeWholePiece()
+    {
+        if (ingredientName != "완두콩" && ingredientName != "목이버섯") return false;
+        if (rend == null) rend = GetComponent<Renderer>();
+        MeshFilter mf = GetComponent<MeshFilter>();
+        if (rend == null || mf == null || mf.sharedMesh == null || !rend.enabled) return false;
+        foreach (Transform t in transform) if (t.name.StartsWith("Piece_")) return false;
+        GameObject piece = new GameObject("Piece_0");
+        piece.transform.SetParent(transform, false);
+        piece.AddComponent<MeshFilter>().sharedMesh = mf.sharedMesh;
+        piece.AddComponent<MeshRenderer>().sharedMaterials = rend.sharedMaterials;
+        rend.enabled = false;
+        return true;
     }
 
     // ---- 밑간 주무르기 ----
@@ -789,6 +808,19 @@ public partial class IngredientItem : Carryable
             yield break;
         }
 
+        // 네모 편으로 써는 재료(양파 4×1 편): 통째 모양 → 네모 조각들
+        if (cutsToFlatSquares && method != CutMethod.Dice)
+        {
+            yield return StartCoroutine(FlatSquaresRoutine(spec, method)); // 네모 편 만들기
+            CurrentState = State.Cut;            // 썬 상태로
+            rend.enabled = false;                // 통째 모양은 숨김
+            isCutting = false;                   // 썰기 끝
+            DropScrap("자투리", OwnColor);        // 끝부분 자투리
+            SupportHandController.Instance?.Hide(); // 받치던 손 뗌
+            ExpandColliderToCoverPieces();       // 조각들을 집을 수 있게
+            yield break;
+        }
+
         if (crescentSlices && (method == CutMethod.Slice || method == CutMethod.Julienne || method == CutMethod.Other))
         {
             yield return StartCoroutine(CrescentRoutine(spec));
@@ -806,6 +838,19 @@ public partial class IngredientItem : Carryable
             rend.enabled = false;
             isCutting = false;
             SupportHandController.Instance?.Hide();
+            yield break;
+        }
+
+        // 다지기: 작은 정육면체 조각들로 (단면이 정사각형)
+        if (method == CutMethod.Dice && MincesToCubes)
+        {
+            yield return StartCoroutine(MinceCubesRoutine(spec));
+            CurrentState = State.Cut;
+            rend.enabled = false;
+            isCutting = false;
+            DropScrap("자투리", OwnColor);
+            SupportHandController.Instance?.Hide();
+            ExpandColliderToCoverPieces();
             yield break;
         }
 

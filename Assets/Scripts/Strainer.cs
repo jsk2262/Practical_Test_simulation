@@ -37,7 +37,11 @@ public partial class Strainer : ToolItem
 
     public void ScoopFrom(MovableBowl vessel)
     {
+        if (SplashIfWetInOil(vessel)) return; // (젖은 체망 → 뜨거운 기름: 기름 튐 · 실격)
+        if (vessel != null && vessel.WaterAmount > 0f) MarkWet();
+        if (vessel != null) scoopedFromOil = vessel.HasFryingOil;
         BeginLocalScoop(vessel);
+        AssistScoop(vessel); // (두부는 두 번에 다 · 기름 속 앙금 조각도)
     }
 
     /// <summary>The pieces spread in the basket (not at the pivot, which is the
@@ -177,7 +181,9 @@ public partial class Strainer : ToolItem
 
         // The water runs off into the bowl underneath...
         drainTimer += Time.deltaTime;
-        if (restingOn.CanHoldWater)
+        // (튀김을 건져 기름을 빼는 중이면 물이 아니라 기름이 떨어진다 - 물로 치면
+        // 그 그릇에 다시 쏟을 때 체망이 젖은 것으로 되어, 다음에 기름을 뜨면 튀었다)
+        if (restingOn.CanHoldWater && !scoopedFromOil)
             restingOn.SetWaterLevel(Mathf.Max(restingOn.WaterAmount, Mathf.Min(0.12f, drainTimer / Mathf.Max(drainSeconds, 0.1f) * 0.12f)));
         // ...and once it's stopped, they're drained.
         if (!drained && drainTimer >= drainSeconds)
@@ -306,6 +312,7 @@ public partial class Strainer : ToolItem
     /// <summary>Cold-water rinse at the sink.</summary>
     public void RinseInColdWater()
     {
+        MarkWet(); // (개수대 찬물에 헹굼)
         foreach (IngredientItem ing in contents)
             ing.GetComponent<CookableItem>()?.ColdShock();
         // (the rinse under the tap is WashBasin's - no hand-washing motion with the strainer in hand)
@@ -314,6 +321,8 @@ public partial class Strainer : ToolItem
     public void DumpInto(MovableBowl bowl)
     {
         if (!HasContents) return;
+        if (SplashIfWetInOil(bowl)) return; // (젖은 체망째 기름에 쏟음: 기름 튐 · 실격)
+        if (bowl.WaterAmount > 0f) MarkWet(); // (데치는 물·찬물에 담금)
 
         foreach (Collider c in contentColliders) if (c != null) c.enabled = true;
         contentColliders.Clear();

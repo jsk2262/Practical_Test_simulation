@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
@@ -90,6 +90,17 @@ public class FryingPanPlating : MonoBehaviour
 
     void OnDisable()
     {
+        HideSauceStream();
+        if (busy)
+        {
+            StopAllCoroutines();
+            pan.SetPourTilt(Quaternion.identity);
+            PanSauce sauce = PanSauce.Of(pan, false);
+            if (sauce != null) sauce.PourLip = null;
+            HandController.Instance?.SetGestureOffset(Vector3.zero);
+            if (HandCarry.Instance != null) HandCarry.Instance.IsLocked = false;
+            positioning = busy = false;
+        }
         foreach (var kv in arrows) if (kv.Value != null) kv.Value.gameObject.SetActive(false);
     }
 
@@ -107,12 +118,20 @@ public class FryingPanPlating : MonoBehaviour
         if (hand != null) hand.IsLocked = true;
         foreach (var kv in arrows) if (kv.Value != null) kv.Value.gameObject.SetActive(false);
 
-        // The hand brings the pan over beside the plate first.
-        Vector3 over = dest.SpotFor(0, 1) + new Vector3(0.9f, 0.6f, 0f);
-        HandController.Instance?.GoTo(new Vector3(over.x, over.y, HandController.Instance.transform.position.z), null);
-        yield return new WaitForSeconds(0.3f);
-
+        HandController hc = HandController.Instance;
+        Vector3 originalOffset = hc != null ? hc.GestureOffset : Vector3.zero;
+        pourReach = originalOffset;
+        pourTarget = dest.SpotFor(0, 1);
+        lipRadius = pan.GetInterior().radius * 0.95f;
+        positioning = true;
+        for (float t = 0f; t < 0.9f; t += Time.deltaTime)
+        {
+            AlignLip(0f);
+            yield return null;
+        }
         yield return Tilt(0f, 1f);
+        PanSauce sourceSauce = PanSauce.Of(pan, false);
+        if (sourceSauce != null) sourceSauce.PourLip = PourLipWorld();
 
         var food = new List<IngredientItem>();
         foreach (Carryable c in pan.Contents) if (c is IngredientItem ing) food.Add(ing);
@@ -143,20 +162,29 @@ public class FryingPanPlating : MonoBehaviour
         }
         const float stagger = 0.012f;
         float total = transferDuration + stagger * PlatedPieces.Count;
+        float pourSauceRate = sourceSauce != null ? sourceSauce.Amount / Mathf.Max(total, 0.01f) : 0f;
         for (float t = 0f; t < total; t += Time.deltaTime)
         {
+            AlignLip(Mathf.Abs(tiltDegrees));
+            if (sourceSauce != null && sourceSauce.Amount > 0f)
+            {
+                sourceSauce.PourLip = PourLipWorld();
+                ShowSauceStream(sourceSauce.Color);
+                PanSauce.Of(dest.Plate, true).Put(sourceSauce.Take(pourSauceRate * Time.deltaTime));
+            }
             float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / transferDuration));
             for (int i = 0; i < food.Count; i++)
                 if (food[i] != null)
-                    food[i].transform.position = Vector3.Lerp(starts[i], ends[i], k) + Vector3.up * Mathf.Sin(k * Mathf.PI) * arcHeight;
+                    food[i].transform.position = SlideToPlate(starts[i], ends[i], k);
             for (int j = 0; j < PlatedPieces.Count; j++)
             {
                 if (PlatedPieces[j] == null) continue;
                 float kj = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((t - j * stagger) / transferDuration));
-                PlatedPieces[j].transform.position = Vector3.Lerp(pieceFrom[j], pieceTo[j], kj) + Vector3.up * Mathf.Sin(kj * Mathf.PI) * arcHeight;
+                PlatedPieces[j].transform.position = SlideToPlate(pieceFrom[j], pieceTo[j], kj);
             }
             yield return null;
         }
+        HideSauceStream();
         MovableBowl plate = dest.Plate;
         // The sauce left in the pan goes over with the food.
         PanSauce.Of(pan, false)?.MoveAllTo(plate);
@@ -180,19 +208,79 @@ public class FryingPanPlating : MonoBehaviour
             Debug.Log($"[담기] {plate.name}: 조각 {PlatedPieces.Count}개 (소스 코팅 {minCoat:0.00}~{maxCoat:0.00})");
         }
 
+        if (sourceSauce != null) sourceSauce.PourLip = null;
         yield return Tilt(1f, 0f);
+        positioning = false;
+        hc?.SetGestureOffset(originalOffset);
         if (hand != null) hand.IsLocked = false;
         busy = false;
         onPlated?.Invoke();
+    }
+
+    private LineRenderer sauceStream;
+    private Material streamMaterial;
+    private void ShowSauceStream(Color color)
+    {
+        if (sauceStream == null)
+        {
+            var go = new GameObject("Plating sauce stream");
+            sauceStream = go.AddComponent<LineRenderer>();
+            streamMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+            streamMaterial.color = color;
+            sauceStream.sharedMaterial = streamMaterial;
+            sauceStream.positionCount = 3;
+            sauceStream.useWorldSpace = true;
+            sauceStream.startWidth = 0.035f;
+            sauceStream.endWidth = 0.045f;
+            sauceStream.numCapVertices = 4;
+            sauceStream.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+        Vector3 lip = PourLipWorld();
+        sauceStream.SetPosition(0, lip);
+        sauceStream.SetPosition(1, Vector3.Lerp(lip, pourTarget, 0.5f));
+        sauceStream.SetPosition(2, pourTarget);
+    }
+    private void HideSauceStream()
+    {
+        if (sauceStream != null) Destroy(sauceStream.gameObject);
+        if (streamMaterial != null) Destroy(streamMaterial);
+        sauceStream = null;
+        streamMaterial = null;
+    }
+    private Vector3 pourReach, pourTarget;
+    private float lipRadius;
+    private bool positioning;
+    private Vector3 PourLipWorld()
+    {
+        float a = Mathf.Abs(tiltDegrees) * Mathf.Deg2Rad;
+        return pan.BodyCenterWorld() + new Vector3(-lipRadius * Mathf.Cos(a), -lipRadius * Mathf.Sin(a), -0.1f);
+    }
+    private void AlignLip(float degrees)
+    {
+        if (HandController.Instance == null) return;
+        float a = degrees * Mathf.Deg2Rad;
+        Vector3 body = pourTarget + new Vector3(lipRadius * Mathf.Cos(a), lipRadius * Mathf.Sin(a) + 0.12f, 0f);
+        Vector3 error = body - pan.BodyCenterWorld();
+        error.z = 0f;
+        pourReach += error * Mathf.Clamp01(Time.deltaTime * 14f);
+        HandController.Instance.SetGestureOffset(pourReach);
+    }
+    private Vector3 SlideToPlate(Vector3 from, Vector3 to, float progress)
+    {
+        // Slide inside the tilted pan, cross its lip, then drop a short distance.
+        Vector3 lip = PourLipWorld();
+        return progress < 0.65f ? Vector3.Lerp(from, lip, progress / 0.65f)
+            : Vector3.Lerp(lip, to, Mathf.Pow((progress - 0.65f) / 0.35f, 2f));
     }
 
     private IEnumerator Tilt(float from, float to)
     {
         for (float t = 0f; t < tiltDuration; t += Time.deltaTime)
         {
-            pan.SetPourTilt(Quaternion.AngleAxis(tiltDegrees * Mathf.Lerp(from, to, Mathf.SmoothStep(0f, 1f, t / tiltDuration)), Vector3.forward));
+            pan.SetPourTilt(Quaternion.AngleAxis(Mathf.Abs(tiltDegrees) * Mathf.Lerp(from, to, Mathf.SmoothStep(0f, 1f, t / tiltDuration)), Vector3.forward));
+            if (positioning) AlignLip(Mathf.Abs(tiltDegrees) * Mathf.Lerp(from, to, Mathf.SmoothStep(0f, 1f, t / tiltDuration)));
             yield return null;
         }
-        pan.SetPourTilt(Quaternion.AngleAxis(tiltDegrees * to, Vector3.forward));
+        pan.SetPourTilt(Quaternion.AngleAxis(Mathf.Abs(tiltDegrees) * to, Vector3.forward));
     }
 }

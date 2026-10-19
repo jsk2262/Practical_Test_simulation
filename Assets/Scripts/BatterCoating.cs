@@ -310,15 +310,7 @@ public class BatterCoating : MonoBehaviour
         Shader lit = Shader.Find("Universal Render Pipeline/Lit");
         coatMat = new Material(lit != null ? lit : Shader.Find("Standard")) { name = "BatterCoat (instance)" };
         coatMat.color = Look.batterColor;
-        // see-through where it's thin (the meat showing under a runny or patchy coat)
-        coatMat.SetFloat("_Surface", 1f);
-        coatMat.SetFloat("_Blend", 0f);
-        coatMat.SetOverrideTag("RenderType", "Transparent");
-        coatMat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        coatMat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        coatMat.SetFloat("_ZWrite", 0f);
-        coatMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-        coatMat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+        // (불투명 - 반투명은 이 화면에서 색이 바랬다. 얇은 곳은 색을 고기 색과 섞어 표현)
         return coatMat;
     }
 
@@ -425,10 +417,15 @@ public class BatterCoating : MonoBehaviour
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             // how much it hides the meat: more batter, better mixed - less when runny
             // fried: going golden brown, and only as much of it as stayed on (Retention)
-            Color col = Fried ? Color.Lerp(look.batterColor, look.friedColor, Mathf.Clamp01(FriedSeconds / Mathf.Max(look.fryBrownSeconds, 0.1f))) : look.batterColor;
+            // 1차 튀김: 하얗게 굳음 → 2차 튀김부터: 노릇하게
+            Color friedTo = FryPasses >= 2 ? look.friedColor : look.firstFryColor; // 몇 번째 튀김인지에 따라 목표 색
+            Color col = Fried ? Color.Lerp(look.batterColor, friedTo, fry) : look.batterColor; // 튀긴 만큼 목표 색으로
             col.a = Mathf.Clamp01(cover * Mathf.Lerp(0.65f, 0.97f, thick) * (stiff <= look.runnyBelow ? 0.75f : 1f) * (Fried ? Mathf.Lerp(0.3f, 1f, Retention) : 1f));
             // (튀겨지며 반죽이 굳어 불투명해진다 - 속 고기가 비치지 않게)
             if (Fried) col.a = Mathf.Lerp(col.a, Mathf.Max(col.a, 0.96f * Retention), fry);
+            // (반투명은 이 화면에서 색이 바래 보여 불투명으로 - 옷이 얇을수록 고기 색이 섞여 비쳐 보이게)
+            col = Color.Lerp(look.meatShowColor, col, Mathf.Sqrt(col.a)); // 덮인 만큼 튀김옷 색 (제곱근: 웬만큼 묻으면 고기가 거의 안 비침)
+            col.a = 1f; // 불투명
             block.Clear();
             block.SetColor("_BaseColor", col);
             block.SetColor("_Color", col);

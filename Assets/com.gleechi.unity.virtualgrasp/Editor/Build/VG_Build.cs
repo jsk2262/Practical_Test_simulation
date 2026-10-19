@@ -24,6 +24,8 @@ namespace VirtualGrasp
 
             public void OnPreprocessBuild(BuildReport report)
             {
+                // Android 전용 설정은 Windows 등 다른 플랫폼 빌드에 적용하지 않는다.
+                if (report.summary.platform != BuildTarget.Android) return;
 
                 if (PlayerSettings.Android.targetArchitectures != AndroidArchitecture.ARM64)
                 {

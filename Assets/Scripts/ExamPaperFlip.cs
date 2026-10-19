@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -34,11 +34,13 @@ public class ExamPaperFlip : MonoBehaviour, IClickable
 
     private Vector3 homePosition;
     private Vector3 homeScale;
+    private Quaternion homeRotation;
 
     void Awake()
     {
         homePosition = transform.position;
         homeScale = transform.localScale;
+        homeRotation = transform.rotation;
         SetFace(false);
     }
 
@@ -52,7 +54,7 @@ public class ExamPaperFlip : MonoBehaviour, IClickable
                 state = ViewState.ZoomedFront;
                 SetFace(false);
                 StopAllCoroutines();
-                StartCoroutine(TweenTo(zoomedPosition, homeScale * zoomedScaleMultiplier));
+                OpenForReading();
                 break;
 
             case ViewState.ZoomedFront:
@@ -64,7 +66,7 @@ public class ExamPaperFlip : MonoBehaviour, IClickable
                 state = ViewState.Small;
                 SetFace(false);
                 StopAllCoroutines();
-                StartCoroutine(TweenTo(homePosition, homeScale));
+                StartCoroutine(TweenTo(homePosition, homeScale, homeRotation));
                 break;
         }
     }
@@ -76,10 +78,32 @@ public class ExamPaperFlip : MonoBehaviour, IClickable
         if (tex != null) paperRenderer.material.mainTexture = tex;
     }
 
-    private IEnumerator TweenTo(Vector3 targetPos, Vector3 targetScale)
+    // 원본 시험지를 카메라 정면에 펼쳐 작은 글씨가 기울어지지 않게 읽는다.
+    private void OpenForReading()
+    {
+        Camera camera = Camera.main;
+        MeshFilter mesh = paperRenderer != null ? paperRenderer.GetComponent<MeshFilter>() : null;
+        if (camera == null || mesh == null || mesh.sharedMesh == null)
+        {
+            StartCoroutine(TweenTo(zoomedPosition, homeScale * zoomedScaleMultiplier, homeRotation));
+            return;
+        }
+        float depth = Mathf.Max(camera.nearClipPlane + 1f, 3f);
+        float height = camera.orthographic ? camera.orthographicSize * 2f
+            : 2f * depth * Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+        Vector3 parentScale = transform.parent != null ? transform.parent.lossyScale : Vector3.one;
+        Vector3 size = Vector3.Scale(mesh.sharedMesh.bounds.size, Vector3.Scale(homeScale, parentScale));
+        float factor = Mathf.Min(height * 0.92f / Mathf.Max(Mathf.Abs(size.y), 0.001f),
+            height * camera.aspect * 0.92f / Mathf.Max(Mathf.Abs(size.x), 0.001f));
+        Vector3 at = camera.ViewportToWorldPoint(new Vector3(0.5f, 0.5f, depth));
+        StartCoroutine(TweenTo(at, homeScale * factor, camera.transform.rotation));
+    }
+
+    private IEnumerator TweenTo(Vector3 targetPos, Vector3 targetScale, Quaternion targetRotation)
     {
         Vector3 startPos = transform.position;
         Vector3 startScale = transform.localScale;
+        Quaternion startRotation = transform.rotation;
         float t = 0f;
 
         while (t < tweenDuration)
@@ -89,10 +113,12 @@ public class ExamPaperFlip : MonoBehaviour, IClickable
             e = e * e * (3f - 2f * e);
             transform.position = Vector3.Lerp(startPos, targetPos, e);
             transform.localScale = Vector3.Lerp(startScale, targetScale, e);
+            transform.rotation = Quaternion.Slerp(startRotation, targetRotation, e);
             yield return null;
         }
 
         transform.position = targetPos;
         transform.localScale = targetScale;
+        transform.rotation = targetRotation;
     }
 }

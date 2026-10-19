@@ -67,7 +67,8 @@ public class WashBasin : Interactable
             HandCarry.Instance.PlaceAtAnchor(transform);
             towel.CurrentContainer = null;
         }
-        else if (hand?.Current is MovableBowl starchBowl && starchBowl.GetComponent<PortionedCondiment>() is PortionedCondiment starch
+        else if (!CleanupMode.IsOn // (정리 때는 윗물 따르기 말고 설거지로)
+                 && hand?.Current is MovableBowl starchBowl && starchBowl.GetComponent<PortionedCondiment>() is PortionedCondiment starch
                  && starch.TryDrain())
         {
             // 앙금녹말: the clear water over the settled starch poured off into
@@ -159,6 +160,10 @@ public class WashBasin : Interactable
         HandCarry hand = HandCarry.Instance;
         HandController hc = HandController.Instance;
         if (hand != null) hand.IsLocked = true;
+        // (클릭 처리(Interactable.OnClicked)가 이 뒤에 손을 개수대 기본 자리로 보낸다 -
+        // 한 프레임 기다렸다가 손을 옮겨야 덮어쓰이지 않는다. 손잡이 팬은 몸통이 손에서
+        // 멀어서, 덮어쓰이면 개수대 밖에서 씻겼다)
+        yield return null;
         WaterTap t = Tap;
         bool wasOn = t != null && t.IsOn;
 
@@ -211,6 +216,8 @@ public class WashBasin : Interactable
         item.SetHoldTurn(baseTurn);
         if (!wasOn) t?.SetRunning(false);
         SupportHandController.Instance?.Hide();
+        // 다 씻은 그릇은 헹군 물을 따라 버린 상태로 (물이 남아 있으면 거기에 튀김을 쏟을 때 체망이 젖은 것으로 되어 기름이 튀었다)
+        if (item is MovableBowl washedDish && washedDish.IsPlateOrBowl) washedDish.SetWaterLevel(0f); // 헹군 물 비우기
         done?.Invoke();
         if (hand != null) hand.IsLocked = false;
         washing = false;
