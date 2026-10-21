@@ -37,9 +37,76 @@ public class FoodPiece : MonoBehaviour
         if (wholeScale.x < 0f) wholeScale = transform.localScale;
         float was = Damage;
         Damage = Mathf.Min(1f, Damage + amount);
-        // worn smaller and a little flattened as it breaks
-        transform.localScale = Vector3.Scale(wholeScale, new Vector3(1f - 0.2f * Damage, 1f - 0.35f * Damage, 1f - 0.2f * Damage));
+        ApplyScale(); // 부서진 만큼 작아지고 납작해짐
         if (was < 0.5f && Damage >= 0.5f) Debug.Log($"[{SourceName}] 조각이 부서지기 시작함 (손상 {Damage:0.00})");
+    }
+
+    /// <summary>너무 익은 정도 (0 .. 1): 데친 물에 너무 오래 둔 두부 - 줄어들고
+    /// 표면에 구멍이 숭숭 난다 (CookableItem.OvercookAt). 되돌아가지 않는다.</summary>
+    public float Overcook { get; private set; }
+    private bool shownRough; // 구멍 난 표면을 이미 입혔는지
+
+    public void SetOvercook(float amount)
+    {
+        if (amount <= Overcook) return; // 더 익지 않았으면 할 일 없음 (줄어든 게 되돌아가지 않음)
+        if (wholeScale.x < 0f) wholeScale = transform.localScale; // 처음 크기를 기억
+        Overcook = amount; // 너무 익은 정도 갱신
+        ApplyScale(); // 너무 익은 만큼 줄어듦
+        if (!shownRough && Overcook >= 0.35f) ShowRough(); // 어느 정도 넘으면 표면을 구멍 난 것으로 바꿈
+    }
+
+    /// <summary>부서짐(Damage)과 너무 익음(Overcook)을 합친 크기.</summary>
+    private void ApplyScale()
+    {
+        Vector3 worn = new Vector3(1f - 0.2f * Damage, 1f - 0.35f * Damage, 1f - 0.2f * Damage); // 부서지면 작아지고 납작해짐
+        transform.localScale = Vector3.Scale(wholeScale, worn) * (1f - 0.15f * Overcook); // 너무 익으면 15%까지 쪼그라듦
+    }
+
+    private void ShowRough()
+    {
+        if (rend == null) rend = GetComponent<Renderer>(); // 렌더러 캐시
+        if (rend == null) return; // 그릴 것이 없으면 끝
+        block ??= new MaterialPropertyBlock(); // 조각마다 따로 쓰는 재질 값
+        rend.GetPropertyBlock(block); // 지금 색 설정은 그대로 두고
+        block.SetTexture("_BaseMap", PoreTexture); // 구멍 숭숭 난 표면 (URP Lit)
+        block.SetTexture("_MainTex", PoreTexture); // (다른 셰이더용)
+        rend.SetPropertyBlock(block); // 적용
+        shownRough = true; // 한 번만
+        Debug.Log($"[{SourceName}] 너무 익음: 조각이 줄어들고 표면에 구멍이 생김"); // 확인용 기록
+    }
+
+    private static Texture2D poreTexture; // 모든 조각이 함께 쓰는 구멍 난 표면 (처음 한 번만 만듦)
+    private static Texture2D PoreTexture
+    {
+        get
+        {
+            if (poreTexture != null) return poreTexture; // 이미 만들었으면 재사용
+            const int size = 128; // 텍스처 크기
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true) { name = "T_TofuPores", wrapMode = TextureWrapMode.Repeat }; // 반복되는 표면
+            var px = new Color[size * size]; // 픽셀 값
+            var rnd = new System.Random(7); // 매번 같은 무늬
+            for (int i = 0; i < px.Length; i++)
+            {
+                float v = 0.8f + (float)rnd.NextDouble() * 0.12f; // 거칠고 얼룩진 바탕
+                px[i] = new Color(v, v * 0.97f, v * 0.9f, 1f); // 누런 기
+            }
+            for (int n = 0; n < 70; n++) // 구멍 70개
+            {
+                int cx = rnd.Next(size), cy = rnd.Next(size); // 구멍 위치
+                float r = 1.5f + (float)rnd.NextDouble() * 3.5f; // 구멍 크기
+                for (int y = -6; y <= 6; y++)
+                    for (int x = -6; x <= 6; x++)
+                    {
+                        float d = Mathf.Sqrt(x * x + y * y) / r; // 구멍 중심에서 거리
+                        if (d > 1f) continue; // 구멍 밖
+                        int i = ((cy + y + size) % size) * size + (cx + x + size) % size; // 가장자리는 반대편으로 이어짐
+                        px[i] *= Mathf.Lerp(0.35f, 0.85f, d * d); // 가운데일수록 어둡게 (패인 구멍)
+                    }
+            }
+            tex.SetPixels(px); // 픽셀 넣기
+            tex.Apply(true, true); // GPU로 올리고 CPU 사본은 버림
+            return poreTexture = tex; // 캐시
+        }
     }
 
     /// <summary>About half its size (world) - how close it comes to walls and other pieces.</summary>
@@ -96,6 +163,9 @@ public class FoodPiece : MonoBehaviour
         HalfSize = o.HalfSize;
         Radius = o.Radius; Sear = o.Sear; Char = o.Char; PanCooked = o.PanCooked; Temp = o.Temp;
         Damage = o.Damage; SearBrown = o.SearBrown; CharBlack = o.CharBlack;
+        if (o.shownRough) ShowRough(); // 너무 익은 표면도 이어받음 (크기는 복제된 그대로)
+        Overcook = o.Overcook; // 너무 익은 정도 이어받음
+        wholeScale = o.wholeScale; // 원래 크기도 이어받아 두 번 줄어들지 않게
         seed = o.seed;
     }
 
@@ -209,6 +279,8 @@ public class FoodPieceGroup : MonoBehaviour
     [Tooltip("Buoyancy against gravity when raw (1 = hovers) and once cooked (more = floats higher).")]
     [SerializeField] private float rawBuoyancy = 1.0f;
     [SerializeField] private float cookedBuoyancy = 1.6f;
+    [Tooltip("다 데쳐지면 떠오르는 재료(두부)가 그 전까지 받는 부력 (1보다 작으면 가라앉음).")]
+    [SerializeField] private float sinkBuoyancy = 0.6f; // 생두부는 물보다 조금 무거워 가라앉는다
     [Tooltip("How hard the boiling water pushes the pieces around.")]
     [SerializeField] private float flowStrength = 0.9f;
     [SerializeField] private float swirl = 0.3f;
@@ -345,8 +417,12 @@ public class FoodPieceGroup : MonoBehaviour
         if (simBowl != null) Step(Mathf.Min(Time.deltaTime, 0.05f));
 
         Color rawRef = cookable != null ? cookable.ColorAt(0f) : Color.white;
+        bool rough = cookable != null && cookable.RoughWhenOvercooked; // 너무 익은 모습을 보이는 재료인지
         foreach (FoodPiece p in Pieces)
+        {
             p.Show(p.PanCooked ? PanColor(p) : cookable != null ? cookable.ColorAt(p.Cook) : Color.white, rawRef);
+            if (rough) p.SetOvercook(cookable.OvercookAt(p.Cook)); // 너무 익은 만큼 줄어들고 표면이 거칠어짐
+        }
     }
 
     /// <summary>In a pan/wok/oil (not in water): there's a pan's heat to cook by.</summary>
@@ -521,7 +597,9 @@ public class FoodPieceGroup : MonoBehaviour
                 if (inside.liquid)
                 {
                     float sub = Mathf.Clamp01((inside.surface - (p.simPos.y - p.Radius)) / (2f * p.Radius));
-                    float buoy = Mathf.Lerp(rawBuoyancy, cookedBuoyancy, Mathf.Clamp01(p.Cook / ttc));
+                    float buoy = cookable != null && cookable.FloatsWhenDone // 두부: 가라앉아 있다가 다 데쳐지면 떠오름
+                        ? (p.Cook >= ttc ? cookedBuoyancy : sinkBuoyancy) // 다 데쳐지기 전엔 바닥 쪽, 다 데쳐지면 수면으로
+                        : Mathf.Lerp(rawBuoyancy, cookedBuoyancy, Mathf.Clamp01(p.Cook / ttc)); // 그 외 재료는 예전 그대로
                     a.y += gravity * buoy * sub;
                     if (sub > 0f)
                     {

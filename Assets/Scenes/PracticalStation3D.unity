@@ -21232,13 +21232,14 @@ MonoBehaviour:
   shakeThreshold: 300
   requiredFryPasses: 2
   timeToOvercooked: 360
-  overcookFadeSeconds: 12
+  overcookFadeSeconds: 40
   doneColor: {r: 0.98, g: 0.96, b: 0.9, a: 1}
-  overcookedColor: {r: 0.86, g: 0.84, b: 0.78, a: 1}
+  overcookedColor: {r: 0.88, g: 0.82, b: 0.66, a: 1}
   panCookedColor: {r: 0, g: 0, b: 0, a: 0}
   searColor: {r: 0, g: 0, b: 0, a: 0}
   charColor: {r: 0, g: 0, b: 0, a: 0}
   floatsWhenDone: 1
+  roughWhenOvercooked: 1
 --- !u!1 &1712166210
 GameObject:
   m_ObjectHideFlags: 0

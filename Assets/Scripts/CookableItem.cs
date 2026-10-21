@@ -64,6 +64,15 @@ public class CookableItem : MonoBehaviour
     /// <summary>Lies low in the pot while it blanches and comes up to the
     /// surface once done (두부: about 2 minutes in the boiling water, then it floats).</summary>
     [SerializeField] private bool floatsWhenDone;
+    public bool FloatsWhenDone => floatsWhenDone; // 썬 조각도 다 데쳐질 때까지 가라앉아 있게 한다 (FoodPieceGroup)
+
+    [Tooltip("너무 익으면 썬 조각이 줄어들고 표면에 구멍이 숭숭 난다 (두부).")]
+    [SerializeField] private bool roughWhenOvercooked; // 너무 익은 모습을 보일 재료인지
+    public bool RoughWhenOvercooked => roughWhenOvercooked; // 조각 쪽에서 읽는다
+
+    /// <summary>너무 익은 정도 0..1 - 색이 overcookedColor로 바뀌는 구간과 같다.</summary>
+    public float OvercookAt(float progress) =>
+        CanOvercook ? Mathf.InverseLerp(Mathf.Max(timeToCooked, timeToOvercooked - overcookFadeSeconds), timeToOvercooked, progress) : 0f; // 색 변화 구간에서 0 → 1
 
     /// <summary>Where it sits in water, as a fraction of its half height above
     /// the surface (MovableBowl.SinkIntoWater): mostly under while raw/cooking
