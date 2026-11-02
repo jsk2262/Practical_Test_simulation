@@ -90,7 +90,7 @@ public class ContextControlHint : MonoBehaviour
         }
         if (bowl != null && !bowl.IsCookingVessel && ShowMix(bowl, false)) return;
         if (target != null && target.GetComponentInParent<BurnerGratePart>() != null)
-        { SetHint(CleanupMode.IsOn ? "받침을 꾹 누르면 들어요 · 불을 끄고 냄비를 먼저 내려주세요" : "화구 받침을 옮기려면 정리를 켜세요"); return; }
+        { SetHint(CleanupMode.IsOn ? "받침을 꾹 누르면 들어요 · 불을 끄고 냄비를 먼저 내려주세요" : "화구 받침을 옮기려면 <color=#FF5A5A>정리</color>를 켜세요"); return; } // 누를 버튼 이름만 붉게
         if (target != null && target.GetComponentInParent<StoveKnob>() != null)
         { SetHint("클릭할 때마다 불 세기가 바뀌어요 · 끔 → 강 → 중 → 약 → 끔"); return; }
         if (bowl != null)
@@ -98,7 +98,7 @@ public class ContextControlHint : MonoBehaviour
             if (bowl.IsDish && !CleanupMode.IsOn && !bowl.WouldPickUp) // 이동이 막힌 접시는 정리 모드를 안내한다.
                 SetHint("접시를 옮기려면 <color=#FF5A5A>정리</color> 버튼을 눌러 초록색으로 켠 뒤 접시를 클릭하세요"); // 누를 버튼 이름만 붉게
             else if (bowl.IsDish && CleanupMode.IsOn && bowl.HasIngredients) // 재료가 남아 있으면 먼저 꺼내야 한다.
-                SetHint("정리가 켜졌어요 · 접시의 재료를 먼저 꺼낸 뒤 접시를 클릭하세요");
+                SetHint("<color=#FF5A5A>정리</color>가 켜졌어요 · 접시의 재료를 먼저 꺼낸 뒤 접시를 클릭하세요"); // 켜진 버튼 이름만 붉게
             else if (bowl.IsDish) // 이동 가능한 접시는 짧게 클릭해 집는다.
                 SetHint("접시를 클릭하면 집어 들어요 · 놓을 곳을 클릭하세요");
             else SetHint("그릇을 꾹 누르면 집어 들어요"); // 냄비와 일반 그릇의 조작은 유지한다.
