@@ -1193,6 +1193,7 @@ public partial class IngredientItem : Carryable
     {
         public Transform rig;
         public float L, d, t;
+        public float pieceL, pieceW; // 조각 한 개의 규격 길이 · 폭 (두께는 t)
         public readonly List<Transform> stack = new List<Transform>();
         public float[] cutX;          // cutX[i]: between piece i-1 and piece i
         public float rightEdge;       // where the stack ends on the right
@@ -1220,7 +1221,16 @@ public partial class IngredientItem : Carryable
         float[] dims = { Mathf.Abs(ms.x * ls.x), Mathf.Abs(ms.y * ls.y), Mathf.Abs(ms.z * ls.z) };
         System.Array.Sort(dims);
         var job = new SliceJob { L = dims[2], d = dims[1] };
-        job.t = Mathf.Max((spec.thicknessCm > 0f ? spec.thicknessCm : ReferenceThicknessCm(method)) * worldPerCm, 0.008f);
+        // 조각 한 개의 규격: 가장 긴 값이 길이, 가장 짧은 값이 두께 - 4 · 1 · 1 을 어느
+        // 칸에 적든 같은 조각이 나온다 (고기 채썰기가 규격을 읽는 방식과 같다). 재료
+        // 자체의 굵기가 아니라 규격이 조각 크기를 정한다 (양파 4 x 1 편과 같은 방식).
+        float lenCm = Mathf.Max(spec.widthCm, Mathf.Max(spec.lengthCm, spec.thicknessCm));  // 가장 긴 값 = 길이
+        float thinCm = Mathf.Min(spec.widthCm, Mathf.Min(spec.lengthCm, spec.thicknessCm)); // 가장 짧은 값 = 두께
+        float midCm = spec.widthCm + spec.lengthCm + spec.thicknessCm - lenCm - thinCm;     // 남은 값 = 폭
+        if (lenCm <= 0f) { lenCm = 4f; midCm = 1f; thinCm = ReferenceThicknessCm(method); } // 규격을 안 적었을 때
+        job.pieceL = lenCm * worldPerCm;                                                    // 조각 길이
+        job.pieceW = Mathf.Max(midCm, 0.1f) * worldPerCm;                                   // 조각 폭
+        job.t = Mathf.Max(Mathf.Max(thinCm, 0.1f) * worldPerCm, 0.008f);                    // 조각 두께 = 칼이 들어가는 간격
 
         // Room on the board for it and its fan of slices to the right.
         Vector3 center = VisibleBounds.center;
@@ -1263,7 +1273,7 @@ public partial class IngredientItem : Carryable
         switch (sliceStyle)
         {
             case SliceStyle.CucumberDiagonal:
-                yield return CucumberPrep(job, method == CutMethod.DiagonalCut ? 45f : 0f, handBase, handCtl, knife);
+                yield return CucumberPrep(job, method == CutMethod.DiagonalCut ? 20f : 0f, handBase, handCtl, knife); // 살짝 어슷 (45도는 너무 비스듬했다)
                 break;
             case SliceStyle.CarrotPlank:
                 yield return CarrotPrep(job, handBase, handCtl, knife);
@@ -1291,9 +1301,9 @@ public partial class IngredientItem : Carryable
             s.gameObject.AddComponent<CutResultPiece>().Init(ingredientName, AppliedCut, spec);
         }
         Destroy(job.rig.gameObject);
-        ShrinkPieces(0.85f);
+        // (조각을 규격대로 만들므로 더 줄이지 않는다 - 줄이면 4 x 1 x 1 이 어긋난다)
         FitColliderToVisible();
-        Debug.Log($"{ingredientName}: {CutMethodName(method)} 완료 ({job.stack.Count}조각, {job.t / worldPerCm:0.0} cm)");
+        Debug.Log($"{ingredientName}: {CutMethodName(method)} 완료 ({job.stack.Count}조각, {job.pieceL / worldPerCm:0.0} x {job.pieceW / worldPerCm:0.0} x {job.t / worldPerCm:0.0} cm)");
     }
 
     /// <summary>오이: two strokes along it take the outer part off (skin side,
@@ -1323,13 +1333,14 @@ public partial class IngredientItem : Carryable
         if (angle != 0f) yield return Turn1(body, Quaternion.identity, Quaternion.AngleAxis(angle, Vector3.up), 0.5f * diceSlowness);
         Destroy(body.gameObject);
 
-        // The slices it's about to become: the cut face (y-z) stretched along
-        // the diagonal, side by side across the turned cucumber.
+        // The slices it's about to become, side by side across the turned
+        // cucumber - 규격대로 반원 단면이 길이(Z) x 폭(Y), 두께는 X.
         float rad = angle * Mathf.Deg2Rad;
-        float stretch = 1f / Mathf.Max(Mathf.Cos(rad), 0.2f);
-        float span = job.L * Mathf.Cos(rad);
-        int n = Mathf.Clamp(Mathf.RoundToInt(span / job.t), 4, 12);
-        float step = span / n, thick = Mathf.Min(job.t, step * 0.9f);
+        float pr = job.pieceL * 0.5f;                   // 반원의 반지름 = 조각 길이의 반
+        float rise = job.pieceW / Mathf.Max(pr, 1e-4f); // 반원 높이(=반지름)를 조각 폭에 맞춰 누른다
+        int n = Mathf.Clamp(Mathf.RoundToInt(job.L * Mathf.Cos(rad) / job.t), 2, 12); // 규격 두께로 몇 조각인지
+        float step = job.t * 1.04f;                     // 칼금이 보이게 조각 사이를 머리카락만큼 띄운다
+        float span = n * step;                          // 조각들이 늘어서는 전체 길이
         job.cutX = new float[n];
         for (int i = 0; i < n; i++)
         {
@@ -1338,13 +1349,13 @@ public partial class IngredientItem : Carryable
             var s = new GameObject($"Piece_{i}").transform;
             s.SetParent(job.rig, false);
             s.localPosition = new Vector3(x, 0f, -x * Mathf.Tan(rad));
-            s.localScale = new Vector3(1f, 1f, stretch);
-            s.gameObject.AddComponent<MeshFilter>().sharedMesh = DiscSliceMesh(r, thick, 0.12f, 0.45f, 16);
+            s.localScale = new Vector3(1f, rise, 1f);
+            s.gameObject.AddComponent<MeshFilter>().sharedMesh = DiscSliceMesh(pr, job.t, 0.12f, 0.45f, 16);
             s.gameObject.AddComponent<MeshRenderer>().sharedMaterials = new[] { new Material(flesh), new Material(skin), new Material(core) };
             job.stack.Add(s);
         }
-        job.rightEdge = span * 0.5f + r;
-        job.fanStep = Mathf.Max(thick * 0.9f, 0.018f); // (overlapping, gathered like slices set out on a plate)
+        job.rightEdge = span * 0.5f + pr;
+        job.fanStep = Mathf.Max(job.t * 0.9f, 0.018f); // (overlapping, gathered like slices set out on a plate)
         job.lean = -65f;
         job.restY = s => 0f;
     }
@@ -1372,23 +1383,23 @@ public partial class IngredientItem : Carryable
         DropScrap("자투리", orange.color);
 
         // laid down on a cut side
-        float ww = w - 2f * trim;
         yield return Turn1(body.transform, Quaternion.identity, Quaternion.AngleAxis(90f, Vector3.right), 0.5f * diceSlowness);
         Destroy(body);
 
-        float lyingH = ww, lyingW = h;
-        int n = Mathf.Clamp(Mathf.RoundToInt(job.L / job.t), 4, 12);
-        float step = job.L / n, thick = Mathf.Min(job.t, step * 0.9f);
+        // 조각은 규격대로: 두께(X) x 길이(Y, 세워 둔 높이) x 폭(Z).
+        int n = Mathf.Clamp(Mathf.RoundToInt(job.L / job.t), 2, 12); // 규격 두께로 몇 조각인지
+        float step = job.t * 1.04f;                                 // 칼금이 보이게 조각 사이를 머리카락만큼 띄운다
+        float span = n * step;                                      // 조각들이 늘어서는 전체 길이
         job.cutX = new float[n];
         for (int i = 0; i < n; i++)
         {
-            float x = -job.L * 0.5f + step * (i + 0.5f);
-            job.cutX[i] = -job.L * 0.5f + step * i;
-            GameObject s = Block(job.rig, $"Piece_{i}", new Vector3(x, lyingH * 0.5f, 0f), new Vector3(thick, lyingH, lyingW), new Material(orange));
+            float x = -span * 0.5f + step * (i + 0.5f);
+            job.cutX[i] = -span * 0.5f + step * i;
+            GameObject s = Block(job.rig, $"Piece_{i}", new Vector3(x, job.pieceL * 0.5f, 0f), new Vector3(job.t, job.pieceL, job.pieceW), new Material(orange));
             job.stack.Add(s.transform);
         }
-        job.rightEdge = job.L * 0.5f;
-        job.fanStep = Mathf.Max(thick * 0.9f, 0.018f); // (overlapping, gathered like slices set out on a plate)
+        job.rightEdge = span * 0.5f;
+        job.fanStep = Mathf.Max(job.t * 0.9f, 0.018f); // (overlapping, gathered like slices set out on a plate)
         job.lean = -76f;
         float a = 76f * Mathf.Deg2Rad;
         job.restY = s => Mathf.Sin(a) * s.localScale.x * 0.5f + Mathf.Cos(a) * s.localScale.y * 0.5f;
@@ -1520,16 +1531,17 @@ public partial class IngredientItem : Carryable
         Destroy(pivot.gameObject);
 
         yield return DiceChop(job.rig, handBase, 0f, handCtl, knife);
+        float spread = job.pieceW * 1.08f / Mathf.Max(sw, 1e-4f); // 조각이 굵어진 만큼 줄 간격도 벌린다 (8%는 조각 사이 칼금)
         int n = 0;
         foreach (Transform b in boxes)
         {
-            Vector3 s = b.localScale, p = b.localPosition;
+            Vector3 p = b.localPosition;
             Material m = b.GetComponent<Renderer>().sharedMaterial;
-            float half = s.x * 0.5f;
             foreach (float side in new[] { -1f, 1f })
             {
-                GameObject piece = Block(job.rig, $"Piece_{n++}", new Vector3(p.x + side * (half * 0.5f + 0.004f), p.y, p.z),
-                    new Vector3(half * 0.97f, s.y, s.z), m);
+                // 조각은 규격대로: 길이(X) x 두께(Y) x 폭(Z)
+                GameObject piece = Block(job.rig, $"Piece_{n++}", new Vector3(p.x + side * (job.pieceL * 0.5f + 0.004f), job.t * 0.5f, p.z * spread),
+                    new Vector3(job.pieceL, job.t, job.pieceW), m);
                 piece.transform.localRotation = Quaternion.AngleAxis(Random.Range(-4f, 4f), Vector3.up);
                 job.stack.Add(piece.transform);
             }
