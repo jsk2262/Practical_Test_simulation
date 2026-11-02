@@ -404,11 +404,13 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
         Vector3 ps = transform.parent.lossyScale;
         a.localScale = new Vector3(1f / Mathf.Max(ps.x, 1e-4f), 1f / Mathf.Max(ps.y, 1e-4f), 1f / Mathf.Max(ps.z, 1e-4f));
 
-        if (Vector3.Dot(Carryable.CounterUp, Vector3.up) > 0.999f && TryGetComponent(out Renderer surface)) // 수평 도마: 도마 앞쪽 조리대 위에 눕혀 둔다
+        if (Vector3.Dot(Carryable.CounterUp, Vector3.up) > 0.999f && TryGetComponent(out Renderer surface)) // 수평 도마: 도마 윗면에 눕혀 둔다
         {
             Bounds face = surface.bounds; // 도마의 보이는 상자
-            // 화면 아래쪽(카메라 쪽) = 월드 +Z. 도마 앞 가장자리 바로 밖, 도마가 얹힌 면 높이에 놓는다.
-            Vector3 rest = new Vector3(face.center.x, face.min.y + halfHeight + 0.02f, face.max.z + 0.30f);
+            // 도마 '윗면'의 앞쪽(화면 아래쪽 = 월드 +Z)에 얹는다. 앞턱 바깥(+0.30)에 두었더니
+            // 조리대 윗면 콜라이더가 거기까지 없어서 칼이 허공에 떠 보였다. 안쪽으로 0.30 들여
+            // 칼 깊이의 반(약 0.28)이 도마 안에 들어오게 하고, 뒤쪽은 칼질 자리로 비워 둔다.
+            Vector3 rest = new Vector3(face.center.x, face.max.y + halfHeight + 0.02f, face.max.z - 0.30f);
             a.position = rest - bodyOffset;
             anchorOffset = a.position - transform.position;
 
@@ -418,7 +420,7 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
                 tool.transform.localPosition = Vector3.zero;
                 tool.transform.rotation = tool.RestingRotation;
                 Bounds shown = WholeBounds(tool); // 눕힌 자세로 다시 잰 칼 전체
-                a.position += new Vector3(rest.x - shown.center.x, face.min.y + shown.extents.y + 0.02f - shown.center.y, rest.z - shown.center.z);
+                a.position += new Vector3(rest.x - shown.center.x, face.max.y + shown.extents.y + 0.02f - shown.center.y, rest.z - shown.center.z); // 밑면이 도마 윗면에 닿게
                 anchorOffset = a.position - transform.position;
             }
             return;

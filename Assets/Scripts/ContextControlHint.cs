@@ -96,7 +96,7 @@ public class ContextControlHint : MonoBehaviour
         if (bowl != null)
         {
             if (bowl.IsDish && !CleanupMode.IsOn && !bowl.WouldPickUp) // 이동이 막힌 접시는 정리 모드를 안내한다.
-                SetHint("접시를 옮기려면 정리 버튼을 눌러 초록색으로 켠 뒤 접시를 클릭하세요");
+                SetHint("접시를 옮기려면 <color=#FF5A5A>정리</color> 버튼을 눌러 초록색으로 켠 뒤 접시를 클릭하세요"); // 누를 버튼 이름만 붉게
             else if (bowl.IsDish && CleanupMode.IsOn && bowl.HasIngredients) // 재료가 남아 있으면 먼저 꺼내야 한다.
                 SetHint("정리가 켜졌어요 · 접시의 재료를 먼저 꺼낸 뒤 접시를 클릭하세요");
             else if (bowl.IsDish) // 이동 가능한 접시는 짧게 클릭해 집는다.
@@ -142,7 +142,7 @@ public class ContextControlHint : MonoBehaviour
         GUI.color = new Color(0.06f, 0.10f, 0.14f, 0.94f);
         GUI.DrawTexture(box, Texture2D.whiteTexture);
         GUI.color = Color.white;
-        if (textStyle == null) textStyle = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = true };
+        if (textStyle == null) textStyle = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = true, richText = true }; // 문구 안에서 <color> 태그를 쓰려고
         textStyle.fontSize = Mathf.RoundToInt(19f * scale);
         textStyle.normal.textColor = Color.Lerp(new Color(1f,0.85f,0.3f), Color.white,
             Mathf.Clamp01((Time.unscaledTime - changedAt) / 0.7f));

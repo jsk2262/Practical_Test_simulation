@@ -73,8 +73,8 @@ public class ChecklistManager : MonoBehaviour
         Do(s, "탕) 앙금녹말", StarchSlurryReady);                                       // 전분물을 저었음
         Do(s, "고기 키친타올", () => Drained("돼지등심") && Drained("돼지고기"));         // 등심 · 다진고기 핏물 제거 (한 줄로 합침)
         Do(s, "탕) 달걀 따로", EggMoved);                                               // 달걀 옮김
-        Do(s, "탕) 목이버섯 불리기", () => Soaking("목이버섯"));                         // 불리는 중 이상
-        Do(s, "탕) 냄비 물 올리기", WaterPotOnFire);                                    // 물 냄비가 켠 불 위에
+        Do(s, "탕) 버섯 불리기", () => Soaking("목이버섯"));                             // 불리는 중 이상 (한 줄에 들어가게 '목이' 생략)
+        Do(s, "탕) 물 올리기", WaterPotOnFire);                                         // 물 냄비가 켠 불 위에 (한 줄에 들어가게 '냄비' 생략)
 
         s = Add("4. 채소 · 데치기");                                                   // 썰기 · 데치기
         Do(s, "탕) 야채 썰기", () => AllCut("대파") && AllCut("양파") && AllCut("오이")  // 탕수육 채소
@@ -99,7 +99,7 @@ public class ChecklistManager : MonoBehaviour
         Do(s, "마) 마파두부 완성", () => OnPlate("두부", false));                        // 담는 접시에 담김
 
         s = Add("8. 정리 · 청소");                                                     // 마무리
-        Do(s, "제출 후 정리와 청소", () => OnPlate("돼지등심", true) && OnPlate("두부", true) && TidiedUp()); // 둘 다 제출하고 뒷정리까지
+        Do(s, "제출 · 정리", () => OnPlate("돼지등심", true) && OnPlate("두부", true) && TidiedUp()); // 둘 다 제출하고 뒷정리까지
     }
 
     private Stage Add(string title) { var s = new Stage { title = title }; stages.Add(s); return s; } // 단계 추가
