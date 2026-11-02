@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
@@ -76,9 +76,10 @@ public class PlanStepCard : MonoBehaviour, IDraggable, IClickable
         if (!isDragging || cam == null || Mouse.current == null) return;
 
         Vector2 screenPos = Mouse.current.position.ReadValue();
-        float depth = transform.position.z - cam.transform.position.z;
-        Vector3 world = cam.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, depth));
-        transform.position = new Vector3(world.x, world.y, transform.position.z);
+        Ray ray = cam.ScreenPointToRay(screenPos); // 화면 위치를 레이로 바꾼다.
+        Plane plane = new Plane(transform.parent.forward, transform.position); // 순서도와 평행한 평면
+        if (plane.Raycast(ray, out float distance)) // 회전된 화면에서도 교차점을 구한다.
+            transform.position = ray.GetPoint(distance); // 카드 깊이를 유지하며 이동한다.
     }
 
     public void OnDragEnd()

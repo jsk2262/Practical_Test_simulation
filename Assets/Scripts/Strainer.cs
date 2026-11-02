@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -37,7 +37,11 @@ public partial class Strainer : ToolItem
 
     public void ScoopFrom(MovableBowl vessel)
     {
+        if (SplashIfWetInOil(vessel)) return; // (젖은 체망 → 뜨거운 기름: 기름 튐 · 실격)
+        if (vessel != null && vessel.WaterAmount > 0f) MarkWet();
+        if (vessel != null) scoopedFromOil = vessel.HasFryingOil;
         BeginLocalScoop(vessel);
+        AssistScoop(vessel); // (두부는 두 번에 다 · 기름 속 앙금 조각도)
     }
 
     /// <summary>The pieces spread in the basket (not at the pivot, which is the
@@ -46,18 +50,23 @@ public partial class Strainer : ToolItem
     {
         Vector3 basket = BasketCenterWorld(out float radius);
         float spread = Mathf.Min(contentSpread, radius * 0.35f);
+        Vector3 up = Carryable.CounterUp;
+        Vector3 right = Vector3.ProjectOnPlane(Vector3.right, up).normalized;
+        Vector3 back = Vector3.Cross(right, up).normalized;
         for (int i = 0; i < contents.Count; i++)
         {
             float angle = i * 2.4f; // golden-angle spiral: evenly spread, no overlap
-            Vector3 offset = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * (spread * Mathf.Sqrt(i));
+            Vector3 offset = (right * Mathf.Cos(angle) + back * Mathf.Sin(angle)) * Mathf.Min(spread * Mathf.Sqrt(i), radius * 0.6f);
             IngredientItem ing = contents[i];
+            if (ing == null) continue;
+            HandCarry.ResetToBaseScale(ing);
             // cut pieces (the diced tofu) heaped to fit the basket, the heap - not
             // the ingredient's pivot - in the middle of it
             ing.GatherPieces(radius * 0.75f);
-            Vector3 target = basket + offset + new Vector3(0f, 0f, -0.05f);
-            ing.transform.position = target;
-            Vector3 shown = ing.VisibleBounds.center;
-            ing.transform.position += new Vector3(target.x - shown.x, target.y - shown.y, 0f);
+            Vector3 target = basket + offset;
+            Bounds shown = ing.VisibleBounds;
+            float halfHeight = Vector3.Dot(shown.extents, new Vector3(Mathf.Abs(up.x), Mathf.Abs(up.y), Mathf.Abs(up.z)));
+            ing.transform.position += target + up * (halfHeight + 0.01f) - shown.center;
         }
     }
 
@@ -152,9 +161,24 @@ public partial class Strainer : ToolItem
         transform.SetParent(bowl.transform, true);
 
         // handle toward 6 o'clock (down, over the bowl's front rim), basket up in the mouth
-        Vector3 basketDir = RestingRotation * -GripLocalDir;
-        float turn = Vector2.SignedAngle(new Vector2(basketDir.x, basketDir.y), Vector2.up);
-        transform.rotation = Quaternion.AngleAxis(turn, Vector3.forward) * RestingRotation;
+        Vector3 up = bowl.GetInterior().up;
+        // 원래 걸려 있던 체는 세로 자세다. 망의 얇은 축을 위로 세워 평평하게 놓고,
+        // 손잡이가 화면의 6시 방향을 향하도록 회전한다.
+        transform.rotation = RestingRotation;
+        MeshFilter mesh = GetComponentInChildren<MeshFilter>();
+        if (mesh != null && mesh.sharedMesh != null)
+        {
+            Vector3 size = mesh.sharedMesh.bounds.size;
+            int thin = size.x <= size.y && size.x <= size.z ? 0 : size.y <= size.z ? 1 : 2;
+            Vector3 localNormal = Vector3.zero; localNormal[thin] = 1f;
+            Vector3 normal = mesh.transform.TransformDirection(localNormal);
+            if (Vector3.Dot(normal, up) < 0f) normal = -normal;
+            transform.rotation = Quaternion.FromToRotation(normal, up) * transform.rotation;
+        }
+        Vector3 grip = Vector3.ProjectOnPlane(transform.TransformDirection(GripLocalDir), up);
+        Vector3 front = Camera.main != null ? Vector3.ProjectOnPlane(-Camera.main.transform.up, up) : Vector3.back;
+        if (grip.sqrMagnitude > 0.0001f && front.sqrMagnitude > 0.0001f)
+            transform.rotation = Quaternion.AngleAxis(Vector3.SignedAngle(grip, front, up), up) * transform.rotation;
         MovableBowl.Interior inside = bowl.GetInterior();
         Vector3 mouth = inside.floorCenter + inside.up * (inside.rim * 0.85f);
         Vector3 basket = BasketCenterWorld(out _);
@@ -162,6 +186,7 @@ public partial class Strainer : ToolItem
         LayoutContents();
 
         restingOn = bowl;
+        CurrentContainer = bowl; // 집을 때 이전 그릇과의 관계도 한 번에 해제한다.
         drainTimer = 0f;
         drained = false;
         HandController.Instance?.PlayChopGesture();
@@ -177,7 +202,9 @@ public partial class Strainer : ToolItem
 
         // The water runs off into the bowl underneath...
         drainTimer += Time.deltaTime;
-        if (restingOn.CanHoldWater)
+        // (튀김을 건져 기름을 빼는 중이면 물이 아니라 기름이 떨어진다 - 물로 치면
+        // 그 그릇에 다시 쏟을 때 체망이 젖은 것으로 되어, 다음에 기름을 뜨면 튀었다)
+        if (restingOn.CanHoldWater && !scoopedFromOil)
             restingOn.SetWaterLevel(Mathf.Max(restingOn.WaterAmount, Mathf.Min(0.12f, drainTimer / Mathf.Max(drainSeconds, 0.1f) * 0.12f)));
         // ...and once it's stopped, they're drained.
         if (!drained && drainTimer >= drainSeconds)
@@ -306,6 +333,7 @@ public partial class Strainer : ToolItem
     /// <summary>Cold-water rinse at the sink.</summary>
     public void RinseInColdWater()
     {
+        MarkWet(); // (개수대 찬물에 헹굼)
         foreach (IngredientItem ing in contents)
             ing.GetComponent<CookableItem>()?.ColdShock();
         // (the rinse under the tap is WashBasin's - no hand-washing motion with the strainer in hand)
@@ -314,6 +342,8 @@ public partial class Strainer : ToolItem
     public void DumpInto(MovableBowl bowl)
     {
         if (!HasContents) return;
+        if (SplashIfWetInOil(bowl)) return; // (젖은 체망째 기름에 쏟음: 기름 튐 · 실격)
+        if (bowl.WaterAmount > 0f) MarkWet(); // (데치는 물·찬물에 담금)
 
         foreach (Collider c in contentColliders) if (c != null) c.enabled = true;
         contentColliders.Clear();
@@ -324,7 +354,7 @@ public partial class Strainer : ToolItem
             Vector3 at = ing.transform.position;
             bowl.PlaceFree(ing, at);
             ing.transform.rotation = ing.RestingRotation;
-            ing.transform.localScale = ing.BaseLocalScale;
+            HandCarry.ResetToBaseScale(ing); // 그릇 부모의 배율도 상쇄한다.
             ing.CurrentContainer = bowl;
             ing.OnPlaced();
         }

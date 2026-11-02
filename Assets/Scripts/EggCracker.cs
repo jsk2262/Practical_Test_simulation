@@ -118,8 +118,10 @@ public class EggCracker : MonoBehaviour
         Vector3 at = transform.position;
         float depth = Mathf.Min(len, r * 1.35f);
         Quaternion openUp = Quaternion.LookRotation(Vector3.Cross(Vector3.right, up), up);
-        LeftHalf.SetPositionAndRotation(at + Vector3.left * r * 1.1f + up * (depth - r), openUp);
-        RightHalf.SetPositionAndRotation(at + Vector3.right * r * 1.1f + up * (depth - r), openUp);
+        // 이 시점엔 계란 렌더러가 꺼져 있어 PlaceFreeAt 이 피벗을 바로 조리대 윗면에 올려 둔다.
+        // 껍질 컵은 피벗에서 depth 만큼 아래로 뻗으므로, 그만큼 올려야 아가리가 조리대에 닿는다.
+        LeftHalf.SetPositionAndRotation(at + Vector3.left * r * 1.1f + up * depth, openUp); // 컵 바닥이 조리대에 닿게
+        RightHalf.SetPositionAndRotation(at + Vector3.right * r * 1.1f + up * depth, openUp); // 반대쪽 반쪽도 같은 높이로
         right?.GoTo(at + new Vector3(0.4f, 0.3f, -0.55f), null);
         // the egg's click box over both halves now
         if (GetComponent<BoxCollider>() is BoxCollider box)

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -127,7 +127,8 @@ public sealed class HandWashSequence : MonoBehaviour
             if (statusLabel != null) statusLabel.text="물을 켜면 손 씻기를 계속합니다";
             return; // no progress while required water is off
         }
-        float dt=Time.deltaTime;
+        float dt = Time.deltaTime; // 일시정지와 일반 속도를 유지한다.
+        if (SpeedMode.On && Time.timeScale > 0f) dt = Time.deltaTime / Time.timeScale * 5f; // 다른 애니메이션의 전역 배속과 무관하게 정확히 5배
         elapsed+=dt; stepElapsed+=dt;
         if (elapsed >= total) { End(true); return; }
         while (stepIndex < steps.Length-1 && stepElapsed >= steps[stepIndex].seconds)

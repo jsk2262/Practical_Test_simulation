@@ -257,6 +257,7 @@ public partial class ToolItem
         {
             var go = new GameObject("SpoonSizeLabel");
             spoonLabel = go.AddComponent<TextMesh>();
+            KoreanFontFallback.Apply(spoonLabel); // 웹에서도 한글이 보이게 한글 글꼴
             spoonLabel.fontSize = 40;
             spoonLabel.characterSize = 0.045f;
             spoonLabel.anchor = TextAnchor.LowerCenter;
@@ -266,7 +267,14 @@ public partial class ToolItem
         if (!spoonLabel.gameObject.activeSelf) spoonLabel.gameObject.SetActive(true);
         Bounds b = new Bounds(transform.position, Vector3.zero);
         foreach (Renderer r in GetComponentsInChildren<Renderer>()) if (r.enabled) b.Encapsulate(r.bounds);
-        spoonLabel.transform.position = new Vector3(b.center.x, b.max.y + 0.08f, b.min.z - 0.8f);
+        // 화면 기준으로 스푼 바로 위에 띄우고 카메라를 정면으로 보게 한다 (TextMesh 는 로컬 +Z 쪽에서 읽힌다).
+        Camera labelCam = Camera.main; // 라벨을 세울 기준
+        if (labelCam != null)
+        {
+            spoonLabel.transform.position = b.center + labelCam.transform.up * (b.extents.magnitude + 0.25f) - labelCam.transform.forward * 0.3f; // 스푼 위, 카메라 쪽으로 당겨서
+            spoonLabel.transform.rotation = Quaternion.LookRotation(-labelCam.transform.forward, labelCam.transform.up); // 글자가 화면을 향하게
+        }
+        else spoonLabel.transform.position = new Vector3(b.center.x, b.max.y + 0.08f, b.min.z - 0.8f);
         spoonLabel.text = IsSpoonLoaded ? $"{SpoonSizeLabel}\n{loadedSeasoning} {LoadedMl:0.#}mL" : SpoonSizeLabel;
 
         // a light card behind it (read over the dark cabinet or other labels too)
@@ -280,7 +288,14 @@ public partial class ToolItem
             spoonLabelCard.GetComponent<Renderer>().sharedMaterial = new Material(s) { color = new Color(1f, 0.98f, 0.92f, 0.88f) };
         }
         Bounds tb = spoonLabel.GetComponent<Renderer>().bounds;
-        spoonLabelCard.position = new Vector3(tb.center.x, tb.center.y, tb.center.z + 0.02f);
+        // 카드는 글자 '뒤'에 깔려야 한다. 옛 코드는 +Z 를 뒤로 봤지만 지금 카메라는 +Z 쪽에
+        // 있어서, 그대로 두면 카드가 글자를 덮어 흰 네모만 보인다.
+        if (labelCam != null)
+        {
+            spoonLabelCard.position = tb.center + labelCam.transform.forward * 0.02f; // 시선 방향으로 더 멀리 = 글자 뒤
+            spoonLabelCard.rotation = Quaternion.LookRotation(labelCam.transform.forward, labelCam.transform.up); // Quad 앞면(-Z)이 카메라를 향하게
+        }
+        else spoonLabelCard.position = new Vector3(tb.center.x, tb.center.y, tb.center.z + 0.02f);
         spoonLabelCard.localScale = new Vector3(tb.size.x + 0.12f, tb.size.y + 0.06f, 1f);
     }
 
@@ -293,8 +308,13 @@ public partial class ToolItem
         var go = new GameObject("SpoonNote");
         Bounds b = new Bounds(transform.position, Vector3.zero);
         foreach (Renderer r in GetComponentsInChildren<Renderer>()) if (r.enabled) b.Encapsulate(r.bounds);
-        go.transform.position = new Vector3(b.center.x, b.max.y + 0.45f, b.min.z - 0.9f);
+        Camera noteCam = Camera.main; // 알림도 화면을 보고 떠야 한다
+        go.transform.position = noteCam != null
+            ? b.center + noteCam.transform.up * (b.extents.magnitude + 0.6f) - noteCam.transform.forward * 0.3f // 스푼 위, 카메라 쪽으로
+            : new Vector3(b.center.x, b.max.y + 0.45f, b.min.z - 0.9f);
+        if (noteCam != null) go.transform.rotation = Quaternion.LookRotation(-noteCam.transform.forward, noteCam.transform.up); // 글자가 화면을 향하게
         TextMesh tm = go.AddComponent<TextMesh>();
+        KoreanFontFallback.Apply(tm); // 웹에서도 한글이 보이게 한글 글꼴
         tm.text = text;
         tm.fontSize = 36;
         tm.characterSize = 0.06f;

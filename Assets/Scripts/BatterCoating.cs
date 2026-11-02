@@ -310,15 +310,7 @@ public class BatterCoating : MonoBehaviour
         Shader lit = Shader.Find("Universal Render Pipeline/Lit");
         coatMat = new Material(lit != null ? lit : Shader.Find("Standard")) { name = "BatterCoat (instance)" };
         coatMat.color = Look.batterColor;
-        // see-through where it's thin (the meat showing under a runny or patchy coat)
-        coatMat.SetFloat("_Surface", 1f);
-        coatMat.SetFloat("_Blend", 0f);
-        coatMat.SetOverrideTag("RenderType", "Transparent");
-        coatMat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        coatMat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        coatMat.SetFloat("_ZWrite", 0f);
-        coatMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-        coatMat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+        // (불투명 - 반투명은 이 화면에서 색이 바랬다. 얇은 곳은 색을 고기 색과 섞어 표현)
         return coatMat;
     }
 
@@ -338,6 +330,11 @@ public class BatterCoating : MonoBehaviour
     public float ColdOilSeconds { get; private set; }
     public bool Fried => FriedSeconds > 0.5f;
     public int FryPasses { get; private set; }
+    private float secondFryStart; // 2차 튀김을 시작할 때까지 튀긴 시간
+    [Tooltip("고기 100g당 앙금(전분) mL가 이 값 이하면 얇은 옷 - 고기 200g에 앙금 1T(15mL)면 7.5.")]
+    [SerializeField] private float fullCoatFrom = 10f;
+    [Tooltip("고기 100g당 앙금(전분) mL가 이 값 이상이면 풍성한 옷 - 고기 200g에 앙금 2T(30mL)면 15.")]
+    [SerializeField] private float fullCoatAt = 14f;
     private bool wasInOil;
     private float nextFryRefresh;
 
@@ -363,7 +360,7 @@ public class BatterCoating : MonoBehaviour
         {
             if (v.IsOilHot) FriedSeconds += SpeedMode.Wait(Time.deltaTime);
             else ColdOilSeconds += Time.deltaTime;
-            if (!wasInOil) { FryPasses++; Debug.Log($"[튀김] {meat.IngredientName}: {FryPasses}번째 튀김 (기름 {(v.IsOilHot ? "적온" : "온도 미달")}) - 기록"); }
+            if (!wasInOil) { FryPasses++; if (FryPasses == 2) secondFryStart = FriedSeconds; Debug.Log($"[튀김] {meat.IngredientName}: {FryPasses}번째 튀김 (기름 {(v.IsOilHot ? "적온" : "온도 미달")}) - 기록"); }
             if (Time.time >= nextFryRefresh) { nextFryRefresh = Time.time + 1f; Refresh(); }
         }
         wasInOil = inOil;
@@ -380,6 +377,34 @@ public class BatterCoating : MonoBehaviour
             if (PieceRenderers().Count != shownPieces) Refresh();
         }
         UpdatePool();
+        ApplyGlaze();
+    }
+
+    /// <summary>튀김옷 하나와 그 위에 묻은 소스.</summary>
+    private class Glaze { public MeshRenderer mr; public FoodPiece piece; public Color col; public float smooth, shown; }
+    private readonly List<Glaze> glazes = new List<Glaze>();
+    private MaterialPropertyBlock glazeBlock;
+
+    /// <summary>걸쭉한 소스에 버무린 튀김: 얼룩진 튀김옷이 소스에 덮여 노릇하고 윤기
+    /// 나게 (조각에 묻은 소스 양 · 걸쭉함만큼). 접시로 옮겨도 조각의 소스를 따라간다.</summary>
+    private void ApplyGlaze()
+    {
+        foreach (Glaze g in glazes)
+        {
+            if (g.mr == null || g.piece == null) continue;
+            float k = Mathf.Clamp01(g.piece.Coat * 2f) * Mathf.InverseLerp(0.12f, 0.35f, g.piece.CoatViscosity); // 소스가 묻어 덮은 정도 (걸쭉한 소스일수록)
+            if (Mathf.Abs(k - g.shown) < 0.01f) continue;               // 바뀐 게 없으면 그대로
+            g.shown = k;
+            Color gold = Color.Lerp(Look.friedColor, g.piece.CoatColor, 0.35f) * 0.92f; // 튀김색에 소스색이 살짝 든 노릇한 색
+            gold.a = 1f;
+            Color c = Color.Lerp(g.col, gold, k * 0.85f);  // 덮일수록 얼룩이 가려짐
+            glazeBlock ??= new MaterialPropertyBlock();
+            glazeBlock.Clear();
+            glazeBlock.SetColor("_BaseColor", c);
+            glazeBlock.SetColor("_Color", c);
+            glazeBlock.SetFloat("_Smoothness", Mathf.Lerp(g.smooth, 0.82f, k)); // 소스 윤기
+            g.mr.SetPropertyBlock(glazeBlock);
+        }
     }
 
     /// <summary>Draws the coat over each piece: thicker with more batter for the
@@ -389,6 +414,7 @@ public class BatterCoating : MonoBehaviour
     {
         foreach (GameObject g in shown) if (g != null) Destroy(g);
         shown.Clear();
+        glazes.Clear(); // 소스 윤기 입힐 목록도 새로
         foreach (Mesh m in coatMeshes) if (m != null) Destroy(m);
         coatMeshes.Clear();
         List<Renderer> pieces = PieceRenderers();
@@ -411,13 +437,20 @@ public class BatterCoating : MonoBehaviour
             if (Fried && !MixDone && rnd > MixProgress * 0.8f) cover *= Mathf.Lerp(0.15f, 0.6f, UnderMixFactor);
             if (cover < 0.05f) continue;
 
-            float s = 1f + look.maxInflate * thick * cover;
+            // 앙금이 넉넉하면(2T) 풍성한 튀김옷, 부족하면(1T) 얇은 예전 모습 - 그 사이는 섞음
+            // 튀김옷이 넉넉한 정도 (0 얇음 .. 1 풍성): 반죽 전체 양이 아니라 앙금(전분) 자체의 양으로 -
+            // 물기 많은 앙금(물을 덜 따름)은 전분이 적게 쳐져 얇은 옷, 앙금 2T면 풍성한 옷
+            float starchPer100g = MeatGrams > 0f ? SolidMl / MeatGrams * 100f : 0f;     // 고기 100g당 전분 mL
+            float full = Mathf.InverseLerp(fullCoatFrom, fullCoatAt, starchPer100g);    // 1T 이하 0 → 2T 근처 1
+            if (stiff <= look.runnyBelow) full *= 0.5f;                                 // 묽은 반죽은 덜 풍성
+            float s = Mathf.Lerp(1f + look.maxInflate * thick * cover,                                   // 얇은 옷 크기
+                                 1.12f + Mathf.Max(look.maxInflate, 0.35f) * Mathf.Max(thick, 0.4f) * cover, full); // 풍성한 옷 크기
             // 튀김옷 모양: 조각(네모)을 그대로 키운 상자가 아니라, 조각을 감싸는 둥근
             // 덩어리에 울퉁불퉁한 결 - 튀길수록 더 오돌토돌 (튀김 반죽이 부풀어 굳은 모양)
             float fry = Fried ? Mathf.Clamp01(FriedSeconds / Mathf.Max(look.fryBrownSeconds, 0.1f)) : 0f;
             var go = new GameObject("BatterCoat");
             go.transform.SetParent(r.transform, false);
-            Mesh coatMesh = CoatMesh(mf.sharedMesh.bounds, s, i * 37 + shownPieces, Mathf.Lerp(0.12f, 0.38f, fry) * (0.6f + 0.4f * cover));
+            Mesh coatMesh = CoatMesh(mf.sharedMesh.bounds, s, i * 37 + shownPieces, Mathf.Lerp(Mathf.Lerp(0.12f, 0.38f, fry), Mathf.Lerp(0.25f, 0.45f, fry), full) * (0.6f + 0.4f * cover)); // 넉넉할수록 반죽부터 울퉁불퉁
             coatMeshes.Add(coatMesh);
             go.AddComponent<MeshFilter>().sharedMesh = coatMesh;
             var mr = go.AddComponent<MeshRenderer>();
@@ -425,10 +458,17 @@ public class BatterCoating : MonoBehaviour
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             // how much it hides the meat: more batter, better mixed - less when runny
             // fried: going golden brown, and only as much of it as stayed on (Retention)
-            Color col = Fried ? Color.Lerp(look.batterColor, look.friedColor, Mathf.Clamp01(FriedSeconds / Mathf.Max(look.fryBrownSeconds, 0.1f))) : look.batterColor;
+            // 1차 튀김: 하얗게 굳음 → 2차 튀김부터: 노릇하게
+            float fry2 = FryPasses >= 2 ? Mathf.Clamp01((FriedSeconds - secondFryStart) / Mathf.Max(look.fryBrownSeconds * 0.5f, 0.1f)) : 0f; // 2차 튀김에서 튀긴 정도
+            Color col = !Fried ? look.batterColor // 튀기기 전: 반죽 색
+                : FryPasses >= 2 ? Color.Lerp(look.firstFryColor, look.friedColor, fry2) // 2차: 흰색 → 노릇하게
+                : Color.Lerp(look.batterColor, look.firstFryColor, fry); // 1차: 하얗게 굳음
             col.a = Mathf.Clamp01(cover * Mathf.Lerp(0.65f, 0.97f, thick) * (stiff <= look.runnyBelow ? 0.75f : 1f) * (Fried ? Mathf.Lerp(0.3f, 1f, Retention) : 1f));
             // (튀겨지며 반죽이 굳어 불투명해진다 - 속 고기가 비치지 않게)
             if (Fried) col.a = Mathf.Lerp(col.a, Mathf.Max(col.a, 0.96f * Retention), fry);
+            // (반투명은 이 화면에서 색이 바래 보여 불투명으로 - 옷이 얇을수록 고기 색이 섞여 비쳐 보이게)
+            col = Color.Lerp(look.meatShowColor, col, Mathf.Lerp(Mathf.Sqrt(col.a), Mathf.Clamp01(Mathf.Sqrt(col.a) * 1.25f), full)); // 덮인 만큼 튀김옷 색 (넉넉하면 고기가 안 비침)
+            col.a = 1f; // 불투명
             block.Clear();
             block.SetColor("_BaseColor", col);
             block.SetColor("_Color", col);
@@ -436,6 +476,7 @@ public class BatterCoating : MonoBehaviour
             block.SetFloat("_Smoothness", Mathf.Lerp(Mathf.Lerp(0.85f, 0.25f, stiff), 0.18f, fry));
             mr.SetPropertyBlock(block);
             shown.Add(go);
+            glazes.Add(new Glaze { mr = mr, piece = r.GetComponent<FoodPiece>(), col = col, smooth = block.GetFloat("_Smoothness"), shown = -1f }); // 소스가 묻으면 이 색 위에 윤기
 
             // stiff: clumps of batter stuck on it
             if (stiff >= look.lumpyAbove)
@@ -550,6 +591,7 @@ public class BatterCoating : MonoBehaviour
         foreach (Renderer r in GetComponentsInChildren<Renderer>()) if (r.enabled) b.Encapsulate(r.bounds);
         go.transform.position = new Vector3(b.center.x, b.max.y + 0.5f, b.min.z - 1.2f);
         TextMesh tm = go.AddComponent<TextMesh>();
+        KoreanFontFallback.Apply(tm); // 웹에서도 한글이 보이게 한글 글꼴
         tm.text = text;
         tm.fontSize = 36;
         tm.characterSize = 0.06f;

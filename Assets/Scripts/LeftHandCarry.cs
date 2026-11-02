@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
@@ -126,8 +126,9 @@ public class LeftHandCarry : MonoBehaviour
         }
         // 2) then carried, following the cursor (eased - no jumps), over the counter's slope
         Vector2 sp = mouse.position.ReadValue();
-        Vector3 cursor = cam.ScreenToWorldPoint(new Vector3(sp.x, sp.y, held.transform.position.z - cam.transform.position.z));
-        Vector3 want = new Vector3(cursor.x, cursor.y, HandCarry.CounterZ(cursor.y) - 0.6f);
+        Ray ray = cam.ScreenPointToRay(sp);
+        Plane plane = new Plane(cam.transform.forward, carryAt); // 카메라와 평행한 손의 현재 깊이
+        Vector3 want = plane.Raycast(ray, out float distance) ? ray.GetPoint(distance) : carryAt; // 고정 월드 Z를 쓰지 않는다.
         carryAt = Vector3.Lerp(carryAt, want, 1f - Mathf.Exp(-14f * Time.deltaTime));
         HoldPose(carryAt);
         held.transform.position = carryAt + gripOffset;
@@ -151,7 +152,9 @@ public class LeftHandCarry : MonoBehaviour
 
         // the left hand reaches from where the food lies; grips it by its middle top
         Bounds b = item.VisibleBounds;
-        Vector3 top = new Vector3(b.center.x, b.center.y + b.extents.y * 0.6f, b.min.z - 0.3f);
+        Vector3 up = Carryable.CounterUp; // 재료의 실제 윗면을 쥔다.
+        Vector3 ext = new Vector3(Mathf.Abs(up.x), Mathf.Abs(up.y), Mathf.Abs(up.z));
+        Vector3 top = b.center + up * (Vector3.Dot(ext, b.extents) + 0.03f);
         gripOffset = item.transform.position - top;
         carryAt = top;
         reachFrom = top + new Vector3(-0.7f, -0.9f, 0f); // (coming in from the lower left - the left arm's side)
@@ -181,7 +184,7 @@ public class LeftHandCarry : MonoBehaviour
         Bounds b = held.VisibleBounds;
         float size = Mathf.Max(b.size.x, b.size.y);
         float curl = Mathf.Lerp(0.85f, 0.35f, Mathf.InverseLerp(0.1f, 0.6f, size));
-        Vector3 fingers = Vector3.ProjectOnPlane(new Vector3(0.3f, -1f, 0f), up).normalized; // (reaching down over it)
+        Vector3 fingers = Vector3.ProjectOnPlane(Camera.main != null ? Camera.main.transform.up : Vector3.forward, up).normalized; // (reaching down over it)
         Vector3 thumb = Quaternion.AngleAxis(90f, up) * Vector3.ProjectOnPlane(fingers, up).normalized;
         s.BeginHolding(fingers, thumb, curl);
         s.HoldKnucklesAt(at);
@@ -285,6 +288,7 @@ public class LeftHandCarry : MonoBehaviour
         {
             var go = new GameObject("LeftHandHint");
             hint = go.AddComponent<TextMesh>();
+            KoreanFontFallback.Apply(hint); // 웹에서도 한글이 보이게 한글 글꼴
             hint.fontSize = 36;
             hint.characterSize = 0.05f;
             hint.anchor = TextAnchor.LowerCenter;

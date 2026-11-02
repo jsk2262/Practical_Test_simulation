@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>Controls only: no recipe answers or scoring. Never consumes mouse input.</summary>
@@ -93,7 +93,17 @@ public class ContextControlHint : MonoBehaviour
         { SetHint(CleanupMode.IsOn ? "받침을 꾹 누르면 들어요 · 불을 끄고 냄비를 먼저 내려주세요" : "화구 받침을 옮기려면 정리를 켜세요"); return; }
         if (target != null && target.GetComponentInParent<StoveKnob>() != null)
         { SetHint("클릭할 때마다 불 세기가 바뀌어요 · 끔 → 강 → 중 → 약 → 끔"); return; }
-        if (bowl != null) { SetHint("그릇을 꾹 누르면 집어 들어요"); return; }
+        if (bowl != null)
+        {
+            if (bowl.IsDish && !CleanupMode.IsOn && !bowl.WouldPickUp) // 이동이 막힌 접시는 정리 모드를 안내한다.
+                SetHint("접시를 옮기려면 정리 버튼을 눌러 초록색으로 켠 뒤 접시를 클릭하세요");
+            else if (bowl.IsDish && CleanupMode.IsOn && bowl.HasIngredients) // 재료가 남아 있으면 먼저 꺼내야 한다.
+                SetHint("정리가 켜졌어요 · 접시의 재료를 먼저 꺼낸 뒤 접시를 클릭하세요");
+            else if (bowl.IsDish) // 이동 가능한 접시는 짧게 클릭해 집는다.
+                SetHint("접시를 클릭하면 집어 들어요 · 놓을 곳을 클릭하세요");
+            else SetHint("그릇을 꾹 누르면 집어 들어요"); // 냄비와 일반 그릇의 조작은 유지한다.
+            return;
+        }
         if (target != null && target.GetComponentInParent<ToolItem>() != null)
         { SetHint("도구를 꾹 누르면 집어 들어요"); return; }
         if (ingredient != null) { SetHint("재료를 클릭하면 집거나 재료에 맞는 작업을 해요"); return; }

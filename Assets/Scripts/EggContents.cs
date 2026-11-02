@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using UnityEngine;
 
@@ -275,7 +275,7 @@ public class EggContents : MonoBehaviour
         Bounds seen = new Bounds(bowl.BodyCenterWorld(), Vector3.zero);
         foreach (Renderer r in bowl.GetComponentsInChildren<Renderer>())
             if (r.enabled && (look == null || !r.transform.IsChildOf(look))) seen.Encapsulate(r.bounds);
-        Vector3 at = new Vector3(seen.center.x, seen.center.y, seen.min.z - 1.2f);
+        Vector3 at = seen.center; // 보이는 그릇 중심을 기준으로 선택창을 연다.
         EggPartChooser.Show(at, Mathf.Max(seen.extents.x, seen.extents.y), title, part =>
         {
             if (this == null || bowl == null) return;
@@ -354,10 +354,21 @@ public static class EggPartChooser
 
     private static void Open(Vector3 worldPos, float bowlRadius, string title, Option[] options)
     {
+        RestoreSceneLabels(); // 기존 선택창을 교체할 때 기존 표시 상태 복구
         if (panel != null) UnityEngine.Object.Destroy(panel); // (sized to each bowl)
         Build(bowlRadius, title, options);
         onChosen = null;
+        Camera cam = Camera.main;
+        if (cam != null)
+        {
+            Vector3 screen = cam.WorldToScreenPoint(worldPos); // 그릇의 화면 위치
+            screen.z = Mathf.Max(cam.nearClipPlane + 0.5f, 2f); // 다른 장면 물체 앞쪽
+            worldPos = cam.ScreenToWorldPoint(screen);
+            panel.transform.rotation = cam.transform.rotation; // 글자와 버튼을 화면 정면으로
+            panel.transform.localScale = Vector3.one * KitchenCamera.ZoomScale; // 확대 시 크기 유지
+        }
         panel.transform.position = worldPos;
+        HideSceneLabels(); // 뒤의 검은 안내 글자가 선택창에 겹치지 않는다.
         panel.SetActive(true);
     }
 
@@ -365,6 +376,23 @@ public static class EggPartChooser
     {
         onChosen = null;
         if (panel != null) panel.SetActive(false);
+        RestoreSceneLabels(); // 취소·선택 시 원래 안내 복구
+    }
+
+    private static readonly System.Collections.Generic.List<Renderer> hiddenLabels = new System.Collections.Generic.List<Renderer>();
+    private static void HideSceneLabels()
+    {
+        foreach (TextMesh label in UnityEngine.Object.FindObjectsByType<TextMesh>(FindObjectsSortMode.None))
+        {
+            if (label.transform.IsChildOf(panel.transform)) continue;
+            Renderer renderer = label.GetComponent<Renderer>();
+            if (renderer != null && renderer.enabled) { hiddenLabels.Add(renderer); renderer.enabled = false; }
+        }
+    }
+    private static void RestoreSceneLabels()
+    {
+        foreach (Renderer renderer in hiddenLabels) if (renderer != null) renderer.enabled = true;
+        hiddenLabels.Clear();
     }
 
     public static bool IsOver(Ray ray)
@@ -428,6 +456,7 @@ public static class EggPartChooser
         go.transform.SetParent(parent, false);
         go.transform.localPosition = local;
         TextMesh tm = go.AddComponent<TextMesh>();
+        KoreanFontFallback.Apply(tm); // 웹에서도 한글이 보이게 한글 글꼴
         tm.text = text;
         tm.fontSize = size;
         tm.characterSize = 0.16f;

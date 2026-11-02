@@ -45,7 +45,6 @@ public class BurnerGrate : MonoBehaviour
     private Renderer[] rends;
     private Collider[] cols;
     private Vector3 homeCenter;
-    private float zOffset;
     private Vector3 offset;          // where the parts are now, from home
     private Place takenFrom;
     private bool waitRelease, lit;
@@ -87,7 +86,6 @@ public class BurnerGrate : MonoBehaviour
         rends = r.ToArray();
         cols = c.ToArray();
         homeCenter = any ? b.center : transform.position;
-        zOffset = homeCenter.z - HandCarry.CounterZ(homeCenter.y);
         block = new MaterialPropertyBlock();
     }
 
@@ -176,8 +174,9 @@ public class BurnerGrate : MonoBehaviour
 
         // follows the mouse, lifted a little off the counter
         Vector2 sp = m.position.ReadValue();
-        Vector3 cursor = cam.ScreenToWorldPoint(new Vector3(sp.x, sp.y, homeCenter.z - cam.transform.position.z));
-        Vector3 at = new Vector3(cursor.x, cursor.y, HandCarry.CounterZ(cursor.y) + zOffset - 0.25f);
+        float depth = Vector3.Dot(homeCenter - cam.transform.position, cam.transform.forward); // 제자리 깊이를 카메라 축 기준으로 잰다
+        Vector3 cursor = cam.ScreenToWorldPoint(new Vector3(sp.x, sp.y, depth)); // 커서가 가리키는 실제 월드 지점
+        Vector3 at = cursor - cam.transform.forward * 0.25f; // 조리대에서 카메라 쪽으로 살짝 띄워 든다
         MoveTo(at - homeCenter);
         HandController.Instance?.SlideTo(at + new Vector3(0.5f, 0.25f, -0.6f), 0.04f);
 
@@ -202,8 +201,7 @@ public class BurnerGrate : MonoBehaviour
     private Vector3 AsideOffset()
     {
         if (asideSpot == null) return Vector3.zero;
-        Vector3 p = asideSpot.position;
-        return new Vector3(p.x, p.y, HandCarry.CounterZ(p.y) + zOffset) - homeCenter;
+        return asideSpot.position - homeCenter; // 보관 지점의 실제 좌표까지의 이동량
     }
 
     /// <summary>Every part to its recorded place plus the offset (never from where it is now).</summary>
@@ -230,14 +228,14 @@ public class BurnerGrate : MonoBehaviour
             label.transform.localPosition = new Vector3(0f, 0f, -0.01f);
             label.transform.localScale = Vector3.one / (dropRadius * 1.6f);
             TextMesh tm = label.AddComponent<TextMesh>();
+            KoreanFontFallback.Apply(tm); // 웹에서도 한글이 보이게 한글 글꼴
             tm.text = "받침 보관";
             tm.fontSize = 36;
             tm.characterSize = 0.07f;
             tm.anchor = TextAnchor.MiddleCenter;
             tm.color = new Color(0.25f, 0.2f, 0.1f);
         }
-        Vector3 p = asideSpot.position;
-        marker.transform.position = new Vector3(p.x, p.y, HandCarry.CounterZ(p.y) - 0.3f);
+        marker.transform.position = asideSpot.position + Carryable.CounterUp * 0.02f; // 보관 지점 바로 위에 표시가 뜨게 한다
         marker.SetActive(show);
     }
 
@@ -247,6 +245,7 @@ public class BurnerGrate : MonoBehaviour
         var go = new GameObject("GrateNote");
         go.transform.position = homeCenter + offset + new Vector3(0f, 1.0f, -1.5f);
         TextMesh tm = go.AddComponent<TextMesh>();
+        KoreanFontFallback.Apply(tm); // 웹에서도 한글이 보이게 한글 글꼴
         tm.text = text;
         tm.fontSize = 40;
         tm.characterSize = 0.08f;

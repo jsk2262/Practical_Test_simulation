@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class HandCarry : MonoBehaviour
 {
@@ -44,6 +44,24 @@ public class HandCarry : MonoBehaviour
         // Rotation even mid-drag, so a wheel turn shows while dragging too.
         if (!IsDragging) Current.transform.position = transform.position + Current.HandHoldOffset;
         Current.transform.rotation = Current.HandRotation;
+        KeepKnifeAboveBoard(); // 실제 칼질 중에는 손과 칼을 함께 표면 위에 둔다.
+    }
+
+    private void KeepKnifeAboveBoard()
+    {
+        if (!IsLocked || !(Current is ToolItem knife) || knife.Kind != ToolKind.Knife) return; // 칼질 외의 운반·세척은 건드리지 않는다.
+        CuttingBoardController board = CuttingBoardController.Instance;
+        if (board == null || !(board.Current is IngredientItem ingredient) || ingredient.CurrentContainer != board) return;
+        Renderer surface = board.GetComponent<Renderer>();
+        Renderer blade = knife.GetComponent<Renderer>();
+        if (surface == null || blade == null || Vector3.Dot(Carryable.CounterUp, Vector3.up) < 0.999f) return;
+        Bounds top = surface.bounds, edge = blade.bounds;
+        if (edge.max.x < top.min.x || edge.min.x > top.max.x || edge.max.z < top.min.z || edge.min.z > top.max.z) return; // 도마 밖에서는 보정하지 않는다.
+        float lift = top.max.y + 0.01f - edge.min.y; // 칼날 맨 아래가 도마 위에 닿도록 한다.
+        if (lift <= 0f) return;
+        Vector3 correction = Carryable.CounterUp * lift;
+        transform.position += correction; // 잡고 있는 손도 같이 올린다.
+        knife.transform.position += correction; // 손잡이와 손의 상대 위치를 유지한다.
     }
 
     public void BeginDrag() => IsDragging = true;
@@ -69,7 +87,7 @@ public class HandCarry : MonoBehaviour
     /// Measuring how far the parent actually stretches this item's own
     /// (now-fixed) local axes via TransformVector sidesteps the permutation
     /// instead of having to reason about the parent's rotation.</summary>
-    private static void ResetToBaseScale(Carryable item)
+    internal static void ResetToBaseScale(Carryable item)
     {
         Transform t = item.transform;
         t.rotation = item.RestingRotation;
@@ -219,11 +237,14 @@ public class HandCarry : MonoBehaviour
 
         Carryable item = Current;
         item.transform.SetParent(null, true);
-        worldPoint = PlayArea.ClampDrop(worldPoint); // (조리대 밖·벽면이면 가장 가까운 조리대 윗면에)
-        if (item is IngredientItem || item is FoodScrap) worldPoint = OnCounter(item, worldPoint);
-        item.transform.position = new Vector3(worldPoint.x, worldPoint.y, FreeDropZ(item, worldPoint.y));
-        ResetToBaseScale(item);
-        KeepAboveCounterEdge(item);
+        ResetToBaseScale(item); // 내려놓은 자세를 먼저 복원한 뒤 접시 바닥 높이를 계산한다.
+        if (!PlayArea.TryPlaceOnCounter(item, worldPoint)) // 수평 조리대는 실제 표면에 놓는다.
+        {
+            worldPoint = PlayArea.ClampDrop(worldPoint); // 이전 기울어진 씬의 배치 방식만 유지한다.
+            if (item is IngredientItem || item is FoodScrap) worldPoint = OnCounter(item, worldPoint);
+            item.transform.position = new Vector3(worldPoint.x, worldPoint.y, FreeDropZ(item, worldPoint.y));
+            KeepAboveCounterEdge(item);
+        }
         item.CurrentContainer = null;
         Current = null;
         item.OnPlaced();

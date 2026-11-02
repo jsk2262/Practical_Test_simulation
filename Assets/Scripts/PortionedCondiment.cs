@@ -94,12 +94,11 @@ public class PortionedCondiment : MonoBehaviour
     /// much starch and water, kept apart. The bowl is empty after.</summary>
     public void TakeAllForPour(out string starchKind, out float starchMl, out float waterMl)
     {
-        float ratio = KitchenDevSettings.Current.settledMlPerDryStarchMl;
         switch (CurrentStage)
         {
             case Stage.Powder: starchKind = PanSauce.DryStarch; starchMl = StarchMl; waterMl = WaterMl; break;
             case Stage.Drained: starchKind = PanSauce.Settled; starchMl = SettledMl; waterMl = 0f; break;
-            default: starchKind = PanSauce.SlurryStarch; starchMl = StarchMl * ratio; waterMl = WaterMl; break;
+            default: starchKind = PanSauce.SlurryStarch; starchMl = StarchMl; waterMl = WaterMl; break;
         }
         Remove();
     }

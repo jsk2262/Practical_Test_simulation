@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -79,21 +79,64 @@ public class CutMethodChooser : MonoBehaviour
 
     /// <summary>onTrim: "다듬기" (peel/stem/seeds off first) - offered only when
     /// given (the ingredient has something to trim and hasn't been trimmed).</summary>
+    private readonly System.Collections.Generic.Dictionary<GameObject, Vector3> baseScales = new System.Collections.Generic.Dictionary<GameObject, Vector3>(); // 창마다 원래 크기
+
+    /// <summary>창을 확대율만큼 줄여 화면에서 늘 같은 크기로 (전체 보기 때 크기 기준).</summary>
+    private void FitToScreen(GameObject panel)
+    {
+        if (!baseScales.TryGetValue(panel, out Vector3 baseScale)) baseScales[panel] = baseScale = panel.transform.localScale; // 처음 크기 기억
+        panel.transform.localScale = baseScale * KitchenCamera.ZoomScale; // 확대율만큼
+    }
+
+    private static void FaceCamera(GameObject panel) // 글자와 클릭 영역을 카메라와 평행하게 둔다.
+    {
+        Camera cam = Camera.main;
+        if (cam != null) panel.transform.rotation = cam.transform.rotation;
+    }
+
     public void Show(Vector3 worldPos, Action<IngredientItem.CutMethod, CutSpec> callback, Action onTrim = null)
     {
         CommitEdit();
         onChosen = callback;
         this.onTrim = onTrim;
+        Camera camera = Camera.main; // 메뉴의 화면 위치는 유지하면서 깊이만 앞으로 옮긴다.
+        if (camera != null)
+        {
+            Vector3 screen = camera.WorldToScreenPoint(worldPos);
+            screen.z = Mathf.Max(camera.nearClipPlane + 0.5f, 2f); // 주방과 안내 표식보다 카메라에 가깝게 둔다.
+            worldPos = camera.ScreenToWorldPoint(screen);
+        }
         shownPos = worldPos;
 
         if (methodPanel == null) BuildMethodPanel();
         if (specPanel == null) BuildSpecPanel();
+        // 주변 버튼과 안내 글자는 그대로 둔다. 메뉴는 카메라 가까이에 표시한다.
 
         methodPanel.transform.position = worldPos;
+        FaceCamera(methodPanel); // 칼질 선택창을 회전된 화면 정면에 맞춘다.
+        FitToScreen(methodPanel); // 확대 중이면 화면에 맞는 크기로
         methodPanel.SetActive(true);
         specPanel.SetActive(false);
         if (trimButton != null) trimButton.SetActive(onTrim != null);
     }
+
+    private readonly System.Collections.Generic.List<Renderer> hiddenSceneLabels = new System.Collections.Generic.List<Renderer>(); // 켜져 있던 글자만 기억한다.
+    private void HideSceneLabels()
+    {
+        if (hiddenSceneLabels.Count > 0) return; // 창 전환 중에는 다시 기록하지 않는다.
+        foreach (TextMesh label in FindObjectsByType<TextMesh>(FindObjectsSortMode.None))
+        {
+            if (label.transform.IsChildOf(methodPanel.transform) || label.transform.IsChildOf(specPanel.transform)) continue;
+            Renderer renderer = label.GetComponent<Renderer>();
+            if (renderer != null && renderer.enabled) { hiddenSceneLabels.Add(renderer); renderer.enabled = false; }
+        }
+    }
+    private void RestoreSceneLabels() // 창을 닫으면 원래 켜져 있던 글자만 되돌린다.
+    {
+        foreach (Renderer renderer in hiddenSceneLabels) if (renderer != null) renderer.enabled = true;
+        hiddenSceneLabels.Clear();
+    }
+    void OnDestroy() { RestoreSceneLabels(); } // 씬 전환으로 종료되어도 남기지 않는다.
 
     private Action onTrim;
     private GameObject trimButton;
@@ -122,6 +165,7 @@ public class CutMethodChooser : MonoBehaviour
         onTrim = null;
         if (methodPanel != null) methodPanel.SetActive(false);
         if (specPanel != null) specPanel.SetActive(false);
+        RestoreSceneLabels(); // 취소 시 안내 글자를 되돌린다.
     }
 
     private void Trim()
@@ -130,6 +174,7 @@ public class CutMethodChooser : MonoBehaviour
         onTrim = null;
         onChosen = null;
         methodPanel.SetActive(false);
+        RestoreSceneLabels(); // 다듬기를 시작하기 전에 안내를 되돌린다.
         trim?.Invoke();
     }
 
@@ -425,6 +470,7 @@ public class CutMethodChooser : MonoBehaviour
         go.transform.localPosition = localPos;
 
         TextMesh tm = go.AddComponent<TextMesh>();
+        KoreanFontFallback.Apply(tm); // 웹에서도 한글이 보이게 한글 글꼴
         tm.text = text;
         tm.fontSize = fontSize;
         tm.characterSize = 0.16f;
@@ -468,6 +514,8 @@ public class CutMethodChooser : MonoBehaviour
             : single ? IngredientItem.CutMethodName(method) + " 규격 (가로=세로=두께)"
             : IngredientItem.CutMethodName(method) + " 규격";
         specPanel.transform.position = shownPos;
+        FaceCamera(specPanel); // 규격 입력창도 동일한 화면 방향을 쓴다.
+        FitToScreen(specPanel); // 확대 중이면 화면에 맞는 크기로
         specPanel.SetActive(true);
         BeginEdit(0);
     }
@@ -478,6 +526,8 @@ public class CutMethodChooser : MonoBehaviour
         CommitEdit();
         specPanel.SetActive(false);
         methodPanel.transform.position = shownPos;
+        FaceCamera(methodPanel); // 뒤로 돌아와도 화면 방향을 유지한다.
+        FitToScreen(methodPanel); // 확대 중이면 화면에 맞는 크기로
         methodPanel.SetActive(true);
     }
 
@@ -489,6 +539,7 @@ public class CutMethodChooser : MonoBehaviour
         if (SingleSize) curLength = curThickness = curWidth;
 
         specPanel.SetActive(false);
+        RestoreSceneLabels(); // 썰기를 시작하기 전에 안내를 되돌린다.
         Action<IngredientItem.CutMethod, CutSpec> callback = onChosen;
         onChosen = null;
 

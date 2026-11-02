@@ -183,7 +183,8 @@ public class CookableItem : MonoBehaviour
         if (process == CookProcess.DeepFry && (vessel == null || !vessel.IsOilHot)) return;
         if (process == CookProcess.StirFry) return; // the pieces aren't stir-fried as a whole
 
-        foreach (FoodPiece p in group.Pieces) p.Cook += SpeedMode.Wait(Time.deltaTime) * group.HeatFactor(p);
+        float cap = SpeedMode.On && CanOvercook ? timeToCooked : float.MaxValue; // 빠른 모드: 다 데친 뒤엔 더 익지 않음 (통째 재료와 같게)
+        foreach (FoodPiece p in group.Pieces) p.Cook = Mathf.Min(p.Cook + SpeedMode.Wait(Time.deltaTime) * group.HeatFactor(p), Mathf.Max(p.Cook, cap)); // 이미 더 익은 건 그대로 두고, 새로 넘지는 않게
         cookProgress = group.MinCook;
 
         if (CurrentStage == Stage.Raw) { CheckDrainedBeforeCooking(); CurrentStage = Stage.InProgress; }

@@ -10,7 +10,7 @@ public class StoveBurner : Interactable, ISlotContainer
 
     /// <summary>How far up (on screen) a vessel sits above the grate's center, so
     /// the flame under it - its size telling 강/중/약 - stays in view.</summary>
-    [SerializeField] private float vesselLift = 0.35f;
+    [SerializeField] private float vesselLift = 0.9f; // 0.35 로는 팬이 불꽃을 완전히 덮었다
 
     public bool IsOn { get; private set; }
     public FlameLevel Level { get; private set; } = FlameLevel.Medium;

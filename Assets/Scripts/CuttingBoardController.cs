@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 [RequireComponent(typeof(HygieneTracker))]
@@ -13,11 +13,25 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
     /// (자투리는 왼쪽 구석에 모으기) - beside the work, not taking the board's spot.</summary>
     public void AddScrap(FoodScrap scrap)
     {
-        Rect top = VisibleTopRect();
         Transform root = IngredientRoot;
+        scrap.transform.SetParent(root, true);
+        if (Vector3.Dot(Carryable.CounterUp, Vector3.up) > 0.999f && TryGetComponent(out Renderer surface)) // 수평 도마의 실제 윗면
+        {
+            Bounds face = surface.bounds; // 도마의 보이는 상자
+            Renderer sr = scrap.GetComponent<Renderer>(); // 자투리 자신의 두께를 재려고
+            float lift = sr != null ? sr.bounds.extents.y + 0.01f : 0.05f; // 윗면에 얹히게 반 높이만큼 띄운다
+            // 화면 왼쪽 위 구석: 화면 오른쪽이 월드 -X, 화면 위쪽이 월드 -Z 다 (아래 구석은 뒤집기 표시 자리)
+            scrap.transform.position = new Vector3(
+                face.max.x - 0.35f + Random.Range(-0.12f, 0.12f),
+                face.max.y + lift,
+                face.min.z + 0.30f + Random.Range(-0.10f, 0.10f));
+            scrap.CurrentContainer = this;
+            return;
+        }
+
+        Rect top = VisibleTopRect();
         // the upper-left corner: the lower one holds the 뒤집기 marker
         Vector3 corner = new Vector3(top.xMin + 0.35f + Random.Range(-0.15f, 0.15f), top.yMax - 0.3f + Random.Range(-0.12f, 0.1f), root.position.z);
-        scrap.transform.SetParent(root, true);
         Vector3 local = root.InverseTransformPoint(corner);
         scrap.transform.localPosition = new Vector3(local.x, local.y, -0.06f);
         scrap.CurrentContainer = this;
@@ -230,14 +244,26 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
     private void LayLiner(ToolItem towel)
     {
         Transform root = IngredientRoot;
-        Rect top = VisibleTopRect();
-        Vector3 c = root.InverseTransformPoint(new Vector3(top.center.x, top.center.y, root.position.z));
-        Vector3 local = new Vector3(c.x, c.y, -0.01f);
+        Vector3 local;
+        Vector2 sheet;
+        if (Vector3.Dot(Carryable.CounterUp, Vector3.up) > 0.999f && TryGetComponent(out Renderer surface)) // 수평 도마의 실제 윗면
+        {
+            Bounds face = surface.bounds; // 도마의 보이는 상자
+            local = root.InverseTransformPoint(new Vector3(face.center.x, face.max.y + 0.012f, face.center.z)); // 윗면 한가운데 바로 위
+            sheet = new Vector2(face.size.x, face.size.z) * 0.4f; // 얇은 높이가 아니라 너비와 깊이를 쓴다
+        }
+        else
+        {
+            Rect top = VisibleTopRect();
+            Vector3 c = root.InverseTransformPoint(new Vector3(top.center.x, top.center.y, root.position.z));
+            local = new Vector3(c.x, c.y, -0.01f);
+            sheet = top.size * 0.4f;
+        }
         if (!HandCarry.Instance.PlaceAtFreeLocalPosition(root, local)) return;
 
         towel.CurrentContainer = this;
         Liner = towel;
-        towel.SpreadAsLiner(this, root, top.size * 0.4f, local); // one sheet: about half the board
+        towel.SpreadAsLiner(this, root, sheet, local); // one sheet: about half the board
     }
 
     /// <summary>The board's top face as seen on screen (world XY). The board is
@@ -293,7 +319,15 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
     /// seen) - its click box, a tilted box, reaches well past the top face, over
     /// a plate set down beside it: food dropped on that plate went onto the
     /// board instead (and later went missing with it).</summary>
-    public bool ShowsAt(Vector3 world) => VisibleTopRect().Contains(new Vector2(world.x, world.y));
+    public bool ShowsAt(Vector3 world)
+    {
+        if (Vector3.Dot(Carryable.CounterUp, Vector3.up) > 0.999f && TryGetComponent(out Renderer surface)) // 수평 도마의 실제 윗면
+        {
+            Bounds b = surface.bounds;
+            return world.x >= b.min.x - 0.01f && world.x <= b.max.x + 0.01f && world.z >= b.min.z - 0.01f && world.z <= b.max.z + 0.01f;
+        }
+        return VisibleTopRect().Contains(new Vector2(world.x, world.y));
+    }
 
     /// <summary>The ray's hits nearest first, the board's skipped where it
     /// doesn't actually show (see ShowsAt) - what a click/drop there means.</summary>
@@ -304,7 +338,7 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
         Vector3 at = ray.origin;
         var kept = new System.Collections.Generic.List<RaycastHit>(hits.Length);
         foreach (RaycastHit h in hits)
-            if (h.collider.GetComponent<CuttingBoardController>() == null || Instance.ShowsAt(at)) kept.Add(h);
+            if (h.collider.GetComponent<CuttingBoardController>() == null || Instance.ShowsAt(h.point)) kept.Add(h);
         return kept.ToArray();
     }
 
@@ -369,6 +403,26 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
         a.rotation = Quaternion.identity;
         Vector3 ps = transform.parent.lossyScale;
         a.localScale = new Vector3(1f / Mathf.Max(ps.x, 1e-4f), 1f / Mathf.Max(ps.y, 1e-4f), 1f / Mathf.Max(ps.z, 1e-4f));
+
+        if (Vector3.Dot(Carryable.CounterUp, Vector3.up) > 0.999f && TryGetComponent(out Renderer surface)) // 수평 도마: 도마 앞쪽 조리대 위에 눕혀 둔다
+        {
+            Bounds face = surface.bounds; // 도마의 보이는 상자
+            // 화면 아래쪽(카메라 쪽) = 월드 +Z. 도마 앞 가장자리 바로 밖, 도마가 얹힌 면 높이에 놓는다.
+            Vector3 rest = new Vector3(face.center.x, face.min.y + halfHeight + 0.02f, face.max.z + 0.30f);
+            a.position = rest - bodyOffset;
+            anchorOffset = a.position - transform.position;
+
+            if (tool != null)
+            {
+                tool.transform.SetParent(a, true);
+                tool.transform.localPosition = Vector3.zero;
+                tool.transform.rotation = tool.RestingRotation;
+                Bounds shown = WholeBounds(tool); // 눕힌 자세로 다시 잰 칼 전체
+                a.position += new Vector3(rest.x - shown.center.x, face.min.y + shown.extents.y + 0.02f - shown.center.y, rest.z - shown.center.z);
+                anchorOffset = a.position - transform.position;
+            }
+            return;
+        }
 
         Rect top = VisibleTopRect();
         Vector3 body = new Vector3(top.center.x, top.yMin + halfHeight + 0.06f, 0f);
@@ -498,7 +552,11 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
         // drop until it's picked back up.
         if (hand?.Current is ToolItem knife && knife.Kind == ToolKind.Knife)
         {
-            if (hand.PlaceAtAnchor(Anchor)) knife.CurrentContainer = this;
+            if (hand.PlaceAtAnchor(Anchor))
+            {
+                knife.CurrentContainer = this;
+                if (Vector3.Dot(Carryable.CounterUp, Vector3.up) > 0.999f) PlaceOnLevelBoard(knife, true); // 오래된 앵커 깊이 대신 실제 윗면
+            }
             return;
         }
 
@@ -535,9 +593,38 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
         return new Vector3(point.x - offset.x, point.y - offset.y, z);
     }
 
+    private void PlaceOnLevelBoard(Carryable item, bool knife) // 실제 도마 표면에 물체 바닥을 맞춘다.
+    {
+        Bounds top = GetComponent<Renderer>().bounds;
+        Renderer renderer = item.GetComponent<Renderer>();
+        Bounds shape = item is IngredientItem ingredient ? ingredient.VisibleBounds : WholeBounds(item); // 손잡이 자식 메시까지 포함한다.
+        Vector3 aim = top.center;
+        TowelSpread sheet = !knife && Liner != null ? IngredientRoot.GetComponentInChildren<TowelSpread>() : null; // 보이는 타올은 도마 쪽 자식이다.
+        if (sheet != null) aim = sheet.transform.position;
+        Camera cam = Camera.main;
+        if (!knife && sheet == null && cam != null && UnityEngine.InputSystem.Mouse.current != null)
+        {
+            Ray ray = cam.ScreenPointToRay(UnityEngine.InputSystem.Mouse.current.position.ReadValue());
+            if (new Plane(Vector3.up, new Vector3(0f, top.max.y, 0f)).Raycast(ray, out float distance)) aim = ray.GetPoint(distance);
+        }
+        float ex = Mathf.Min(shape.extents.x + 0.02f, top.extents.x), ez = Mathf.Min(shape.extents.z + 0.02f, top.extents.z);
+        if (knife) aim.z = top.max.z - ez; // 칼은 도마 뒤쪽 가장자리에 둔다.
+        Vector3 center = new Vector3(Mathf.Clamp(aim.x, top.min.x + ex, top.max.x - ex), top.max.y + shape.extents.y + 0.015f, Mathf.Clamp(aim.z, top.min.z + ez, top.max.z - ez));
+        item.transform.position += center - shape.center;
+    }
+
     private void PlaceIngredientFree(IngredientItem item)
     {
         Transform root = IngredientRoot;
+        if (Vector3.Dot(Carryable.CounterUp, Vector3.up) > 0.999f) // 수평으로 옮긴 도마의 배치 경로
+        {
+            if (HandCarry.Instance.PlaceAtFreeLocalPosition(root, Vector3.zero))
+            {
+                item.CurrentContainer = this; Current = item;
+                PlaceOnLevelBoard(item, false);
+            }
+            return;
+        }
 
         // Wherever the player puts it (나이나이 레시피 style): the piece's middle
         // under the cursor, for a click as for a drag - and turned however the
@@ -651,12 +738,16 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
         Vector3 home = transform.position;
         Collider sinkCollider = sink.GetComponent<Collider>();
         Vector3 sinkCenter = sinkCollider != null ? sinkCollider.bounds.center : sink.position;
-        // Board stays at its own depth (it's drawn over the counter there).
-        Vector3 atSink = new Vector3(sinkCenter.x, sinkCenter.y, home.z);
+        bool level = Vector3.Dot(Carryable.CounterUp, Vector3.up) > 0.999f; // 수평 조리대인가
+        // 수평이면 높이는 그대로 두고 조리대 위를 가로질러 간다 (옛 2.5D 는 화면 평면에서만 움직였다).
+        Vector3 atSink = level ? new Vector3(sinkCenter.x, home.y, sinkCenter.z)
+                               : new Vector3(sinkCenter.x, sinkCenter.y, home.z);
 
         yield return MoveTo(home, atSink, 0.45f);
 
-        HandController.Instance?.GoTo(new Vector3(atSink.x, atSink.y, HandController.Instance.transform.position.z), null);
+        Vector3 handAt = HandController.Instance != null ? HandController.Instance.transform.position : Vector3.zero; // 손의 현재 자리
+        HandController.Instance?.GoTo(level ? new Vector3(atSink.x, handAt.y, atSink.z) // 손도 같은 축으로 따라간다
+                                            : new Vector3(atSink.x, atSink.y, handAt.z), null);
         HandController.Instance?.PlayWashGesture(1.0f);
         Vector3 baseScale = transform.localScale;
         for (float t = 0f; t < 1.0f; t += Time.deltaTime)
@@ -778,10 +869,22 @@ public class CuttingBoardController : PlaceSlot, ITowelLined
     /// then ended up behind the board while the knife (re-seated in front by
     /// ReseatToolsAfterFlip) chopped at nothing. Keeps the root on or in front
     /// of the current top face, and every ingredient on it fully in front.</summary>
+    public void EnsureIngredientsAboveBoard() => PullIngredientsInFront();
+
     private void PullIngredientsInFront()
     {
         Collider boardCollider = GetComponent<Collider>();
         if (boardCollider == null || ingredientRoot == null) return;
+        if (Vector3.Dot(Carryable.CounterUp, Vector3.up) > 0.999f) // 수평 도마에서는 앞뒤 Z가 아닌 실제 윗면 높이를 사용한다.
+        {
+            float surface = boardCollider.bounds.max.y;
+            foreach (IngredientItem item in Items)
+            {
+                Bounds bounds = item.VisibleBounds;
+                if (bounds.min.y < surface + 0.01f) item.transform.position += Vector3.up * (surface + 0.01f - bounds.min.y);
+            }
+            return;
+        }
 
         float surfaceZ = boardCollider.bounds.min.z;
         Vector3 p = ingredientRoot.position;

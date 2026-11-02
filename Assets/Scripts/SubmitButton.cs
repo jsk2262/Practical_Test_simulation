@@ -53,6 +53,7 @@ public class SubmitButton : MonoBehaviour, IClickable
         ls = go.transform.lossyScale;
         t.transform.localScale = new Vector3(1f / ls.x, 1f / ls.y, 1f);
         b.label = t.AddComponent<TextMesh>();
+        KoreanFontFallback.Apply(b.label); // 웹에서도 한글이 보이게 한글 글꼴
         b.label.fontSize = 60;
         b.label.characterSize = tb.size.y * 0.09f;
         b.label.anchor = TextAnchor.MiddleCenter;

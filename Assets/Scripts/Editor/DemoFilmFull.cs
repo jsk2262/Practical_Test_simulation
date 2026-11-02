@@ -119,7 +119,8 @@ public static partial class DemoFilm
 
         Add(null, null, 4f, 1.4f, () =>
         {
-            UnityEngine.Object.FindFirstObjectByType<CookingPlanManager>()?.Show();
+            CookingPlanManager pm = UnityEngine.Object.FindFirstObjectByType<CookingPlanManager>(); // 순서 카드 화면
+            if (pm != null && !pm.IsShowing) pm.Show(); // 이미 열려 있으면 다시 열지 않음 (두 번 열면 숨긴 글자 목록이 지워져 탭 이름 · 체크리스트가 안 돌아왔다)
             PlanAnnouncerOn(false);
             Cam(0f, 0.6f, 6.8f, 0.01f);
             DemoCaption.Card("기능사 실기\n시뮬레이션", "중식조리기능사 · 탕수육 + 마파두부를 실제 시험처럼 함께");

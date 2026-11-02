@@ -3,13 +3,14 @@ using UnityEngine;
 /// <summary>
 /// The knife left lying on the cutting board when the board is lifted
 /// (BoardSinkWash): it isn't carried along - freed from the board where it
-/// lies (world position and turn kept), it first slides off down the board's
-/// slope toward its front edge (pushed a little against the way the board is
-/// moved), and once it's over the counter's edge, a Rigidbody takes over: it
-/// falls under gravity onto the floor and comes to rest there by its own
-/// collisions (on an invisible floor surface - the floor has no collider of
-/// its own). Then it's an ordinary knife again, lying on the floor - dirty
-/// (to be washed before it's used again) and picked up as usual.
+/// lies (world position and turn kept), it first slides across the counter
+/// toward its front edge (pushed a little against the way the board is
+/// moved), and once it's past that edge, a Rigidbody takes over: it
+/// falls under gravity and comes to rest below the counter's edge by its own
+/// collisions - on the shelves standing there, or on an invisible floor
+/// surface at the cabinet's foot (the floor itself has no collider). Then
+/// it's an ordinary knife again, lying where it fell - dirty (to be washed
+/// before it's used again) and picked up as usual.
 /// Only one thing moves it at a time: the slide drives the transform while
 /// the body is absent; afterwards only the Rigidbody does. It can't be picked
 /// up while it's falling (HandCarry asks IsFalling).
@@ -26,7 +27,7 @@ public class KnifeFall : MonoBehaviour
     private static int recorded;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void ResetForPlay() { recorded = 0; catcher = null; }
+    private static void ResetForPlay() { recorded = 0; catcher = null; lipBox = null; }
 
     private ToolItem knife;
     private Transform board;
@@ -67,13 +68,25 @@ public class KnifeFall : MonoBehaviour
     private Vector3 lastBoardPos;
     private bool sliding = true;
     private float spinDeg;
+    private Renderer[] ownRenderers;
+    private Vector3 toFront;        // 조리대 윗면에 누운 '앞쪽'(플레이어가 보는 쪽) 방향
+    private float frontEdge;        // 그 축에서 조리대 앞턱의 가장 앞 지점
 
     void Start()
     {
         ownColliders = GetComponentsInChildren<Collider>();
         foreach (Collider c in ownColliders) c.enabled = false; // (not clicked or bumped while it slides)
+        ownRenderers = GetComponentsInChildren<Renderer>(); // 매 프레임 다시 찾지 않게 한 번만 모아 둔다
         lastBoardPos = board != null ? board.position : transform.position;
         spinDeg = Random.Range(-40f, 40f);
+
+        // 조리대는 수평이라 '내리막'이 없다. 칼은 조리대가 열려 있는 앞쪽으로 밀려 떨어진다.
+        Camera cam = Camera.main;
+        Vector3 up = Carryable.CounterUp; // 조리대 윗면의 법선
+        toFront = cam != null ? Vector3.ProjectOnPlane(-cam.transform.forward, up).normalized : Vector3.forward; // 조리대 면에 투영한 카메라 쪽
+        Bounds lip = CounterLip(); // 씬에 서 있는 조리대 앞턱
+        frontEdge = Vector3.Dot(lip.center, toFront)
+                  + Mathf.Abs(lip.extents.x * toFront.x) + Mathf.Abs(lip.extents.y * toFront.y) + Mathf.Abs(lip.extents.z * toFront.z); // 앞턱의 가장 앞까지
     }
 
     void Update()
@@ -82,21 +95,19 @@ public class KnifeFall : MonoBehaviour
         float dt = Time.deltaTime;
         if (dt <= 0f) return;
 
-        // Down the board's slope toward its front edge (the counter is tilted
-        // to the camera: down the screen), the board pulled away under it
-        // leaving it behind a little; gently - it slips, it isn't thrown.
-        Vector3 downSlope = Vector3.ProjectOnPlane(Vector3.down, Carryable.CounterUp).normalized;
-        Vector3 boardVel = board != null ? (board.position - lastBoardPos) / dt : Vector3.zero;
+        // Across the counter toward its front edge, the board pulled away under
+        // it leaving it behind a little; gently - it slips, it isn't thrown.
+        Vector3 up = Carryable.CounterUp; // 조리대 윗면의 법선
+        Vector3 boardVel = board != null ? (board.position - lastBoardPos) / dt : Vector3.zero; // 도마가 빠져나가는 속도
         if (board != null) lastBoardPos = board.position;
-        Vector3 drag = Vector3.ProjectOnPlane(-boardVel, Carryable.CounterUp);
-        slideVel += (downSlope * 6f + Vector3.ClampMagnitude(drag, 3f) * 0.6f) * dt;
+        Vector3 drag = Vector3.ProjectOnPlane(-boardVel, up); // 도마에 끌려 반대쪽으로 밀리는 몫
+        slideVel += (toFront * 6f + Vector3.ClampMagnitude(drag, 3f) * 0.6f) * dt; // 앞쪽으로 천천히 가속
         slideVel = Vector3.ClampMagnitude(slideVel, 2.2f);
         transform.position += slideVel * dt;
-        transform.rotation = Quaternion.AngleAxis(spinDeg * dt, Carryable.CounterUp) * transform.rotation;
+        transform.rotation = Quaternion.AngleAxis(spinDeg * dt, up) * transform.rotation;
 
-        // Over the counter's front edge: it falls from here.
-        float lipTop = CounterLipTop();
-        if (Bounds().max.y < lipTop || transform.position.y < lipTop - 0.6f) StartFalling();
+        // Past the counter's front edge: it falls from here.
+        if (Vector3.Dot(Bounds().center, toFront) > frontEdge) StartFalling(); // 무게중심이 앞턱을 넘으면 낙하 시작
     }
 
     // ---- 2) falling: the Rigidbody only ----
@@ -104,8 +115,7 @@ public class KnifeFall : MonoBehaviour
     private void StartFalling()
     {
         sliding = false;
-        // In front of the counter and cabinet from here (the camera looks
-        // straight along z - a change of depth doesn't move it on screen).
+        // 앞턱을 넘은 자리에서 수납장 문 바로 앞으로만 살짝 밀어 내고, 그 평면 안에서 떨어진다.
         transform.position = new Vector3(transform.position.x, transform.position.y, floorZ);
 
         // A simple box for the body (its own mesh collider isn't convex).
@@ -149,20 +159,15 @@ public class KnifeFall : MonoBehaviour
         if (stillFor > 0.35f || physicsFor > 5f) Finish();
     }
 
-    void OnCollisionEnter(Collision c)
-    {
-        if (c.collider != null && c.collider.gameObject == catcher)
-            knife?.GetComponent<HygieneTracker>()?.MarkNeedsWash(); // (on the floor: dirty)
-    }
-
     // ---- 3) at rest: an ordinary knife again ----
 
     private void Finish()
     {
         if (done) return;
         done = true;
+        knife?.GetComponent<HygieneTracker>()?.MarkNeedsWash(); // 조리대 아래로 떨어진 칼은 어디에 닿았든 다시 씻어야 한다
         CleanUp();
-        Debug.Log("[도마] 칼이 바닥에 떨어져 멈춤 - 다시 집을 수 있음");
+        Debug.Log("[도마] 칼이 조리대 아래로 떨어져 멈춤 - 다시 집을 수 있음");
         Destroy(this);
     }
 
@@ -194,8 +199,8 @@ public class KnifeFall : MonoBehaviour
 
     private Bounds Bounds()
     {
-        Renderer[] rs = GetComponentsInChildren<Renderer>();
-        if (rs.Length == 0) return new Bounds(transform.position, Vector3.one * 0.1f);
+        Renderer[] rs = ownRenderers; // Start 에서 모아 둔 렌더러들
+        if (rs == null || rs.Length == 0) return new Bounds(transform.position, Vector3.one * 0.1f);
         Bounds b = rs[0].bounds;
         foreach (Renderer r in rs) b.Encapsulate(r.bounds);
         return b;
@@ -223,16 +228,17 @@ public class KnifeFall : MonoBehaviour
         return any ? lb : new Bounds(Vector3.zero, Vector3.one * 0.1f);
     }
 
-    private static float? lipTop;
-    private static float CounterLipTop()
+    private static Bounds? lipBox;
+    /// <summary>The counter's front lip, as it stands in the scene.</summary>
+    private static Bounds CounterLip()
     {
-        if (!lipTop.HasValue)
+        if (!lipBox.HasValue)
         {
             GameObject lip = GameObject.Find("Counter_FrontLip");
             Renderer r = lip != null ? lip.GetComponent<Renderer>() : null;
-            lipTop = r != null ? r.bounds.max.y : -1.15f;
+            lipBox = r != null ? r.bounds : new Bounds(Vector3.zero, Vector3.one * 0.1f); // 못 찾으면 원점의 작은 상자
         }
-        return lipTop.Value;
+        return lipBox.Value;
     }
 
     private static GameObject catcher;

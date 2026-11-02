@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -333,6 +333,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         // not - a bowl's leftover water just gets poured out first.
         if (CleanupMode.IsOn && IsPlateOrBowl && occupied.Count == 0 && WaterAmount > 0f) SetWaterAmount(0f);
         if (CleanupMode.IsOn && IsPlateOrBowl && occupied.Count == 0 && HasPortion) GetComponent<PortionedCondiment>().Remove();
+        if (CleanupMode.IsOn && IsPlateOrBowl && occupied.Count == 0 && HasEgg) EggContents.Of(this, false).Clear(); // 정리 때: 남은 달걀도 비우고 설거지
         // (a pan that's had oil or a sauce in it is dirty too, whatever put it
         // there; and in clean-up anything can be washed - a pan or pot as well)
         // (다 씻은 뒤에도 빈 PanSauce 컴포넌트는 남아 있다 - 씻은 뒤로는 실제로
@@ -790,7 +791,8 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         UpdateOilHeat();
         if (!canHoldWater) return;
 
-        bool canBoil = IsFilledWithWater && !IsHeld && CurrentBurner != null && CurrentBurner.IsOn;
+        bool canBoil = (IsFilledWithWater || (SpeedMode.On && WaterAmount > 0f)) // 빠른 모드: 물이 조금만 있어도 끓음
+                       && !IsHeld && CurrentBurner != null && CurrentBurner.IsOn;
         float timeToBoil = HasLid ? timeToBoilWithLid : timeToBoilNoLid;
         if (!canBoil)
         {
@@ -816,6 +818,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         bool heating = !IsHeld && CurrentBurner != null && CurrentBurner.IsOn;
         oilHeat = heating ? Mathf.Min(oilHeat + SpeedMode.Wait(Time.deltaTime) * FlameRate, timeToHeatOil * 1.5f)
                           : Mathf.Max(0f, oilHeat - Time.deltaTime * 0.3f);
+        if (heating && SpeedMode.On) oilHeat = timeToHeatOil * (160f / 155f); // 빠른 모드: 불에 올리면 바로 180℃로 맞추고 유지 (20 + 155 × 160/155 = 180)
         // Frying oil hot on the flame spatters the burner's floor (under its grate).
         if (heating && OilHeat01 > 0.5f) BurnerFloorDirt.Soil(CurrentBurner, BurnerFloorDirt.SoilKind.Oil, Time.deltaTime);
         if (oilSurface == null) return;
@@ -844,6 +847,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     {
         Interior inside = GetInterior();
         float radius = inside.radius * 0.35f;
+        PanSauce.Of(this, false)?.Sweep(world, world, radius);
         foreach (Carryable c in occupied.Keys)
             if (c.GetComponent<FoodPieceGroup>() is FoodPieceGroup g) g.Poke(world, radius);
         HandController hc = HandController.Instance;
@@ -851,12 +855,26 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             hc.SetGestureOffset(hc.GestureOffset + ToolItem.TowardSpoonHead(tool, world, Time.deltaTime));
     }
 
+    /// <summary>기름 속에 앙금 조각(온도 확인용)이 떠 있음 - 체망으로 건질 수 있게.</summary>
+    public bool HasBatterDrops
+    {
+        get
+        {
+            foreach (Transform t in transform) if (t.name == "BatterDrop") return true;
+            return false;
+        }
+    }
+
     /// <summary>기름 온도 확인: a little starch batter dropped in the oil. Hot
     /// enough, it bobs straight back up and sizzles; too cold, it sinks and
     /// only drifts up slowly.</summary>
+    /// <summary>반죽 조각으로 기름 온도를 확인한 횟수 (체크리스트용).</summary>
+    public static int BatterTestCount { get; private set; }
+
     public void DropBatterTest()
     {
         if (!HasFryingOil || oilSurface == null) return;
+        BatterTestCount++; // 온도 확인 한 번 함
         StartCoroutine(BatterTest(OilDropPointFromPointer(GetInterior().floorCenter)));
     }
 
@@ -906,18 +924,28 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
                     // Accumulate heat rather than snapshotting IsOilHot on entry.
                     float rate = BatterProbeRiseRate(temperature, batterProbeSecondsAt175);
                     riseProgress = Mathf.Clamp01(riseProgress + rate * dt);
-                    float target = riseProgress > 0f ? -radius * 0.3f : availableDepth * fraction;
+                    // 덜 뜨거운 기름이라도 익어 수분이 빠지면 뜬다 - 노릇해지기(익음 25%) 전에는 다 떠오름
+                    bool cookedUp = cooked >= 0.25f; // 익어서 떠오를 때
+                    if (cookedUp) riseProgress = 1f; // 온도와 상관없이 떠오름
+                    float target = riseProgress > 0f ? 0f : availableDepth * fraction; // 떠오르면 중심이 기름 표면 = 절반 잠김
                     float speed = riseProgress > 0f
-                        ? (availableDepth + radius) * rate
+                        ? (availableDepth + radius) * Mathf.Max(rate, cookedUp ? 0.5f : 0f) // 익어서 뜰 때는 너무 느리지 않게 (약 2초)
                         : availableDepth * 0.4f;
                     depth = Mathf.MoveTowards(depth, target, speed * dt);
-                    floating = riseProgress >= 1f && depth <= 0f;
+                    floating = riseProgress >= 1f && depth <= 0.001f; // 표면까지 올라오면 떠 있는 상태
                 }
                 else
-                    depth = -radius * (0.3f + Mathf.Sin(age * 5f) * 0.1f);
+                    depth = radius * Mathf.Sin(age * 5f) * 0.08f; // 절반 잠긴 채 살짝 출렁 (예전엔 30% 위로 올라와 얹힌 것처럼 보였다)
 
                 Vector3 at = inside.floorCenter + transform.TransformVector(offsetLocal);
-                blob.transform.position = at + inside.up * (OilSurfaceHeight - depth);
+                // 기름 표면 높이를 '그 자리'에서 잰다: 표면 원판이 그릇 위 방향과 조금 기울어 있어,
+                // 가운데 높이 하나로 쓰면 팬 안쪽은 잠기고 앞쪽은 처음부터 떠 보였다
+                Vector3 n = oilSurface.transform.up;                                             // 기름 표면의 위 방향
+                float along = Vector3.Dot(n, inside.up);                                          // 그릇 위 방향과의 기울기
+                float surfaceHere = Mathf.Abs(along) > 0.1f
+                    ? Vector3.Dot(n, oilSurface.transform.position - at) / along                  // 이 자리에서 표면까지 높이
+                    : OilSurfaceHeight;                                                           // (기울기를 못 재면 예전 값)
+                blob.transform.position = at + inside.up * (surfaceHere - depth);                 // 표면 기준 깊이만큼
                 cooked += Mathf.InverseLerp(130f, 205f, temperature) * dt * 0.025f;
                 Color color = Color.Lerp(new Color(0.97f, 0.96f, 0.9f),
                     new Color(0.65f, 0.38f, 0.12f), Mathf.Clamp01(cooked));
@@ -1110,6 +1138,15 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
 
     /// <summary>Tips the vessel in hand (담기 - FryingPanPlating's pour).</summary>
     public void SetPourTilt(Quaternion tilt) => SetTempHoldRotation(tilt);
+
+    /// <summary>화면에서 본 기울기 (양수 = 화면상 한쪽으로, 기울기 각도들은 그 기준으로
+    /// 맞춰져 있다). 축은 카메라의 시선이다 - 월드 Z 로 고정하면 카메라가 반대편으로
+    /// 옮겨간 지금 화면에서 기울기가 반대로 보인다.</summary>
+    public static Quaternion PourTilt(float degrees)
+    {
+        Camera cam = Camera.main; // 화면 기준 축을 알아야 한다
+        return Quaternion.AngleAxis(degrees, cam != null ? cam.transform.forward : Vector3.back); // 시선 둘레로 기울인다
+    }
 
     protected override void OnClickedWhileHandFull(Carryable held)
     {
@@ -1517,7 +1554,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         if (hand != null) hand.IsLocked = true;
         HandController.Instance?.GoTo(BodyCenterWorld() + new Vector3(0.6f, 0.7f, 0f) + new Vector3(0f, 0f, HandController.Instance.transform.position.z - BodyCenterWorld().z), null);
         yield return new WaitForSeconds(0.3f);
-        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { from.SetPourTilt(Quaternion.AngleAxis(-70f * t / 0.3f, Vector3.forward)); yield return null; }
+        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { from.SetPourTilt(MovableBowl.PourTilt(-70f * t / 0.3f)); yield return null; }
         float total = kept.Amount;
         PanSauce into = PanSauce.Of(this, true);
         for (float t = 0f; t < 0.6f; t += Time.deltaTime)
@@ -1528,7 +1565,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         into.Put(kept.Take(kept.Amount)); // (the last of it)
         MarkUsed();
         Debug.Log($"[옮겨 담기] {from.name} → {name}: 소스 {total:0.#}스푼");
-        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { from.SetPourTilt(Quaternion.AngleAxis(-70f * (1f - t / 0.3f), Vector3.forward)); yield return null; }
+        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { from.SetPourTilt(MovableBowl.PourTilt(-70f * (1f - t / 0.3f))); yield return null; }
         from.SetPourTilt(Quaternion.identity);
         if (hand != null) hand.IsLocked = false;
         pouring = false;
@@ -1578,7 +1615,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         yield return new WaitForSeconds(0.3f);
         // (a careful tip for a part, all the way for the lot)
         float angle = part == EggContents.Part.All || egg.Beaten || egg.Mixed ? -75f : -55f;
-        for (float t = 0f; t < 0.35f; t += Time.deltaTime) { from.SetPourTilt(Quaternion.AngleAxis(angle * t / 0.35f, Vector3.forward)); yield return null; }
+        for (float t = 0f; t < 0.35f; t += Time.deltaTime) { from.SetPourTilt(MovableBowl.PourTilt(angle * t / 0.35f)); yield return null; }
         yield return new WaitForSeconds(0.3f);
         string what = egg.Beaten || egg.Mixed ? egg.Label : EggPartChooser.Name(part);
         egg.Take(part, out float whites, out float yolks, out bool beaten);
@@ -1586,7 +1623,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         MarkUsed();
         Debug.Log($"[옮겨 담기] {from.name} → {name}: 달걀 {what} (흰자 {whites:0.#}, 노른자 {yolks:0.#})");
         yield return new WaitForSeconds(0.2f);
-        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { from.SetPourTilt(Quaternion.AngleAxis(angle * (1f - t / 0.3f), Vector3.forward)); yield return null; }
+        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { from.SetPourTilt(MovableBowl.PourTilt(angle * (1f - t / 0.3f))); yield return null; }
         from.SetPourTilt(Quaternion.identity);
         if (hand != null) hand.IsLocked = false;
         pouring = false;
@@ -1604,14 +1641,14 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         if (hand != null) hand.IsLocked = true;
         HandController.Instance?.GoTo(BodyCenterWorld() + new Vector3(0.6f, 0.7f, 0f) + new Vector3(0f, 0f, HandController.Instance.transform.position.z - BodyCenterWorld().z), null);
         yield return new WaitForSeconds(0.3f);
-        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { cup.SetPourTilt(Quaternion.AngleAxis(-75f * t / 0.3f, Vector3.forward)); yield return null; }
+        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { cup.SetPourTilt(MovableBowl.PourTilt(-75f * t / 0.3f)); yield return null; }
         float ml = cup.WaterMl;
         cup.SetWaterAmount(0f);
         PanSauce.Of(this, true).Add(Condiments.Water, ml / ToolItem.TablespoonMl);
         MarkUsed();
         Debug.Log($"[옮겨 담기] {cup.name} → {name}: 물 {ml:0}mL");
         yield return new WaitForSeconds(0.3f);
-        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { cup.SetPourTilt(Quaternion.AngleAxis(-75f * (1f - t / 0.3f), Vector3.forward)); yield return null; }
+        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { cup.SetPourTilt(MovableBowl.PourTilt(-75f * (1f - t / 0.3f))); yield return null; }
         cup.SetPourTilt(Quaternion.identity);
         if (hand != null) hand.IsLocked = false;
         pouring = false;
@@ -1626,7 +1663,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         // over this one, then tipped
         HandController.Instance?.GoTo(BodyCenterWorld() + new Vector3(0.6f, 0.7f, 0f) + new Vector3(0f, 0f, HandController.Instance.transform.position.z - BodyCenterWorld().z), null);
         yield return new WaitForSeconds(0.3f);
-        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { from.SetPourTilt(Quaternion.AngleAxis(-70f * t / 0.3f, Vector3.forward)); yield return null; }
+        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { from.SetPourTilt(MovableBowl.PourTilt(-70f * t / 0.3f)); yield return null; }
 
         var food = new List<Carryable>();
         foreach (Carryable c in from.Contents) if ((c is IngredientItem || c is FoodScrap) && Accepts(c)) food.Add(c);
@@ -1654,7 +1691,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             yield return new WaitForSeconds(0.08f);
         }
 
-        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { from.SetPourTilt(Quaternion.AngleAxis(-70f * (1f - t / 0.3f), Vector3.forward)); yield return null; }
+        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { from.SetPourTilt(MovableBowl.PourTilt(-70f * (1f - t / 0.3f))); yield return null; }
         from.SetPourTilt(Quaternion.identity);
         if (hand != null) hand.IsLocked = false;
         pouring = false;
@@ -1696,7 +1733,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             any = true;
             // a drop off the spatula (thin: runs off, thick: hangs and falls slowly)
             if (HandCarry.Instance?.Current is ToolItem tool && tool.GetComponentInChildren<Renderer>() is Renderer tr)
-                sauce.DripFrom(new Vector3(tr.bounds.center.x, tr.bounds.min.y, tr.bounds.min.z));
+                sauce.DripFrom(new Vector3(tr.bounds.center.x, tr.bounds.min.y, tr.bounds.center.z)); // 주걱 바로 아래로 떨어진다 (옛 코드는 앞쪽 가장자리였다)
         }
         if (!any) return false;
         if (stirRoutine != null) StopCoroutine(stirRoutine);
@@ -1711,13 +1748,17 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         HandController hand = HandController.Instance;
         if (hand == null) yield break;
         Interior inside = GetInterior();
+        // 젓는 원은 팬 '속' 평면에 그려야 한다. 옛 코드는 월드 XY(화면 평면)에 그려서,
+        // 수평 팬에서는 원이 세로로 서는 바람에 주걱이 팬 위 허공에서 돌았다.
+        Vector3 across = Vector3.ProjectOnPlane(Vector3.right, inside.up).normalized; // 팬 속 평면의 한 축
+        Vector3 deep = Vector3.Cross(across, inside.up).normalized; // 그와 직각인 축
         ToolItem tool = HandCarry.Instance != null ? HandCarry.Instance.Current as ToolItem : null;
         if (tool == null)
         {
             for (float t = 0f; t < 0.45f; t += Time.deltaTime)
             {
                 float a = t / 0.45f * Mathf.PI * 2f;
-                hand.SetGestureOffset(new Vector3(Mathf.Cos(a), Mathf.Sin(a) * 0.6f, 0f) * inside.radius * 0.5f);
+                hand.SetGestureOffset((across * Mathf.Cos(a) + deep * (Mathf.Sin(a) * 0.6f)) * inside.radius * 0.5f); // 팬 속에서 원을 그린다
                 yield return null;
             }
             hand.SetGestureOffset(Vector3.zero);
@@ -1728,11 +1769,15 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         // 원을 그리면 손잡이 끝이 팬 위에 있고 머리는 팬 밖으로 나가 있었다.
         Vector3 center = BodyCenterWorld();
         Vector3 reach = hand.GestureOffset;
+        Vector3 lastSpoon = center + across * inside.radius * 0.5f; // a=0 일 때의 자리
         for (float t = 0f; t < 0.45f; t += Time.deltaTime)
         {
             float a = t / 0.45f * Mathf.PI * 2f;
-            Vector3 circle = new Vector3(Mathf.Cos(a), Mathf.Sin(a) * 0.6f, 0f) * inside.radius * 0.5f;
-            reach += ToolItem.TowardSpoonHead(tool, center + circle, Time.deltaTime);
+            Vector3 circle = (across * Mathf.Cos(a) + deep * (Mathf.Sin(a) * 0.6f)) * inside.radius * 0.5f; // 팬 속 평면 위의 원
+            Vector3 spoon = center + circle;
+            PanSauce.Of(this, false)?.Sweep(lastSpoon, spoon, inside.radius * 0.22f);
+            lastSpoon = spoon;
+            reach += ToolItem.TowardSpoonHead(tool, spoon, Time.deltaTime);
             hand.SetGestureOffset(reach);
             yield return null;
         }
@@ -1753,7 +1798,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
 
     public override bool CanAcceptDrop(Carryable item)
     {
-        if (item is Strainer strainer) return CanRestStrainer || (strainer.HasContents ? !IsFull : occupied.Count > 0);
+        if (item is Strainer strainer) return CanRestStrainer || (strainer.HasContents ? !IsFull : occupied.Count > 0 || HasBatterDrops);
         if (item is ToolItem knife && knife.Kind == ToolKind.Knife) return CanScoopFromBoard();
         if (item is ToolItem spatula && spatula.Kind == ToolKind.Spatula) return occupied.Count > 0;
         if (item is MovableBowl from && (object)from != this && !IsDish && from.GetComponent<FryingPanPlating>() == null
@@ -1800,9 +1845,8 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             Vector3 shift = mouth - lidBounds.center;
             // Resting just on the rim, not pressed into it, and tipped a little
             // so a sliver of the gap under it shows (as a lid sits on a pot).
-            lid.transform.position += new Vector3(shift.x, shift.y, 0f) + inside.up * (lidBounds.extents.y * 0.35f);
-            lid.transform.RotateAround(mouth + inside.up * (lidBounds.extents.y * 0.35f) + Vector3.left * lidBounds.extents.x,
-                Vector3.forward, 6f); // (its right side lifted off the rim)
+            float halfHeight = Vector3.Dot(new Vector3(Mathf.Abs(inside.up.x), Mathf.Abs(inside.up.y), Mathf.Abs(inside.up.z)), lidBounds.extents); // 뚜껑 두께
+            lid.transform.position += shift + inside.up * (halfHeight + 0.015f); // 뚜껑 바닥을 냄비 입구 위로 올린다.
         }
 
         currentLid = lid;
@@ -1843,6 +1887,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
     {
         Transform root = ContentRoot;
         item.transform.SetParent(root, false);
+        HandCarry.ResetToBaseScale(item); // 접시 부모의 배율·회전이 두부에 추가되지 않도록 복원한다.
 
         Vector3 desired3 = root.InverseTransformPoint(worldDropPosition);
         Vector2 desired = new Vector2(
@@ -1865,14 +1910,25 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             // 썬 채소가 팬·웍·냄비에 들어가면: 조각마다 따로 익고·타고·저으면 움직이게
             if (IsCookingVessel && item is IngredientItem toCook) toCook.EnsurePieceGroup();
             if (item is IngredientItem cut && cut.CurrentState == IngredientItem.State.Cut)
-                cut.GatherPieces(Mathf.Min(InsideRadius(), inside.radius * 0.45f));
+                cut.GatherPieces(IsDeepBowl ? inside.radius * 0.7f // 깊은 볼: 바닥에 넓게 골고루 펼침
+                                            : Mathf.Min(InsideRadius(), inside.radius * 0.45f)); // 그 외: 예전처럼 모아 담기
             // What shows of it (cut slices lie off to one side of the pivot) goes on the spot.
             // (튀김 기름: 정해진 자리가 아니라 커서로 가리킨 곳에 - 한 조각씩 팬 가장자리
             // 여기저기 따로 넣을 수 있게. 겹치면 바로 옆 빈 곳)
             Vector3 want = HasFryingOil && item is IngredientItem ? OilDropSpot(item, inside, worldDropPosition) : FreeSlot(item, inside);
             Vector3 shown = VisibleCenter(item);
-            item.transform.position += HasFryingOil && item is IngredientItem
-                ? want - shown : new Vector3(want.x - shown.x, want.y - shown.y, 0f);
+            // (팬 · 웍 · 냄비: 깊이(z)까지 맞춘다 - 화면 가로세로만 옮기면 도마에 있던
+            // 깊이 그대로라, 기울어진 화구 위 팬에서는 앞쪽 벽 밑으로 들어가 안 보였다)
+            item.transform.position += want - shown; // 접시도 조리대 평면의 X·Z 위치를 함께 적용한다.
+            // 그릇 안쪽 반지름 안으로 담는다. 이미 다른 것이 있으면 더미가 가장자리
+            // 자리에 놓여, 더미 자신의 반경이 더해져 벽을 넘어 튀어나왔다.
+            // (튀김 기름은 ClampOilDropPoint 가 이미 가장자리를 지킨다)
+            if (!HasFryingOil)
+            {
+                Vector3 over = Vector3.ProjectOnPlane(VisibleCenter(item) - inside.floorCenter, inside.up); // 바닥 평면에서 가운데로부터 벗어난 양
+                float room = Mathf.Max(0f, inside.radius - VisibleReach(item, inside.up));                  // 가운데가 벗어나도 되는 한계
+                if (over.magnitude > room) item.transform.position -= over.normalized * (over.magnitude - room); // 넘친 만큼 가운데로 당긴다
+            }
         }
         if (!(HasFryingOil && item is IngredientItem))
         {
@@ -1893,6 +1949,16 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         {
             string what = ing.DrainOnTowel == IngredientItem.DrainNeed.Blood ? "핏물" : "물기";
             ExamDeductions.Add($"{ing.IngredientName}: 키친타올로 {what} 제거 없이 조리");
+        }
+    }
+
+    /// <summary>깊은 볼(bowlSize2x3 등, 접시가 아닌 오목한 그릇): 내용물을 바닥에 넓게 담는다.</summary>
+    private bool IsDeepBowl
+    {
+        get
+        {
+            Interior i = GetInterior(); // 그릇 안쪽 모양
+            return !IsCookingVessel && i.rim > i.radius * 0.35f; // 조리 그릇이 아니고 벽이 높으면 깊은 볼
         }
     }
 
@@ -1919,7 +1985,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         }
         if (!deep) slots.Add(inside.floorCenter);
 
-        var others = new List<Vector2>();
+        var others = new List<Vector3>();
         foreach (Carryable c in occupied.Keys)
             if (c != null && (object)c != item) others.Add(VisibleCenter(c));
         if (others.Count == 0) return slots[0];
@@ -1931,7 +1997,7 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         foreach (Vector3 s in slots)
         {
             float gap = float.MaxValue;
-            foreach (Vector2 o in others) gap = Mathf.Min(gap, ((Vector2)s - o).magnitude);
+            foreach (Vector3 o in others) gap = Mathf.Min(gap, Vector3.ProjectOnPlane(s - o, inside.up).magnitude); // 접시 평면에서 간격을 비교한다.
             if (gap >= r * 0.8f) return s;
             if (gap > bestGap + 0.01f) { bestGap = gap; best = s; }
         }
@@ -1990,6 +2056,24 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         // 겹친다고 다른 빈자리로 옮기지 않는다. 넣은 뒤의 충돌/붙음은 조각 시뮬레이션이 처리.
         return ClampOilDropPoint(requestedPoint, clearance) + inside.up * clearance;
     }
+    /// <summary>그릇 바닥 평면에서 이것이 차지하는 반지름 (보이는 것 기준).</summary>
+    private static float VisibleReach(Carryable c, Vector3 up)
+    {
+        Bounds b = new Bounds(c.transform.position, Vector3.zero); // 보이는 것들을 담을 상자
+        bool any = false;
+        foreach (Renderer r in c.GetComponentsInChildren<Renderer>())
+        {
+            if (!r.enabled || r is ParticleSystemRenderer) continue; // 꺼진 것·입자는 크기에서 뺀다
+            if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds);
+        }
+        if (!any) return 0f;
+        Vector3 e = b.extents;                                            // 축에 맞춘 상자의 반쪽 크기
+        Vector3 across = Vector3.ProjectOnPlane(Vector3.right, up).normalized; // 바닥 평면의 가로 축
+        Vector3 deep = Vector3.Cross(across, up).normalized;                   // 바닥 평면의 깊이 축
+        return Mathf.Max(Mathf.Abs(e.x * across.x) + Mathf.Abs(e.y * across.y) + Mathf.Abs(e.z * across.z),
+                         Mathf.Abs(e.x * deep.x) + Mathf.Abs(e.y * deep.y) + Mathf.Abs(e.z * deep.z)); // 두 축 중 큰 쪽
+    }
+
     private static Vector3 VisibleCenter(Carryable c)
     {
         // (조각으로 나뉜 것: 조각들의 실제 자리 가운데)
@@ -2023,6 +2107,20 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         Vector3 up = dish.transform.TransformDirection(Vector3.up).normalized;
         if (Vector3.Dot(up, new Vector3(0f, 0.6f, -1f)) < 0f) up = -up;
         Vector3 plane = dish.bounds.center;
+        // 수평 접시는 보이는 윗면을 기준으로 한다. 옛 화면 깊이(z) 기준은
+        // 접시 중심에 두부 바닥을 놓아 표면에 묻히게 한다.
+        if (Vector3.Dot(Carryable.CounterUp, Vector3.up) > 0.999f && !IsCookingVessel && !IsDeepBowl)
+            plane.y = Mathf.Max(plane.y, GetInterior().floorCenter.y) + 0.02f;
+        // 팬 · 웍 · 냄비: 모델 전체(손잡이 · 벽까지)의 가운데는 안쪽 바닥보다 한참 위라,
+        // 그 높이에 맞춰 화면 깊이로 밀면 재료가 앞쪽 벽 밑으로 들어가 안 보였다 -
+        // 안쪽 바닥 기준으로, 바닥의 위쪽 방향으로만 올린다
+        bool cooking = (IsCookingVessel || IsDeepBowl) && item is IngredientItem; // 조리 그릇 · 깊은 볼(두부 · 튀김 담는 볼)은 안쪽 바닥 기준
+        if (cooking)
+        {
+            Interior inside = GetInterior();
+            up = inside.up;
+            plane = inside.floorCenter;
+        }
 
         float lowest = float.MaxValue;
         foreach (MeshFilter mf in item.GetComponentsInChildren<MeshFilter>())
@@ -2037,7 +2135,8 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
         // Along the camera's line of sight, not the dish's up: the piece stays on
         // screen right where it was set down (moving along up slid it up the plate).
         float need = 0.01f - lowest;
-        if (Mathf.Abs(up.z) > 0.3f) item.transform.position += new Vector3(0f, 0f, need / up.z);
+        if (cooking) item.transform.position += up * need;
+        else if (Mathf.Abs(up.z) > 0.3f) item.transform.position += new Vector3(0f, 0f, need / up.z);
         else item.transform.position += up * need;
     }
 

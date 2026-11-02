@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -29,6 +29,10 @@ public class KitchenCamera : MonoBehaviour
     public enum View { Overview, Board, Burner }
     public View Current { get; private set; } = View.Overview;
     public static bool IsZoomed => Instance != null && Instance.Current != View.Overview;
+
+    /// <summary>지금 화면 크기 ÷ 전체 보기 화면 크기 (전체 보기 1, 확대하면 작아짐) - 창을 이만큼 곱하면 화면에서 같은 크기.</summary>
+    public static float ZoomScale => Instance != null && Instance.cam != null && Instance.fullSize > 0f
+        ? Instance.cam.orthographicSize / Instance.fullSize : 1f;
 
     /// <summary>전환 중이거나 화면을 끌어 옮기는 중: 월드 클릭(집기·놓기·칼질...)을 받지 않는다.</summary>
     public static bool BlocksWorldInput => Instance != null && (Instance.transitioning || Instance.panning);
@@ -111,7 +115,7 @@ public class KitchenCamera : MonoBehaviour
         var allBurners = FindObjectsByType<StoveBurner>(FindObjectsSortMode.None);
         StoveBurner lower = null;
         foreach (StoveBurner b in allBurners)
-            if (lower == null || b.transform.position.y < lower.transform.position.y) lower = b;
+            if (lower == null || ScreenFrame(b.transform.position).y < ScreenFrame(lower.transform.position).y) lower = b;
         zoomBurners = lower != null ? new[] { lower } : new StoveBurner[0];
         fullPos = transform.position;
         fullSize = cam.orthographic ? cam.orthographicSize : 6.8f;
@@ -148,7 +152,7 @@ public class KitchenCamera : MonoBehaviour
                 if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds);
             }
         }
-        return any ? Rect.MinMaxRect(b.min.x - 0.3f, b.min.y - 0.2f, b.max.x + 0.3f, b.max.y + 0.3f) : new Rect(-12f, -6f, 24f, 14f);
+        return any ? Pad(ProjectBounds(b), 0.3f) : new Rect(-12f, -6f, 24f, 14f);
     }
 
     // ---- 요청 ----
@@ -212,7 +216,7 @@ public class KitchenCamera : MonoBehaviour
         if (!CanZoomBurner(burner)) return;
         focusBurner = burner;
         // 기준: 화구 자리 (흔드는 팬이 아니라) + 손잡이 자리 상자 + 불조절 손잡이 + 옆 그릇
-        Vector2 p = burner.transform.position;
+        Vector2 p = ScreenFrame(burner.transform.position); // 화면의 가로·세로 좌표
         Rect r = Rect.MinMaxRect(p.x + burnerBoxMin.x, p.y + burnerBoxMin.y, p.x + burnerBoxMax.x, p.y + burnerBoxMax.y);
         foreach (StoveKnob k in FindObjectsByType<StoveKnob>(FindObjectsSortMode.None))
             if (k.Burner == burner) r = Union(r, RectOf(k.gameObject));
@@ -231,7 +235,7 @@ public class KitchenCamera : MonoBehaviour
         float aspect = Mathf.Max(cam.aspect, 0.1f);
         float size = Mathf.Max(r.height * 0.5f / usableHeight, r.width * 0.5f / (aspect * usableWidth));
         size = Mathf.Clamp(size, minZoomSize, Mathf.Max(minZoomSize, Mathf.Min(maxSize, fullSize)));
-        Vector3 pos = new Vector3(r.center.x, r.center.y, fullPos.z);
+        Vector3 pos = FromScreenFrame(new Vector3(r.center.x, r.center.y, ScreenFrame(fullPos).z)); // 시선 깊이를 유지한다.
         Go(view, ClampToBounds(pos, size), size);
     }
 
@@ -253,7 +257,7 @@ public class KitchenCamera : MonoBehaviour
     void Update()
     {
         Mouse mouse = Mouse.current;
-        if (mouse == null || cam == null) return;
+        if (mouse == null || cam == null || PauseMenu.IsPaused) return; // 일시정지 중에는 시점 조작 안 함
         Vector2 screen = mouse.position.ReadValue();
 
         if (transitioning)
@@ -291,7 +295,7 @@ public class KitchenCamera : MonoBehaviour
         Vector2 delta = screen - lastPanMouse;
         lastPanMouse = screen;
         float worldPerPixel = cam.orthographicSize * 2f / Mathf.Max(cam.pixelHeight, 1);
-        Vector3 move = new Vector3(delta.x, delta.y, 0f) * worldPerPixel * panSensitivity;
+        Vector3 move = (transform.right * delta.x + transform.up * delta.y) * worldPerPixel * panSensitivity;
         Vector3 pos = transform.position + (dragMovesContent ? -move : move);
         transform.position = ClampToBounds(pos, cam.orthographicSize);
     }
@@ -347,9 +351,9 @@ public class KitchenCamera : MonoBehaviour
     }
 
     /// <summary>창이 열려 있거나, 다른 조작이 마우스·Esc를 쓰는 중.</summary>
-    private static bool SomethingOpenOrBusy()
+    public static bool SomethingOpenOrBusy()
     {
-        if (ConfirmDialog.IsOpen || ExamResultView.IsOpen || EggPartChooser.IsOpen) return true;
+        if (PauseMenu.IsPaused || ConfirmDialog.IsOpen || ExamResultView.IsOpen || EggPartChooser.IsOpen) return true; // (일시정지 중 포함)
         if (CutMethodChooser.Instance != null && CutMethodChooser.Instance.IsOpen) return true;
         if (HandCarry.Instance != null && HandCarry.Instance.IsLocked) return true; // (썰기·붓기 같은 애니메이션 중)
         return InputCapturedElsewhere();
@@ -367,13 +371,13 @@ public class KitchenCamera : MonoBehaviour
         HandCarry hand = HandCarry.Instance;
         if (hc == null || hc.IsMoving || (hand != null && (hand.IsLocked || hand.IsDragging)) || InputCapturedElsewhere()) return;
         float h = cam.orthographicSize, w = h * cam.aspect;
-        Vector3 c = transform.position;
-        Vector3 rest = hc.RestPosition;
+        Vector3 c = ScreenFrame(transform.position);
+        Vector3 rest = ScreenFrame(hc.RestPosition);
         bool inView = rest.x > c.x - w * 0.9f && rest.x < c.x + w * 0.9f && rest.y > c.y - h * 0.95f && rest.y < c.y + h * 0.9f;
         if (inView) return;
         // (화면 아래 가운데에서 조금 위 - 작업 대상은 가리지 않게)
         Vector3 to = new Vector3(Mathf.Clamp(rest.x, c.x - w * 0.5f, c.x + w * 0.5f), c.y - h * 0.72f, rest.z);
-        hc.SlideTo(to, 0.25f);
+        hc.SlideTo(FromScreenFrame(to), 0.25f);
     }
 
     // ---- 화면 고정 UI ----
@@ -387,7 +391,8 @@ public class KitchenCamera : MonoBehaviour
         foreach (Hud h in huds)
         {
             if (h.t == null) continue;
-            h.t.position = new Vector3(c.x + (h.pos.x - fullPos.x) * k, c.y + (h.pos.y - fullPos.y) * k, h.pos.z);
+            Vector3 offset = ScreenFrame(h.pos - fullPos); // 초기 화면 안 위치
+            h.t.position = c + FromScreenFrame(new Vector3(offset.x * k, offset.y * k, offset.z));
             h.t.localScale = h.scale * k;
         }
     }
@@ -419,7 +424,7 @@ public class KitchenCamera : MonoBehaviour
         if (burner == null || cam == null) return false;
         // A screen-sized button just below its burner (under the grate, out of the
         // pan's way); never scale the burner itself.
-        Vector3 p = cam.WorldToScreenPoint(burner.transform.position + Vector3.down * burnerButtonDrop);
+        Vector3 p = cam.WorldToScreenPoint(burner.transform.position - cam.transform.up * burnerButtonDrop);
         float scale = Mathf.Max(1f, Screen.height / 900f);
         float w = 120f * scale, h = 38f * scale;
         if (p.z <= 0f || p.x < w * 0.5f || p.x > Screen.width - w * 0.5f
@@ -510,10 +515,11 @@ public class KitchenCamera : MonoBehaviour
     {
         float halfH = size, halfW = size * cam.aspect;
         Rect b = panBounds;
+        pos = ScreenFrame(pos); // 경계와 같은 화면 좌표계
         pos.x = b.width > halfW * 2f ? Mathf.Clamp(pos.x, b.xMin + halfW, b.xMax - halfW) : b.center.x;
         pos.y = b.height > halfH * 2f ? Mathf.Clamp(pos.y, b.yMin + halfH, b.yMax - halfH) : b.center.y;
-        pos.z = fullPos.z;
-        return pos;
+        pos.z = ScreenFrame(fullPos).z;
+        return FromScreenFrame(pos);
     }
 
     private static Rect RectOf(GameObject g)
@@ -525,9 +531,17 @@ public class KitchenCamera : MonoBehaviour
             if (!r.enabled || r is ParticleSystemRenderer || r.GetComponent<TextMesh>() != null) continue;
             if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds);
         }
-        return Rect.MinMaxRect(b.min.x, b.min.y, b.max.x, b.max.y);
+        return ProjectBounds(b);
     }
 
+    private static Vector3 ScreenFrame(Vector3 p) => Camera.main != null ? Quaternion.Inverse(Camera.main.transform.rotation) * p : p; // 회전만 변환한다.
+    private static Vector3 FromScreenFrame(Vector3 p) => Camera.main != null ? Camera.main.transform.rotation * p : p;
+    private static Rect ProjectBounds(Bounds b) // 모든 모서리를 화면 평면으로 투영한다.
+    {
+        Bounds projected = new Bounds(ScreenFrame(b.center), Vector3.zero);
+        for (int i = 0; i < 8; i++) projected.Encapsulate(ScreenFrame(b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1))));
+        return Rect.MinMaxRect(projected.min.x, projected.min.y, projected.max.x, projected.max.y);
+    }
     private static Rect Union(Rect a, Rect b) =>
         Rect.MinMaxRect(Mathf.Min(a.xMin, b.xMin), Mathf.Min(a.yMin, b.yMin), Mathf.Max(a.xMax, b.xMax), Mathf.Max(a.yMax, b.yMax));
 

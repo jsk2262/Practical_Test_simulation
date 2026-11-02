@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
@@ -31,16 +31,12 @@ public class HangingRack : Interactable, ISlotContainer
         foreach (Carryable item in startItems)
         {
             if (item == null || !CanHang(item) || item.IsHeld) continue;
-            int hook = NearestFreeHook(HookX(0));
-            for (int i = 0; i < hooks.Length; i++) if (hooks[i] == null) { hook = i; break; }
-            if (hook < 0) break;
-
+            int hook = NearestFreeHook(item.transform.position.x); // 씬에서 가장 가까운 걸이에 등록한다.
+            if (hook < 0) continue;
             item.CurrentContainer?.Release(item);
-            item.transform.SetParent(hookRoot, true);
-            item.transform.localScale = item.BaseLocalScale; // hookRoot is unscaled in world terms
-            hooks[hook] = item;
+            hooks[hook] = item; // 기존 위치와 회전은 그대로 두고 사용 중인 고리만 기록한다.
             item.CurrentContainer = this;
-            HangAt(item, hook);
+            if (item is ToolItem tool) tool.LearnGripFromHangingPose(item.transform.rotation); // 다시 걸 때 손잡이 방향을 유지한다.
         }
     }
 
@@ -134,7 +130,12 @@ public class HangingRack : Interactable, ISlotContainer
         t.rotation = Quaternion.AngleAxis(turn, Vector3.forward) * rest;
 
         Renderer r = item.GetComponentInChildren<Renderer>();
-        Vector3 hookPoint = new Vector3(HookX(hook), rail.min.y - hookDrop, rail.min.z - frontOffset);
+        // 레일에서 '카메라 쪽' 면에 건다. 옛 프레임은 카메라가 -Z 쪽이라 rail.min.z 가 앞이었지만,
+        // 지금은 카메라가 +Z 쪽이어서 그대로 두면 걸린 것이 선반 안쪽으로 파묻혔다.
+        Camera rackCam = Camera.main;                                              // 어느 쪽이 앞인지 알려면 카메라가 필요하다
+        float frontZ = rackCam == null || rackCam.transform.forward.z < 0f         // 카메라가 -Z 를 보면 +Z 쪽이 앞
+                     ? rail.max.z + frontOffset : rail.min.z - frontOffset;
+        Vector3 hookPoint = new Vector3(HookX(hook), rail.min.y - hookDrop, frontZ);
         if (r == null) { t.position = hookPoint; return; }
 
         Bounds b = r.bounds;

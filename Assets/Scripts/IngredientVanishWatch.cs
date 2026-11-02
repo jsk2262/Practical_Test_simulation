@@ -73,7 +73,11 @@ public class IngredientVanishWatch : MonoBehaviour
 
     private void Report(Carryable c, string why, Vector3 at)
     {
+#if UNITY_6000_5_OR_NEWER
+        if (!reported.Add(unchecked((int)UnityEngine.EntityId.ToULong(c.GetEntityId())) + why)) return;
+#else
         if (!reported.Add(c.GetInstanceID() + why)) return;
+#endif
         string holder = c.CurrentContainer is Component h ? h.name : "-";
         string parent = c.transform.parent != null ? c.transform.parent.name : "-";
         Debug.LogWarning($"[사라짐 감지] {c.name}: {why} - 위치 {at:F2}, 담긴 곳 {holder}, 부모 {parent}\n마지막으로 놓은 경로:\n{c.LastPlacedBy}");

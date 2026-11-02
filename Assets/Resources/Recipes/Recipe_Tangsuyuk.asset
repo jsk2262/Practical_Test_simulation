@@ -183,7 +183,9 @@ MonoBehaviour:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    friedColor: {r: 0.86, g: 0.62, b: 0.28, a: 1}
+    firstFryColor: {r: 0.98, g: 0.95, b: 0.84, a: 1}
+    friedColor: {r: 0.8, g: 0.52, b: 0.17, a: 1}
+    meatShowColor: {r: 0.72, g: 0.42, b: 0.36, a: 1}
     fryBrownSeconds: 40
   strokesToMix: 6
   mixDoneAt: 0.95

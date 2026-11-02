@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -178,9 +178,22 @@ public partial class ToolItem : Carryable
         go.AddComponent<BoxCollider>().size = new Vector3(1f, 1f, 0.02f);
         go.transform.SetParent(root, false);
         go.transform.localPosition = localPos;
-        go.transform.rotation = Quaternion.identity;
-        Vector3 rs = root.lossyScale;
-        go.transform.localScale = new Vector3(worldSize.x / rs.x, worldSize.y / rs.y, 1f);
+        Vector3 up = Carryable.CounterUp; // 펼친 타올의 윗면은 조리대 위쪽을 향한다.
+        Vector3 along = Vector3.ProjectOnPlane(Vector3.forward, up).normalized;
+        if (along.sqrMagnitude < 0.001f) along = Vector3.ProjectOnPlane(Vector3.up, up).normalized;
+        go.transform.rotation = Quaternion.LookRotation(-up, along); // Quad의 앞면(-Z)을 위로 향하게 한다.
+        Renderer support = under is MovableBowl bowl ? bowl.VisibleDishRenderer() : under.GetComponent<Renderer>(); // 놓인 표면
+        if (support != null && Vector3.Dot(up, Vector3.up) > 0.999f)
+        {
+            Bounds surface = support.bounds;
+            worldSize = new Vector2(surface.size.x, surface.size.z) * 0.4f; // 얇은 높이가 아닌 표면 너비와 깊이를 쓴다.
+            go.transform.position = new Vector3(surface.center.x, surface.max.y + 0.012f, surface.center.z); // 도마·접시 위에 펼친다.
+        }
+        Quaternion localTurn = go.transform.localRotation; // 회전된 부모의 축별 배율을 상쇄한다.
+        float sx = root.TransformVector(localTurn * Vector3.right).magnitude;
+        float sy = root.TransformVector(localTurn * Vector3.up).magnitude;
+        float sz = root.TransformVector(localTurn * Vector3.forward).magnitude;
+        go.transform.localScale = new Vector3(worldSize.x / Mathf.Max(sx, 0.0001f), worldSize.y / Mathf.Max(sy, 0.0001f), 1f / Mathf.Max(sz, 0.0001f));
 
         Renderer rend = go.GetComponent<Renderer>();
         Shader lit = Shader.Find("Universal Render Pipeline/Lit");
@@ -231,6 +244,32 @@ public partial class ToolItem : Carryable
         return true;
     }
 
+    private bool TryKnifeHandleOffset(out Vector3 offset) // 가장 어두운 재질의 영역을 손잡이로 찾는다.
+    {
+        offset = Vector3.zero;
+        float darkest = 0.4f; bool found = false; Vector3 grip = Vector3.zero; // 자식 손잡이 메시도 검사한다.
+        foreach (MeshFilter filter in GetComponentsInChildren<MeshFilter>())
+        {
+            Renderer renderer = filter.GetComponent<Renderer>(); Mesh mesh = filter.sharedMesh;
+            if (mesh == null || renderer == null) continue;
+            Material[] materials = renderer.sharedMaterials;
+            for (int i = 0; i < materials.Length && i < mesh.subMeshCount; i++)
+            {
+                Material m = materials[i]; if (m == null) continue;
+                Color color = m.HasProperty("_BaseColor") ? m.GetColor("_BaseColor") : m.color;
+                if (color.grayscale >= darkest) continue;
+                int[] indices = mesh.GetTriangles(i); if (indices.Length == 0) continue;
+                Vector3[] vertices = mesh.vertices; Bounds bounds = new Bounds(vertices[indices[0]], Vector3.zero);
+                foreach (int index in indices) bounds.Encapsulate(vertices[index]);
+                grip = transform.InverseTransformPoint(filter.transform.TransformPoint(bounds.center));
+                darkest = color.grayscale; found = true;
+            }
+        }
+        offset = RestingRotation * Vector3.Scale(grip, BaseLocalScale); // 손잡이 중앙이 손 중심에 오도록 한다.
+        return found;
+    }
+
+
     private bool IsUtensil => kind == ToolKind.Ladle || kind == ToolKind.Spatula || kind == ToolKind.Spoon
                            || kind == ToolKind.Chopsticks || kind == ToolKind.Whisk || kind == ToolKind.MeasuringSpoon;
 
@@ -257,6 +296,9 @@ public partial class ToolItem : Carryable
     [Tooltip("뜰채: 손에 들 때 뒤집어서 바구니의 오목한 안쪽이 위로 오게 (모델이 반대로 만들어졌으면 끄기).")]
     [SerializeField] private bool strainerFlipInHand = true;
     private bool laidDownInHand;
+    private Quaternion knifeCarryTurn = Quaternion.identity; // 칼을 잡았을 때 화면 위로 향하는 회전
+    private Vector3 knifeCarryGrip; // 회전 후 손잡이 중심
+    private Vector3 knifeHandAnchor; // 손 모델의 실제 손가락 위치
 
     /// <summary>Utensils stand upright in the holder; carried that way they read
     /// as being lifted straight up. In hand they lie flat instead (head to the
@@ -268,6 +310,22 @@ public partial class ToolItem : Carryable
         // first, so base.OnPickedUp sees (and later re-enables) its colliders.
         EndLiner();
         base.OnPickedUp();
+        if (kind == ToolKind.Knife && TryKnifeHandleOffset(out Vector3 handleOffset)) // 검은 손잡이 부분을 손 중심에 맞춘다.
+        {
+            laidDownInHand = true;
+            Camera cam = Camera.main;
+            Renderer blade = GetComponent<Renderer>();
+            Vector3 bladeDirection = blade != null ? blade.bounds.center - (transform.position + handleOffset) : Vector3.up;
+            Vector3 screenDirection = cam != null ? cam.transform.InverseTransformDirection(bladeDirection) : bladeDirection;
+            Vector2 screenAxis = new Vector2(screenDirection.x, screenDirection.y);
+            float angle = screenAxis.sqrMagnitude > 0.000001f ? Vector2.SignedAngle(screenAxis, Vector2.up) : 0f;
+            knifeCarryTurn = Quaternion.AngleAxis(angle, cam != null ? cam.transform.forward : Vector3.forward); // 칼날이 화면 12시 방향
+            knifeCarryGrip = knifeCarryTurn * handleOffset; // 회전한 검은 손잡이의 중심
+            SetTempHoldRotation(knifeCarryTurn);
+            knifeHandAnchor = HandController.Instance != null && HandCarry.Instance != null ? HandController.Instance.KnucklePosition - HandCarry.Instance.transform.position : Vector3.zero; // 손의 실제 쥐는 위치
+            SetTempHoldOffset(knifeHandAnchor - BaseHandHoldOffset - knifeCarryGrip); // 손잡이 중심과 손가락을 일치시킨다.
+            return;
+        }
 
         // Strainers are held horizontally: basket left, handle right, held by the
         // handle end - however they were resting or hanging.
@@ -424,34 +482,54 @@ public partial class ToolItem : Carryable
     /// pivot - is what ends up in the hand.</summary>
     private void ComputeChopStance()
     {
-        uprightChopRotation = Quaternion.identity;
-        chopGripVector = Vector3.zero;
+        uprightChopRotation = Quaternion.identity; // 계산 전 기본값
+        chopGripVector = Vector3.zero; // 계산 전 기본값
 
-        Renderer rend = GetComponent<Renderer>();
-        if (rend == null) return;
+        Renderer rend = GetComponent<Renderer>(); // 칼의 크기를 재려면 렌더러가 필요하다.
+        if (rend == null) return; // 잴 수 없으면 기본 자세 그대로 둔다.
 
-        Bounds lb = rend.localBounds;
-        Vector3 size = lb.size;
+        Bounds lb = rend.localBounds; // 칼 자체 좌표에서의 크기
+        Vector3 size = lb.size; // 가로·세로·두께
         Vector3 longLocal = size.x >= size.y && size.x >= size.z ? Vector3.right
-                          : size.y >= size.z ? Vector3.up : Vector3.forward;
-        float halfLength = Vector3.Dot(size, longLocal) * 0.5f;
+                          : size.y >= size.z ? Vector3.up : Vector3.forward; // 가장 긴 축이 칼의 길이 방향이다.
+        float halfLength = Vector3.Dot(size, longLocal) * 0.5f; // 길이의 절반
 
-        Vector2 axis = RestingRotation * longLocal;
-        if (axis.sqrMagnitude < 1e-6f) return;
+        // 수평 조리대: 화면 좌표가 아니라 실제 축으로 세운다. 손잡이는 플레이어 쪽,
+        // 넓은 면은 좌우를 향해 칼날이 도마를 보고 서고, 재료를 가로질러 내려온다.
+        Camera chopCam = Camera.main; // 플레이어가 보는 방향을 알아야 한다
+        Vector3 counterUp = Carryable.CounterUp; // 조리대 윗면의 법선
+        if (Vector3.Dot(counterUp, Vector3.up) > 0.999f && chopCam != null
+            && KnifeAxes(out Vector3 chopLong, out Vector3 chopThin, out float chopSign))
+        {
+            Vector3 toPlayer = Vector3.ProjectOnPlane(-chopCam.transform.forward, counterUp).normalized; // 조리대 면에 누운 플레이어 쪽
+            Vector3 across = Vector3.Cross(counterUp, toPlayer); // 그와 직각인 가로 방향
+            Quaternion fromLocal = Quaternion.LookRotation(chopLong * chopSign, chopThin); // 칼의 손잡이축·두께축을 표준 틀로
+            Quaternion stance = Quaternion.LookRotation(toPlayer, across) * Quaternion.Inverse(fromLocal); // 손잡이를 앞으로, 넓은 면을 옆으로
+            Vector3 edge = stance * (Vector3.Cross(chopLong, chopThin) * EdgeSign(chopLong, chopThin)); // 날이 향하는 쪽
+            if (Vector3.Dot(edge, counterUp) > 0f) stance = Quaternion.AngleAxis(180f, toPlayer) * stance; // 날이 위를 보면 길이축 둘레로 뒤집는다
+            if (flipChopUpright) stance = Quaternion.AngleAxis(180f, toPlayer) * stance; // 인스펙터에서 뒤집으면 한 번 더
+            uprightChopRotation = stance * Quaternion.Inverse(RestingRotation); // 놓인 자세 위에 덧씌울 회전
+            Vector3 chopGrip = lb.center + chopLong * (chopSign * halfLength * 0.75f); // 손잡이 쪽 3/4 지점을 쥔다
+            chopGripVector = stance * Vector3.Scale(chopGrip, BaseLocalScale); // 쥐는 지점을 월드 기준으로 옮긴다
+            return;
+        }
+
+        Vector2 axis = RestingRotation * longLocal; // 놓여 있을 때 길이 방향이 화면에서 향하는 쪽
+        if (axis.sqrMagnitude < 1e-6f) return; // 화면상 길이가 없으면 계산하지 않는다.
 
         // The knife's resting pose has its blade toward the top of the screen
         // and the black handle toward the bottom (taking the upper end as the
         // handle had the hand gripping the blade end instead).
-        float handleSign = axis.y >= 0f ? -1f : 1f;
-        if (flipChopUpright) handleSign = -handleSign;
-        Vector2 handleDir = axis * handleSign;
+        float handleSign = axis.y >= 0f ? -1f : 1f; // 아래쪽을 향한 끝을 손잡이로 본다.
+        if (flipChopUpright) handleSign = -handleSign; // 뒤집기 설정이 켜져 있으면 반대로
+        Vector2 handleDir = axis * handleSign; // 손잡이가 향하는 방향
 
         uprightChopRotation = Quaternion.AngleAxis(chopTiltZ, Vector3.forward)
-                            * Quaternion.AngleAxis(Vector2.SignedAngle(handleDir, Vector2.down), Vector3.forward);
+                            * Quaternion.AngleAxis(Vector2.SignedAngle(handleDir, Vector2.down), Vector3.forward); // 손잡이를 아래로 세운 칼질 자세
 
         // Grip about three quarters of the way from the middle out along the handle.
-        Vector3 gripLocal = lb.center + longLocal * (handleSign * halfLength * 0.75f);
-        chopGripVector = uprightChopRotation * RestingRotation * Vector3.Scale(gripLocal, BaseLocalScale);
+        Vector3 gripLocal = lb.center + longLocal * (handleSign * halfLength * 0.75f); // 손잡이 쪽 3/4 지점을 쥔다.
+        chopGripVector = uprightChopRotation * RestingRotation * Vector3.Scale(gripLocal, BaseLocalScale); // 쥐는 지점을 월드 기준으로 옮긴다.
     }
     private IEnumerator ChopMotionRoutine()
     {
@@ -506,13 +584,13 @@ public partial class ToolItem : Carryable
     /// the handle, like the reference grip.</summary>
     private void ApplyChopPose(float lift)
     {
-        SetTempHoldRotation(Quaternion.Slerp(Quaternion.identity, uprightChopRotation, chopBlend));
+        SetTempHoldRotation(uprightChopRotation); // 내려놓기 전까지 12시 방향을 유지한다.
         // The knife rides the hand transform, so whatever extra shift the hand
         // takes to close its fist on the handle is taken back out here.
         Vector3 fistShift = HandController.Instance != null
             ? HandController.Instance.SetChopPose(chopBlend, Vector3.up * lift + chopGripVector * chopBlend, BaseHandHoldOffset)
             : Vector3.zero;
-        SetTempHoldOffset(-chopGripVector * chopBlend - fistShift);
+        SetTempHoldOffset(knifeHandAnchor - BaseHandHoldOffset - chopGripVector - fistShift); // 손가락 기준을 칼질 사이에도 유지한다.
     }
 
     // ---- 칼에 썬 재료 올려 옮기기 (knife as a bench scraper) ----
@@ -529,6 +607,7 @@ public partial class ToolItem : Carryable
     {
         if (kind != ToolKind.Knife || !IsHeld || KnifeLoad != null || loadRoutine != null || ing == null || ing.IsHeld) return false;
         EndChopStance();
+        SetFlatCarryForLoad(); // 잘린 재료를 올리기 전에 칼등을 평평하게 눕힌다.
 
         if (ing.CurrentContainer != null)
         {
@@ -541,6 +620,82 @@ public partial class ToolItem : Carryable
         ing.transform.SetParent(transform, true);
         loadRoutine = StartCoroutine(SlideOntoBlade(ing));
         return true;
+    }
+
+    private int edgeSign; // 폭 축에서 날이 있는 쪽 (0 = 아직 재지 않음)
+
+    /// <summary>칼날이 폭 축의 어느 쪽인지 - 메시에서 더 얇은 끝을 날로 본다.
+    /// 칼 모델이 바뀌어도 맞게 서도록 값을 고정하지 않고 재며, 한 번 재면 기억한다.</summary>
+    private float EdgeSign(Vector3 longLocal, Vector3 thinLocal)
+    {
+        if (edgeSign != 0) return edgeSign; // 이미 쟀으면 그대로 쓴다
+        edgeSign = 1; // 못 재면 쓰는 기본값
+        MeshFilter mf = GetComponent<MeshFilter>(); // 칼날 메시
+        if (mf == null || mf.sharedMesh == null) return edgeSign;
+        Mesh mesh = mf.sharedMesh;
+        Vector3 width = Vector3.Cross(longLocal, thinLocal); // 날-등 방향
+        float half = Mathf.Abs(Vector3.Dot(mesh.bounds.extents, width)); // 폭의 절반
+        float mid = Vector3.Dot(mesh.bounds.center, width); // 폭 축에서의 가운데
+        float loMin = float.MaxValue, loMax = float.MinValue, hiMin = float.MaxValue, hiMax = float.MinValue;
+        foreach (Vector3 v in mesh.vertices) // (칼마다 한 번만 도는 계산이다)
+        {
+            float w = Vector3.Dot(v, width) - mid; // 가운데에서 폭 축으로 떨어진 거리
+            float t = Vector3.Dot(v, thinLocal); // 두께 축에서의 위치
+            if (w < -half * 0.75f) { loMin = Mathf.Min(loMin, t); loMax = Mathf.Max(loMax, t); } // 한쪽 끝의 두께
+            else if (w > half * 0.75f) { hiMin = Mathf.Min(hiMin, t); hiMax = Mathf.Max(hiMax, t); } // 반대쪽 끝의 두께
+        }
+        if (loMax < loMin || hiMax < hiMin) return edgeSign; // 한쪽 끝이 비면 재지 못한 것이다
+        edgeSign = (loMax - loMin) < (hiMax - hiMin) ? -1 : 1; // 얇은 쪽이 날이다
+        return edgeSign;
+    }
+
+    /// <summary>칼 메시의 축: 길이 방향, 두께 방향(넓은 면의 법선), 그리고 손잡이가
+    /// 길이축의 어느 쪽에 있는지. 칼 모델이 바뀌어도 다시 재서 쓴다.</summary>
+    private bool KnifeAxes(out Vector3 longLocal, out Vector3 thinLocal, out float handleSign)
+    {
+        longLocal = Vector3.right; thinLocal = Vector3.forward; handleSign = 1f; // 못 재면 쓰는 기본값
+        Renderer blade = GetComponent<Renderer>(); // 칼날 메시
+        Renderer handle = HandleRenderer(); // 검은 손잡이 메시
+        if (blade == null || handle == null) return false; // 둘 다 있어야 방향을 정할 수 있다
+        Vector3 size = blade.localBounds.size; // 칼 자체 좌표에서의 가로·세로·두께
+        longLocal = size.x >= size.y && size.x >= size.z ? Vector3.right
+                  : size.y >= size.z ? Vector3.up : Vector3.forward; // 가장 긴 축이 길이
+        thinLocal = size.x <= size.y && size.x <= size.z ? Vector3.right
+                  : size.y <= size.z ? Vector3.up : Vector3.forward; // 가장 짧은 축이 두께
+        if (longLocal == thinLocal) return false; // 납작하지 않으면 자세를 정할 수 없다
+        Vector3 toHandle = Quaternion.Inverse(transform.rotation) * (handle.bounds.center - blade.bounds.center); // 손잡이가 놓인 쪽 (칼 좌표)
+        handleSign = Vector3.Dot(toHandle, longLocal) < 0f ? -1f : 1f; // 길이축에서 손잡이 쪽 부호
+        return true;
+    }
+
+    private void SetFlatCarryForLoad() // 넓은 칼면이 위로 오게 눕혀 썬 재료를 받친다.
+    {
+        Renderer blade = GetComponent<Renderer>(); Renderer handle = HandleRenderer(); Camera cam = Camera.main;
+        if (blade == null || handle == null || cam == null) return;
+        Vector3 up = Carryable.CounterUp;
+
+        // 수평 조리대: 두께축을 위로 세워 넓은 면을 수평으로 만든다 (옛 코드는 조리대
+        // 축 둘레로 돌리기만 해서, 칼이 날로 선 채 재료를 얹으려 했다).
+        if (Vector3.Dot(up, Vector3.up) > 0.999f && KnifeAxes(out Vector3 flatLong, out Vector3 flatThin, out float flatSign))
+        {
+            Vector3 toPlayer = Vector3.ProjectOnPlane(-cam.transform.forward, up).normalized; // 손잡이가 향할 플레이어 쪽
+            Quaternion fromLocal = Quaternion.LookRotation(flatLong * flatSign, flatThin); // 칼의 손잡이축·두께축을 표준 틀로
+            Quaternion flat = Quaternion.LookRotation(toPlayer, up) * Quaternion.Inverse(fromLocal); // 두께축을 위로 = 넓은 면이 수평
+            Quaternion delta = flat * Quaternion.Inverse(RestingRotation); // 놓인 자세 위에 덧씌울 회전
+            if (!TryKnifeHandleOffset(out Vector3 flatGrip)) return; // 손잡이 위치를 모르면 그만둔다
+            SetTempHoldRotation(delta);
+            SetTempHoldOffset(knifeHandAnchor - BaseHandHoldOffset - delta * flatGrip); // 눕혀도 손잡이를 놓치지 않는다
+            return;
+        }
+
+        Vector3 local = Quaternion.Inverse(transform.rotation) * (blade.bounds.center - handle.bounds.center);
+        Vector3 from = Vector3.ProjectOnPlane(RestingRotation * local, up);
+        Vector3 to = Vector3.ProjectOnPlane(cam.transform.up, up);
+        if (from.sqrMagnitude < 0.000001f || to.sqrMagnitude < 0.000001f) return;
+        Quaternion turn = Quaternion.AngleAxis(Vector3.SignedAngle(from, to, up), up);
+        if (!TryKnifeHandleOffset(out Vector3 grip)) return;
+        SetTempHoldRotation(turn);
+        SetTempHoldOffset(knifeHandAnchor - BaseHandHoldOffset - turn * grip); // 평평하게 돌려도 손잡이를 놓치지 않는다.
     }
 
     private System.Collections.IEnumerator SlideOntoBlade(IngredientItem ing)
@@ -669,8 +824,8 @@ public partial class ToolItem : Carryable
             if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds);
         }
         Vector3 offset = any ? b.center - pivot : Vector3.zero;
-        offset.z = 0f;
-        return BladePoint() - offset;
+        float height = any ? Vector3.Dot(b.extents, new Vector3(Mathf.Abs(CounterUp.x), Mathf.Abs(CounterUp.y), Mathf.Abs(CounterUp.z))) : 0f;
+        return BladePoint() + CounterUp * height - offset; // 보이는 재료 바닥을 칼등 위에 놓는다.
     }
 
     /// <summary>Middle of the blade's flat, just in front of it: along the knife's
@@ -680,6 +835,7 @@ public partial class ToolItem : Carryable
         Renderer r = GetComponentInChildren<Renderer>();
         if (r == null) return transform.position;
         Bounds b = r.bounds;
+        if (Vector3.Dot(CounterUp, Vector3.up) > 0.999f) return b.center + CounterUp * (b.extents.y + 0.01f); // 평평한 칼등 중앙
         Vector2 size = b.size;
         Vector3 c = b.center;
         Vector3 axis = size.x >= size.y ? Vector3.right : Vector3.up;

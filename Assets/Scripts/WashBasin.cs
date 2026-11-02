@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class WashBasin : Interactable
 {
@@ -67,7 +67,8 @@ public class WashBasin : Interactable
             HandCarry.Instance.PlaceAtAnchor(transform);
             towel.CurrentContainer = null;
         }
-        else if (hand?.Current is MovableBowl starchBowl && starchBowl.GetComponent<PortionedCondiment>() is PortionedCondiment starch
+        else if (!CleanupMode.IsOn // (정리 때는 윗물 따르기 말고 설거지로)
+                 && hand?.Current is MovableBowl starchBowl && starchBowl.GetComponent<PortionedCondiment>() is PortionedCondiment starch
                  && starch.TryDrain())
         {
             // 앙금녹말: the clear water over the settled starch poured off into
@@ -159,6 +160,10 @@ public class WashBasin : Interactable
         HandCarry hand = HandCarry.Instance;
         HandController hc = HandController.Instance;
         if (hand != null) hand.IsLocked = true;
+        // (클릭 처리(Interactable.OnClicked)가 이 뒤에 손을 개수대 기본 자리로 보낸다 -
+        // 한 프레임 기다렸다가 손을 옮겨야 덮어쓰이지 않는다. 손잡이 팬은 몸통이 손에서
+        // 멀어서, 덮어쓰이면 개수대 밖에서 씻겼다)
+        yield return null;
         WaterTap t = Tap;
         bool wasOn = t != null && t.IsOn;
 
@@ -176,7 +181,7 @@ public class WashBasin : Interactable
             ? dish.BodyCenterWorld() : ItemBounds(item).center;
         Vector3 centerFromHand = visibleCenter - item.transform.position + item.HandHoldOffset;
         Vector3 handAt = target - centerFromHand;
-        if (hc != null) hc.GoTo(new Vector3(handAt.x, handAt.y, hc.transform.position.z), null);
+        if (hc != null) hc.GoTo(handAt, null); // 바뀐 씬에서 깊이까지 씻는 위치로 함께 이동한다.
         yield return new WaitForSeconds(0.4f);
         t?.SetRunning(true);
 
@@ -211,6 +216,8 @@ public class WashBasin : Interactable
         item.SetHoldTurn(baseTurn);
         if (!wasOn) t?.SetRunning(false);
         SupportHandController.Instance?.Hide();
+        // 다 씻은 그릇은 헹군 물을 따라 버린 상태로 (물이 남아 있으면 거기에 튀김을 쏟을 때 체망이 젖은 것으로 되어 기름이 튀었다)
+        if (item is MovableBowl washedDish && washedDish.IsPlateOrBowl) washedDish.SetWaterLevel(0f); // 헹군 물 비우기
         done?.Invoke();
         if (hand != null) hand.IsLocked = false;
         washing = false;
@@ -332,6 +339,13 @@ public class WashBasin : Interactable
     // 손 씻기 원점은 유지하고, 물건만 화면 위쪽으로 올린다.
     private Vector3 ItemWashTarget(Vector3 stream)
     {
+        Camera cam = Camera.main;
+        if (cam != null && Vector3.Dot(Carryable.CounterUp, Vector3.up) > 0.999f)
+        {
+            Vector3 screen = cam.WorldToScreenPoint(BasinCenter()); // 화면에서 보이는 개수대 안쪽
+            screen.z = cam.WorldToScreenPoint(transform.position).z; // 클릭 영역과 같은 깊이
+            return cam.ScreenToWorldPoint(screen);
+        }
         Vector3 origin = WashSpot(stream);
         return new Vector3(BasinCenter().x, origin.y + 0.65f, origin.z);
     }
@@ -340,8 +354,7 @@ public class WashBasin : Interactable
     {
         if (handWash != null)
         {
-            var so = handWash.GetType().GetField("washOrigin", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            if (so?.GetValue(handWash) is Transform origin && origin != null) return origin.position;
+            if (handWash.washOrigin != null) return handWash.washOrigin.position; // 씬에 지정된 실제 손 씻기 원점
         }
         return stream + Vector3.down * 0.3f;
     }
@@ -444,11 +457,11 @@ public class WashBasin : Interactable
         Vector3 c = BasinCenter();
         HandController.Instance?.GoTo(new Vector3(c.x + 0.5f, c.y + 0.6f, HandController.Instance.transform.position.z), null);
         yield return new WaitForSeconds(0.25f);
-        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { vessel.SetPourTilt(Quaternion.AngleAxis(-60f * t / 0.3f, Vector3.forward)); yield return null; }
+        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { vessel.SetPourTilt(MovableBowl.PourTilt(-60f * t / 0.3f)); yield return null; }
         float start = vessel.WaterAmount;
         for (float t = 0f; t < 0.6f; t += Time.deltaTime) { vessel.SetWaterLevel(Mathf.Lerp(start, 0f, t / 0.6f)); yield return null; }
         vessel.PourOffWater();
-        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { vessel.SetPourTilt(Quaternion.AngleAxis(-60f * (1f - t / 0.3f), Vector3.forward)); yield return null; }
+        for (float t = 0f; t < 0.3f; t += Time.deltaTime) { vessel.SetPourTilt(MovableBowl.PourTilt(-60f * (1f - t / 0.3f))); yield return null; }
         vessel.SetPourTilt(Quaternion.identity);
         if (hand != null) hand.IsLocked = false;
         pouring = false;
@@ -463,7 +476,15 @@ public class WashBasin : Interactable
     {
         Vector3 c = BasinCenter();
         Vector3 body = bowl.BodyCenterWorld();
-        bowl.transform.position += new Vector3(c.x - body.x, c.y - body.y, 0f);
+        Camera cam = Camera.main; // 현재 시점에서 보이는 개수대 가운데에 맞춘다.
+        if (cam != null && Vector3.Dot(Carryable.CounterUp, Vector3.up) > 0.999f)
+        {
+            Vector3 projected = cam.WorldToScreenPoint(c); // 개수대 안쪽의 화면 위치
+            projected.z = cam.WorldToScreenPoint(transform.position).z; // 싱크 클릭 면의 깊이
+            Vector3 target = cam.ScreenToWorldPoint(projected);
+            bowl.transform.position += target - body; // X·Y·Z를 함께 이동해 앞쪽이나 아래로 빠지지 않는다.
+        }
+        else bowl.transform.position += new Vector3(c.x - body.x, c.y - body.y, 0f); // 기존 기울어진 씬 호환
     }
 
     private Vector3? basinCenter;

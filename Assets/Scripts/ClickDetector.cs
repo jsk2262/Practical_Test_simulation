@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
@@ -67,7 +67,7 @@ public class ClickDetector : MonoBehaviour
         // before this - and is then taken here as usual.)
         // (Likewise the cutting board carried to the sink - BoardSinkWash.)
         // (카메라 전환·가운데 드래그 이동 중에도 새 집기·놓기·칼질은 시작하지 않는다 - KitchenCamera)
-        if (ConfirmDialog.IsOpen || ExamResultView.IsOpen || (HandCarry.Instance != null && HandCarry.Instance.IsLocked) || ClothWiper.InputCaptured || BoardSinkWash.InputCaptured || BurnerGrate.InputCaptured || MeatKneader.InputCaptured || LeftHandCarry.IsCarrying
+        if (PauseMenu.IsPaused || ConfirmDialog.IsOpen || ExamResultView.IsOpen || (HandCarry.Instance != null && HandCarry.Instance.IsLocked) || ClothWiper.InputCaptured || BoardSinkWash.InputCaptured || BurnerGrate.InputCaptured || MeatKneader.InputCaptured || LeftHandCarry.IsCarrying
             || KitchenCamera.BlocksWorldInput)
         {
             HoldProgressRing.Hide();
@@ -558,8 +558,12 @@ public class ClickDetector : MonoBehaviour
         HandCarry hand = HandCarry.Instance;
         if (hand == null || hand.Current == null) return;
 
-        float depth = hand.Current.RestZ - targetCamera.transform.position.z;
-        Vector3 world = targetCamera.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, depth));
+        Vector3 world; // 카메라가 회전해도 클릭한 조리대 위치를 구한다.
+        if (!PlayArea.TryCounterPoint(targetCamera.ScreenPointToRay(screenPos), out world))
+        {
+            float depth = Vector3.Dot(hand.Current.transform.position - targetCamera.transform.position, targetCamera.transform.forward); // 이전 씬의 대체 평면
+            world = targetCamera.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, depth));
+        }
 
         // Cut pieces on the knife's blade are slid off right here; the knife stays in hand.
         if (hand.Current is ToolItem knife && knife.KnifeLoad != null)

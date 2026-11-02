@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -31,6 +31,9 @@ public partial class IngredientItem : Carryable
     [SerializeField] private IngredientCategory category = IngredientCategory.None;
     [SerializeField] private bool isSoakable = false;
     [SerializeField] private float soakDuration = 5f;
+    [Tooltip("다 불었을 때 크기 배수 (마른 목이버섯이 물을 먹어 부푸는 정도).")]
+    [SerializeField] private float soakSwell = 1.4f;
+    private float soakShownSwell = 1f; // 지금까지 부풀린 배수
 
     /// <summary>Meat needs to be blotted with a paper towel after cutting to draw
     /// off excess blood, like in the real exam - purely visual/practice, not
@@ -210,7 +213,9 @@ public partial class IngredientItem : Carryable
     /// (CookableItem)이 없던 재료면 채소용으로 붙인다. 이미 있으면 아무것도 안 함.</summary>
     public void EnsurePieceGroup()
     {
-        if (CurrentState != State.Cut || GetComponent<FoodPieceGroup>() != null) return;
+        if (GetComponent<FoodPieceGroup>() != null) return;
+        // 썰지 않고 통째로 넣는 재료(완두콩 · 안 찢은 목이버섯)는 통째로 한 조각
+        if (CurrentState != State.Cut && !MakeWholePiece()) return;
         var pieces = new List<Renderer>();
         foreach (Renderer r in GetComponentsInChildren<Renderer>())
             if (r.name.StartsWith("Piece_") && r.GetComponent<MeshFilter>() != null && r.GetComponent<FoodPiece>() == null) pieces.Add(r);
@@ -245,6 +250,23 @@ public partial class IngredientItem : Carryable
             group.Add(fp);
         }
         Debug.Log($"[{ingredientName}] 조각 {pieces.Count}개를 따로 익고 움직이게 함 (팬·냄비에 들어감)");
+    }
+
+    /// <summary>통째로 쓰는 재료(완두콩 · 목이버섯)를 팬에 넣을 때: 겉모양을 조각(Piece_0)
+    /// 하나로 옮겨, 썬 채소처럼 저으면 움직이고 소스 · 열을 받게 한다.</summary>
+    private bool MakeWholePiece()
+    {
+        if (ingredientName != "완두콩" && ingredientName != "목이버섯") return false;
+        if (rend == null) rend = GetComponent<Renderer>();
+        MeshFilter mf = GetComponent<MeshFilter>();
+        if (rend == null || mf == null || mf.sharedMesh == null || !rend.enabled) return false;
+        foreach (Transform t in transform) if (t.name.StartsWith("Piece_")) return false;
+        GameObject piece = new GameObject("Piece_0");
+        piece.transform.SetParent(transform, false);
+        piece.AddComponent<MeshFilter>().sharedMesh = mf.sharedMesh;
+        piece.AddComponent<MeshRenderer>().sharedMaterials = rend.sharedMaterials;
+        rend.enabled = false;
+        return true;
     }
 
     // ---- 밑간 주무르기 ----
@@ -291,10 +313,15 @@ public partial class IngredientItem : Carryable
     void Update()
     {
         UpdateTowelDrain();
+        // 물 담긴 볼 · 작은 접시에 담가 두면 불리기 시작 (수돗물 아래에서 시작하는 것과 같음)
+        if (CurrentSoakState == SoakState.Dry && InBowl is MovableBowl soakIn && soakIn.WaterAmount > 0f) StartSoaking();
         if (CurrentSoakState != SoakState.Soaking) return;
 
         soakTimer += Time.deltaTime;
         rend.material.color = Color.Lerp(rend.material.color, new Color(0.55f, 0.4f, 0.35f), Time.deltaTime * 0.3f);
+        float swell = Mathf.Lerp(1f, soakSwell, Mathf.Clamp01(soakTimer / soakDuration)); // 지금 부푼 배수
+        transform.localScale *= swell / soakShownSwell;                                    // 물을 먹으며 점점 부풂 (그릇을 옮겨 크기 기준이 바뀌어도 늘어난 만큼만)
+        soakShownSwell = swell;
 
         if (soakTimer >= soakDuration)
         {
@@ -357,6 +384,7 @@ public partial class IngredientItem : Carryable
         if (!isSoakable || CurrentSoakState == SoakState.Soaking || CurrentSoakState == SoakState.Soaked) return;
         CurrentSoakState = SoakState.Soaking;
         soakTimer = 0f;
+        soakShownSwell = 1f; // 아직 안 부풂
     }
 
     public void Wash()
@@ -394,6 +422,15 @@ public partial class IngredientItem : Carryable
         {
             HandCarry.Instance?.PickUp(served);
             return true;
+        }
+
+        // 팬 · 웍 · 냄비에 들어간 재료는 맨손으로 집지 않는다 - 튀김젓가락 · 국자 ·
+        // 건지개로 꺼낸다. (손에 도구를 들고 누르면 OnClickedWhileHandFull 로 가므로
+        // 여기서 막히는 것은 맨손뿐이다)
+        if (InBowl is MovableBowl cooking && cooking.IsCookingVessel)
+        {
+            Notice("팬 안의 재료는 손으로 집을 수 없어요 (튀김젓가락 · 국자로 꺼내세요)"); // 왜 안 집히는지 알려 준다
+            return true;                                                                   // 기본 집기 동작을 막는다
         }
 
         // 버무리기 by hand: the meat with its 튀김옷 (or a 밑간 not worked in yet) in
@@ -585,7 +622,8 @@ public partial class IngredientItem : Carryable
             // The ring menu goes all round the knife in hand, in front of everything.
             Renderer knifeRend = tool.GetComponentInChildren<Renderer>();
             Vector3 center = knifeRend != null ? knifeRend.bounds.center : transform.position;
-            center.z = Mathf.Min(center.z, transform.position.z) - 0.6f;
+            Camera cam = Camera.main; // 현재 카메라 방향으로 앞에 배치한다.
+            if (cam != null) center -= cam.transform.forward * 0.6f; // 회전한 씬에서 세계 Z로 밀지 않는다.
             CutMethodChooser.Instance.Show(center, PerformCut, CanTrim ? PerformTrim : (System.Action)null);
         }
     }
@@ -654,7 +692,7 @@ public partial class IngredientItem : Carryable
         CuttingBoardController.Instance.Select(this);
         // 고기 (채썰기용): 다듬기 is cutting the ends off to the strips' length (4 cm).
         if (sliceStyle == SliceStyle.MeatStrips) { StartCoroutine(WhileLocked(MeatTrimRoutine())); return; }
-        StartCoroutine(WhileLocked(chiliTrim ? ChiliTrimRoutine() : TrimRoutine()));
+        StartCoroutine(WhileLocked(ingredientName == "생강" ? GingerTrimRoutine() : chiliTrim ? ChiliTrimRoutine() : TrimRoutine())); // 생강은 겉면을 깎아 노란 속살을 드러낸다.
     }
 
     private IEnumerator TrimRoutine()
@@ -731,6 +769,7 @@ public partial class IngredientItem : Carryable
         SpeedMode.BeginAnimation(); // (빠른 모드: the cutting plays fast - even if something else unlocks the hand)
         try { yield return StartCoroutine(routine); }
         finally { SpeedMode.EndAnimation(); }
+        if (IsOnCuttingBoard) CuttingBoardController.Instance.EnsureIngredientsAboveBoard();
         if (hand != null) hand.IsLocked = false;
     }
 
@@ -789,6 +828,19 @@ public partial class IngredientItem : Carryable
             yield break;
         }
 
+        // 네모 편으로 써는 재료(양파 4×1 편): 통째 모양 → 네모 조각들
+        if (cutsToFlatSquares && method != CutMethod.Dice)
+        {
+            yield return StartCoroutine(FlatSquaresRoutine(spec, method)); // 네모 편 만들기
+            CurrentState = State.Cut;            // 썬 상태로
+            rend.enabled = false;                // 통째 모양은 숨김
+            isCutting = false;                   // 썰기 끝
+            DropScrap("자투리", OwnColor);        // 끝부분 자투리
+            SupportHandController.Instance?.Hide(); // 받치던 손 뗌
+            ExpandColliderToCoverPieces();       // 조각들을 집을 수 있게
+            yield break;
+        }
+
         if (crescentSlices && (method == CutMethod.Slice || method == CutMethod.Julienne || method == CutMethod.Other))
         {
             yield return StartCoroutine(CrescentRoutine(spec));
@@ -806,6 +858,19 @@ public partial class IngredientItem : Carryable
             rend.enabled = false;
             isCutting = false;
             SupportHandController.Instance?.Hide();
+            yield break;
+        }
+
+        // 다지기: 작은 정육면체 조각들로 (단면이 정사각형)
+        if (method == CutMethod.Dice && MincesToCubes)
+        {
+            yield return StartCoroutine(MinceCubesRoutine(spec));
+            CurrentState = State.Cut;
+            rend.enabled = false;
+            isCutting = false;
+            DropScrap("자투리", OwnColor);
+            SupportHandController.Instance?.Hide();
+            ExpandColliderToCoverPieces();
             yield break;
         }
 
@@ -2145,6 +2210,7 @@ public partial class IngredientItem : Carryable
         var go = new GameObject("IngredientNote");
         go.transform.position = VisibleBounds.center + new Vector3(0f, 0.7f, -1.5f);
         TextMesh tm = go.AddComponent<TextMesh>();
+        KoreanFontFallback.Apply(tm); // 웹에서도 한글이 보이게 한글 글꼴
         tm.text = text;
         tm.fontSize = 36;
         tm.characterSize = 0.07f;
@@ -2801,13 +2867,44 @@ public partial class IngredientItem : Carryable
         if (pieces.Count != expect) Debug.LogWarning($"[두부] {expect}조각이어야 하는데 {pieces.Count}조각");
     }
 
+    private static Mesh dicedBlockMesh; // 모든 두부 조각이 같은 직육면체 메시를 공유한다.
+    private static Mesh DicedBlockMesh() // 면별 정점을 분리해서 모서리 법선이 섞이지 않게 한다.
+    {
+        if (dicedBlockMesh != null) return dicedBlockMesh; // 최초 한 번만 만든다.
+        var vertices = new Vector3[24]; // 면마다 네 정점을 독립적으로 둔다.
+        var normals = new Vector3[24]; // 한 면의 법선은 모두 같게 유지한다.
+        var uv = new Vector2[24]; // 기존 두부 재질을 적용할 텍스처 좌표
+        var triangles = new int[36]; // 여섯 면에 각각 두 삼각형
+        Vector3[] faces = { Vector3.right, Vector3.left, Vector3.up, Vector3.down, Vector3.forward, Vector3.back }; // 바깥 방향
+        for (int face = 0; face < 6; face++) // 평평한 여섯 면을 만든다.
+        {
+            Vector3 n = faces[face]; // 이번 면의 바깥 법선
+            Vector3 u = Vector3.Cross(Mathf.Abs(n.y) > 0.5f ? Vector3.forward : Vector3.up, n).normalized; // 가로 방향
+            Vector3 v = Vector3.Cross(n, u); // 세로 방향
+            int first = face * 4; // 이번 면의 정점 시작점
+            vertices[first] = (n - u - v) * 0.5f;
+            vertices[first + 1] = (n + u - v) * 0.5f;
+            vertices[first + 2] = (n + u + v) * 0.5f;
+            vertices[first + 3] = (n - u + v) * 0.5f;
+            for (int j = 0; j < 4; j++) normals[first + j] = n; // 모서리에서 이웃 면과 평균내지 않는다.
+            uv[first] = Vector2.zero; uv[first + 1] = Vector2.right; uv[first + 2] = Vector2.one; uv[first + 3] = Vector2.up;
+            int t = face * 6; // 바깥쪽을 바라보는 삼각형 순서
+            triangles[t] = first; triangles[t + 1] = first + 1; triangles[t + 2] = first + 2;
+            triangles[t + 3] = first; triangles[t + 4] = first + 2; triangles[t + 5] = first + 3;
+        }
+        dicedBlockMesh = new Mesh { name = "Tofu_FlatCutBlock", vertices = vertices, normals = normals, uv = uv, triangles = triangles }; // 각진 절단 조각
+        dicedBlockMesh.RecalculateBounds(); // 표시와 충돌에 사용할 경계
+        dicedBlockMesh.RecalculateTangents(); // 재질의 표면 방향도 평평한 면에 맞춘다.
+        return dicedBlockMesh;
+    }
+
     private CutPiece MakeCutPiece(Transform rig, Vector3 rigPos, Quaternion rigRot, Vector3 size, Bounds mb)
     {
         var go = new GameObject("Piece");
         go.transform.SetParent(rig, false);
         go.transform.localPosition = rigPos;
         go.transform.localRotation = rigRot;
-        go.AddComponent<MeshFilter>().sharedMesh = sharedMesh;
+        go.AddComponent<MeshFilter>().sharedMesh = sharedMesh; // 원본 메시를 그대로 써서 자르는 연출을 살린다.
         go.AddComponent<MeshRenderer>().sharedMaterials = rend.sharedMaterials;
         BoxCollider box = go.AddComponent<BoxCollider>();
         box.center = mb.center;
@@ -3023,7 +3120,13 @@ public partial class IngredientItem : Carryable
             if (pieces.Count == 0) all = r.bounds; else all.Encapsulate(r.bounds);
             pieces.Add(c);
         }
-        if (pieces.Count < 2 || Mathf.Max(all.extents.x, all.extents.y) <= radius) return;
+        // 조각들은 그릇 '바닥 평면'에 펼쳐진다. 옛 코드는 x·y(화면 가로세로)만 재서,
+        // 수평 그릇에서는 깊이(z)로 넓게 퍼진 더미가 '이미 작다'고 판정돼 모이지 않고
+        // 그릇 밖으로 삐져나왔다.
+        float wide = Vector3.Dot(Carryable.CounterUp, Vector3.up) > 0.999f   // 수평 조리대인가
+                   ? Mathf.Max(all.extents.x, all.extents.z)                 // 수평 그릇: 펼쳐지는 평면이 X·Z 다
+                   : Mathf.Max(all.extents.x, all.extents.y);                // 기울어진 옛 프레임: 화면 가로세로
+        if (pieces.Count < 2 || wide <= radius) return;
 
         Vector3 up = Carryable.CounterUp, right = Vector3.right, back = Vector3.Cross(right, up).normalized;
         float spread = Mathf.Max(radius * 0.8f, 0.05f);
@@ -3047,6 +3150,15 @@ public partial class IngredientItem : Carryable
     {
         // (with others on the board: only if it doesn't push this one into them -
         // those already there are never moved; otherwise it's cut where it lies)
+        if (Vector3.Dot(Carryable.CounterUp, Vector3.up) > 0.999f && CuttingBoardController.Instance != null)
+        {
+            Bounds boardBounds = CuttingBoardController.Instance.GetComponent<Renderer>().bounds;
+            float halfX = Mathf.Min(all.extents.x, boardBounds.extents.x);
+            float halfZ = Mathf.Min(Mathf.Max(all.extents.z, all.extents.y), boardBounds.extents.z);
+            float x = Mathf.Clamp(all.center.x, boardBounds.min.x + halfX, boardBounds.max.x - halfX);
+            float z = Mathf.Clamp(all.center.z, boardBounds.min.z + halfZ, boardBounds.max.z - halfZ);
+            return new Vector3(x - all.center.x, 0f, z - all.center.z); // 작업 공간 보정은 도마 평면에서만 이동한다.
+        }
         Vector3 s = FitShift(top, all);
         if (s == Vector3.zero || !(CuttingBoardController.Instance is CuttingBoardController board) || board.Items.Count < 2) return s;
         Bounds vb = VisibleBounds;
@@ -3123,7 +3235,7 @@ public partial class IngredientItem : Carryable
     private IEnumerator DiceChop(Transform rig, Vector3 handBase, float line, HandController handCtl, ToolItem knife)
     {
         Vector3 offset = rig.right * line;
-        handCtl?.SlideTo(handBase + new Vector3(offset.x, offset.y, 0f), 0.3f * diceSlowness);
+        handCtl?.SlideTo(handBase + offset, 0.3f * diceSlowness); // 도마 방향의 세 좌표를 모두 반영한다.
         yield return new WaitForSeconds(0.45f * diceSlowness);
         handCtl?.PlayChopGesture();
         knife?.PlayChopMotion();

@@ -97,7 +97,7 @@ public class HandController : MonoBehaviour
     /// <summary>Where the middle knuckles sit relative to the knife's grip point
     /// in the chop stance - just past the handle (and toward the camera) so it
     /// runs through the middle of the curled fist (screenshot-checked).</summary>
-    [SerializeField] private Vector3 chopHandleGripOffset = new Vector3(0.12f, 0.08f, -0.3f);
+    [SerializeField] private Vector3 chopHandleGripOffset = new Vector3(0f, 0.08f, -0.3f);
 
     /// <summary>The knife-chopping stance, driven by ToolItem's chop motion:
     /// blend 0..1 turns the hand from its normal pose to a fist around the

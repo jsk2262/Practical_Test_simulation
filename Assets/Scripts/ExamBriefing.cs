@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -69,6 +69,7 @@ public class ExamBriefing : MonoBehaviour
         {
             text.text = Wrap(line);
             LineStarted?.Invoke(line);
+            lineAt = Time.time; // 이 줄을 띄운 시각 (빠른 모드 자동 넘기기용)
             float voice = VoiceSeconds != null ? VoiceSeconds(line) : 0f;
             float seconds = voice > 0f ? voice + 0.4f : SpeechSeconds(line);
             skip = false;
@@ -107,6 +108,8 @@ public class ExamBriefing : MonoBehaviour
                 string line = at >= 0 ? v.Cues[at].text : "";
                 text.text = Wrap(line.Replace("\n", " "));
                 if (at >= 0) LineStarted?.Invoke(line);
+                lineAt = Time.time; // 이 줄을 띄운 시각 (빠른 모드 자동 넘기기용)
+                skip = false;       // (줄이 바뀐 프레임에 남은 넘기기는 버림 - 두 줄씩 넘어가지 않게)
             }
             if (skip)
             {
@@ -126,7 +129,11 @@ public class ExamBriefing : MonoBehaviour
         Keyboard k = Keyboard.current;
         if (k != null && (k.spaceKey.wasPressedThisFrame || k.enterKey.wasPressedThisFrame))
             skip = true;
+        if (SpeedMode.On && Time.time - lineAt >= FastLineSeconds) skip = true; // 빠른 모드: 한 줄을 1초만 보여 주고 넘김
     }
+
+    private float lineAt; // 지금 줄을 띄운 시각
+    private const float FastLineSeconds = 1f; // 빠른 모드에서 한 줄을 보여 주는 시간
 
     /// <summary>Korean read aloud at an examiner's pace (≈4 syllables a second):
     /// how long a line will take once it's voiced - numbers and units read out
@@ -194,7 +201,8 @@ public class ExamBriefing : MonoBehaviour
         bar.transform.SetParent(transform, false);
         // Up over the seasoning shelf, out of the way of the counter where the
         // ingredients are being sorted.
-        bar.transform.position = new Vector3(c.x, c.y + half * 0.82f, -4f);
+        bar.transform.rotation = cam != null ? cam.transform.rotation : Quaternion.identity; // 자막을 현재 화면과 평행하게 한다.
+        bar.transform.position = c + bar.transform.forward * 3f + bar.transform.up * (half * 0.82f); // 카메라 정면 상단
 
         GameObject bg = GameObject.CreatePrimitive(PrimitiveType.Quad);
         bg.name = "Bg";
@@ -208,6 +216,7 @@ public class ExamBriefing : MonoBehaviour
         label.transform.SetParent(bar.transform, false);
         label.transform.localPosition = new Vector3(0f, 0f, -0.05f);
         text = label.AddComponent<TextMesh>();
+        KoreanFontFallback.Apply(text); // 웹에서도 한글이 보이게 한글 글꼴
         text.fontSize = 44;
         text.characterSize = 0.08f;
         text.lineSpacing = 1.1f;

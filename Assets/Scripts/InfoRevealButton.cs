@@ -27,17 +27,32 @@ public class InfoRevealButton : MonoBehaviour, IClickable
         this.body = body;
     }
 
+    private Vector3 popupBaseScale; // 창의 전체 보기 기준 크기
+
+    /// <summary>창을 카메라 앞 얼마에 띄울지 - 조리대·선반(깊이 14 이상)보다 앞.</summary>
+    private const float PopupViewDistance = 12f;
+
     public void OnClicked()
     {
         if (popup == null) BuildPopup();
         bool willOpen = !popup.activeSelf;
-        // (창은 전체 화면 기준 자리에 뜬다 - 확대 중이면 먼저 전체 보기로, 다시 누르면 열림)
-        if (willOpen && KitchenCamera.IsZoomed) { KitchenCamera.Instance.ShowOverview(); return; }
 
         if (willOpen)
         {
             if (currentlyOpen != null && currentlyOpen != this) currentlyOpen.ClosePopup();
             currentlyOpen = this;
+            // 힌트처럼 화면 가운데에 띄움 (버튼 바로 아래가 아니라)
+            Camera cam = Camera.main;                                                       // 지금 보는 카메라
+            if (cam != null)
+            {
+                // 화면 한가운데에 띄운다. 옛 프레임은 카메라가 조리대와 같은 높이라
+                // (cam.x, cam.y) 가 곧 화면 중앙이었지만, 지금 카메라는 위·앞에 있어
+                // 그 자리에 두면 창이 화면 위쪽 바깥으로 나가 안 열리는 것처럼 보였다.
+                popup.transform.position = cam.ViewportToWorldPoint(new Vector3(0.5f, 0.5f, PopupViewDistance)); // 화면 중앙, 카메라 앞
+                popup.transform.rotation = Quaternion.LookRotation(cam.transform.forward, cam.transform.up);     // 창이 화면과 나란하게
+            }
+            if (popupBaseScale == Vector3.zero) popupBaseScale = popup.transform.localScale;      // 전체 보기 기준 크기 기억
+            popup.transform.localScale = popupBaseScale * KitchenCamera.ZoomScale;               // 확대 중이면 화면에 맞게 줄임
         }
         else if (currentlyOpen == this)
         {
@@ -86,6 +101,7 @@ public class InfoRevealButton : MonoBehaviour, IClickable
         titleGo.transform.SetParent(popup.transform, false);
         titleGo.transform.localPosition = new Vector3(0f, popupSize.y * 0.5f - 0.35f, -0.02f);
         TextMesh titleTm = titleGo.AddComponent<TextMesh>();
+        KoreanFontFallback.Apply(titleTm); // 웹에서도 한글이 보이게 한글 글꼴
         titleTm.text = title;
         titleTm.fontSize = 28;
         titleTm.fontStyle = FontStyle.Bold;
@@ -97,6 +113,7 @@ public class InfoRevealButton : MonoBehaviour, IClickable
         bodyGo.transform.SetParent(popup.transform, false);
         bodyGo.transform.localPosition = new Vector3(0f, -0.15f, -0.02f);
         TextMesh bodyTm = bodyGo.AddComponent<TextMesh>();
+        KoreanFontFallback.Apply(bodyTm); // 웹에서도 한글이 보이게 한글 글꼴
         bodyTm.text = body;
         bodyTm.fontSize = 23;
         bodyTm.characterSize = 0.1f;
@@ -116,6 +133,7 @@ public class InfoRevealButton : MonoBehaviour, IClickable
         xGo.transform.SetParent(btn.transform, false);
         xGo.transform.localPosition = new Vector3(0f, 0f, -0.05f);
         TextMesh xTm = xGo.AddComponent<TextMesh>();
+        KoreanFontFallback.Apply(xTm); // 웹에서도 한글이 보이게 한글 글꼴
         xTm.text = "X";
         xTm.fontSize = 20;
         xTm.characterSize = 0.1f;

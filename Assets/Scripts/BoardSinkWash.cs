@@ -55,7 +55,7 @@ public class BoardSinkWash : MonoBehaviour
     private CuttingBoardController board;
     private Collider col;
     private Quaternion homeRot;
-    private float zOffset, halfLen, halfWid;
+    private float halfLen, halfWid;
     private Vector3 pickedPos;
     private Quaternion pickedRot;
     private State pickedFrom;
@@ -73,8 +73,7 @@ public class BoardSinkWash : MonoBehaviour
         board = GetComponent<CuttingBoardController>();
         col = GetComponent<Collider>();
         homeRot = transform.rotation;
-        zOffset = transform.position.z - HandCarry.CounterZ(transform.position.y);
-        Bounds home = Box; halfLen = home.extents.x * 0.92f; halfWid = home.extents.y * 0.55f;
+        Bounds home = Box; halfLen = home.extents.x * 0.92f; halfWid = home.extents.z * 0.55f; // 가로폭은 두께(y)가 아니라 깊이(z)다
         if (dishSoap == null) dishSoap = GameObject.Find("DishSoap")?.transform;
         if (sponge == null) sponge = GameObject.Find("Sponge")?.transform;
         if (dryCloth == null) dryCloth = GameObject.Find("CleaningCloth_Top")?.transform;
@@ -147,9 +146,9 @@ public class BoardSinkWash : MonoBehaviour
 
         // just follows the mouse, lying as on the counter
         Vector2 sp = mouse.position.ReadValue();
-        Vector3 cursor = cam.ScreenToWorldPoint(new Vector3(sp.x, sp.y, transform.position.z - cam.transform.position.z));
-        float y = cursor.y + grabOffset.y;
-        transform.SetPositionAndRotation(new Vector3(cursor.x + grabOffset.x, y, HandCarry.CounterZ(y) + zOffset), homeRot);
+        float depth = Vector3.Dot(pickedPos - cam.transform.position, cam.transform.forward); // 집어 든 지점의 카메라 축 거리
+        Vector3 cursor = cam.ScreenToWorldPoint(new Vector3(sp.x, sp.y, depth)); // 커서가 가리키는 실제 월드 지점
+        transform.SetPositionAndRotation(cursor + grabOffset, homeRot); // 도마 가운데가 커서에 오게 따라간다
         HandController.Instance?.SlideTo(Grip(), 0.05f);
 
         if (!mouse.leftButton.wasPressedThisFrame || waitRelease) return;
@@ -210,8 +209,8 @@ public class BoardSinkWash : MonoBehaviour
 
     private Vector3 BasinCenter()
     {
-        GameObject back = GameObject.Find("Sink_WallB");
-        if (back != null && back.GetComponent<Renderer>() is Renderer r) return r.bounds.center;
+        GameObject floor = GameObject.Find("Sink_Bottom"); // 뒷벽이 아니라 개수대 바닥을 기준으로 삼는다
+        if (floor != null && floor.GetComponent<Renderer>() is Renderer r) return r.bounds.center;
         WashBasin sink = FindFirstObjectByType<WashBasin>();
         return sink != null ? sink.transform.position : transform.position;
     }
@@ -220,30 +219,29 @@ public class BoardSinkWash : MonoBehaviour
     {
         state = State.InSink;
         Vector3 basin = BasinCenter();
-        Quaternion rot = Quaternion.AngleAxis(sinkLean, Vector3.forward) * homeRot;
+        // 도마(긴 쪽 3.4)가 개수대 폭(2.0)보다 커서, 90도 돌려야 안에 들어간다.
+        Quaternion rot = Quaternion.AngleAxis(90f, Carryable.CounterUp) * Quaternion.AngleAxis(sinkLean, Vector3.forward) * homeRot;
         transform.rotation = rot;
         Vector3 mid = Box.center;
-        Vector3 target = new Vector3(basin.x + sinkOffset.x, basin.y + sinkOffset.y, 0f);
-        transform.position += new Vector3(target.x - mid.x, target.y - mid.y, 0f);
-        transform.position = new Vector3(transform.position.x, transform.position.y, HandCarry.CounterZ(transform.position.y) + zOffset + sinkDepthShift);
+        transform.position += basin + sinkOffset - mid; // 깊이까지 세 축 모두 개수대 안에 맞춘다
+        transform.position += Carryable.CounterUp * sinkDepthShift; // 개수대 안쪽으로 그만큼 더 내려놓는다
     }
 
-    /// <summary>Its long side, on screen, pointing up the lean (the low end at -).</summary>
+    /// <summary>조리대 면에 눕힌 긴 축 (낮은 쪽이 -).</summary>
     private Vector3 Along()
     {
-        Vector3 u = Vector3.ProjectOnPlane(transform.right, Vector3.forward).normalized;
-        return u.x < 0f ? -u : u;
+        Vector3 u = Vector3.ProjectOnPlane(transform.right, Carryable.CounterUp).normalized; // 조리대 면에 투영한 긴 축
+        return u.x < 0f || (u.x == 0f && u.z < 0f) ? -u : u; // 돌려놔도 방향이 뒤집히지 않게 한쪽으로 통일
     }
 
-    /// <summary>A point on its face as seen: s along it (-1 low end .. 1 high end), t across.</summary>
+    /// <summary>도마 윗면 바로 위의 한 점: s는 긴 쪽(-1..1), t는 가로.</summary>
     private Vector3 Face(float s, float t)
     {
-        Vector3 u = Along(), v = new Vector3(-u.y, u.x, 0f);
+        Vector3 up = Carryable.CounterUp;
+        Vector3 u = Along(), v = Vector3.Cross(up, u); // 윗면 위에서 긴 축과 직각인 가로 방향
         Bounds box = Box;
-        Vector3 c = box.center;
-        float z = box.min.z - 0.05f;
-        Vector3 p = c + u * (s * halfLen) + v * (t * halfWid);
-        return new Vector3(p.x, p.y, z);
+        float half = Mathf.Abs(box.extents.x * up.x) + Mathf.Abs(box.extents.y * up.y) + Mathf.Abs(box.extents.z * up.z); // 중심에서 윗면까지
+        return box.center + up * (half + 0.05f) + u * (s * halfLen) + v * (t * halfWid); // 윗면 살짝 위의 점
     }
 
     private IEnumerator Wash()
@@ -298,7 +296,7 @@ public class BoardSinkWash : MonoBehaviour
         if (dropMat == null) dropMat = Unlit(new Color(0.62f, 0.82f, 1f));
         GameObject d = Ball(dropMat, Random.Range(0.025f, 0.045f));
         Vector3 u = Along();
-        float s = Mathf.Clamp((stream.x - Face(0f, 0f).x) / Mathf.Max(u.x * halfLen, 0.01f), -0.9f, 0.9f);
+        float s = Mathf.Clamp(Vector3.Dot(stream - Face(0f, 0f), u) / Mathf.Max(halfLen, 0.01f), -0.9f, 0.9f); // 물줄기가 긴 축 어디에 떨어지는지
         float t = Random.Range(-0.4f, 0.4f);
         Vector3 land = Face(s, t);
         Vector3 start = new Vector3(land.x + Random.Range(-0.03f, 0.03f), stream.y, land.z);
@@ -330,7 +328,7 @@ public class BoardSinkWash : MonoBehaviour
         foreach (float s in new[] { -0.55f, 0f, 0.55f })
         {
             Vector3 at = Face(s, Random.Range(-0.2f, 0.2f));
-            Vector3 from = over + new Vector3(s * halfLen * 0.6f, 0f, 0f);
+            Vector3 from = over + Along() * (s * halfLen * 0.6f); // 도마가 놓인 방향을 따라 짜 뿌린다
             dishSoap.position = from;
             SupportHandController.Instance?.ShowNear(from + new Vector3(0f, 0.2f, -0.1f));
             GameObject blob = Ball(soapMat, 0.07f);
@@ -356,28 +354,28 @@ public class BoardSinkWash : MonoBehaviour
         Vector3 p0 = sponge != null ? sponge.position : Vector3.zero;
         Quaternion r0 = sponge != null ? sponge.rotation : Quaternion.identity;
         Quaternion onBoard = Quaternion.AngleAxis(sinkLean, Vector3.forward) * r0;
-        if (sponge != null) yield return Move(sponge, p0, Face(-0.75f, 0f) + new Vector3(0f, 0f, -0.08f), r0, onBoard, 0.4f);
+        if (sponge != null) yield return Move(sponge, p0, Face(-0.75f, 0f) + Carryable.CounterUp * 0.08f, r0, onBoard, 0.4f); // 윗면에서 살짝 띄운다
         float nextFoam = 0f;
         for (float k = 0f; k < scrubSeconds; k += Time.deltaTime)
         {
             // three times up and back, a little zigzag across
             float s = Mathf.Lerp(-0.75f, 0.75f, Mathf.PingPong(k / scrubSeconds * 6f, 1f));
             float t = Mathf.Sin(k * 9f) * 0.35f;
-            Vector3 at = Face(s, t) + new Vector3(0f, 0f, -0.08f);
+            Vector3 at = Face(s, t) + Carryable.CounterUp * 0.08f; // 윗면에서 살짝 띄운다
             if (sponge != null) sponge.SetPositionAndRotation(at, onBoard * Quaternion.AngleAxis(Mathf.Sin(k * 18f) * 6f, Vector3.forward));
-            SupportHandController.Instance?.ShowNear(at + new Vector3(0f, 0.15f, -0.08f));
+            SupportHandController.Instance?.ShowNear(at + Carryable.CounterUp * 0.15f); // 보조손은 그보다 더 위
             if (k >= nextFoam)
             {
                 nextFoam = k + 0.07f;
                 GameObject f = Ball(foamMat, Random.Range(0.04f, 0.08f));
-                f.transform.position = Face(s + Random.Range(-0.08f, 0.08f), t + Random.Range(-0.3f, 0.3f)) + new Vector3(0f, 0f, -0.02f);
+                f.transform.position = Face(s + Random.Range(-0.08f, 0.08f), t + Random.Range(-0.3f, 0.3f)) + Carryable.CounterUp * 0.02f; // 거품은 윗면에 붙는다
                 foam.Add(f);
             }
             for (int i = soapBlobs.Count - 1; i >= 0; i--)
             {
                 GameObject b = soapBlobs[i];
                 if (b == null) { soapBlobs.RemoveAt(i); continue; }
-                if (((Vector2)(b.transform.position - at)).magnitude < 0.35f) b.transform.localScale *= 0.97f;
+                if ((b.transform.position - at).magnitude < 0.35f) b.transform.localScale *= 0.97f; // 세 축 모두 보고 가까운 세제만 줄인다
             }
             yield return null;
         }

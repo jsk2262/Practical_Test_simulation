@@ -24,7 +24,7 @@ public class CountdownTimer : MonoBehaviour
 
     void Update()
     {
-        if (!started || remaining <= 0f) return;
+        if (!started || remaining <= 0f || PauseMenu.IsPaused) return; // 일시정지 중에는 시험 시간도 멈춤 (빠른 모드는 실제 시간으로 세므로)
 
         // (빠른 모드: real time - not the sped-up animations)
         remaining -= SpeedMode.On ? Time.unscaledDeltaTime : Time.deltaTime;

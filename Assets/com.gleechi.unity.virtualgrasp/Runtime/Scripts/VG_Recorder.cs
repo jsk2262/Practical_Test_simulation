@@ -294,7 +294,11 @@ namespace VirtualGrasp.Scripts
             else
             {
                 foreach (SkinnedMeshRenderer sm in m_replayAvatars)
+#if UNITY_6000_5_OR_NEWER
+                    res.Add(unchecked((int)UnityEngine.EntityId.ToULong(sm.GetEntityId()))); // 기존 리플레이 플러그인이 받는 32비트 ID
+#else
                     res.Add(sm.GetInstanceID());
+#endif
             }
 
             return res;

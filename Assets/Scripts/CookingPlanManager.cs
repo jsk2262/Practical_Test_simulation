@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -94,7 +94,9 @@ public class CookingPlanManager : MonoBehaviour
 
     void Start()
     {
-        Show();
+        var selection = GetComponent<ChineseExamSelectionManager>(); // 메뉴 추첨 관리자를 재사용한다.
+        if (selection == null) selection = gameObject.AddComponent<ChineseExamSelectionManager>(); // 같은 관리자 오브젝트에 추가한다.
+        selection.Open(Show); // 두 과제를 선택한 뒤 기존 순서 화면을 연다.
     }
 
     void Update()
@@ -114,6 +116,7 @@ public class CookingPlanManager : MonoBehaviour
     public void Show()
     {
         if (panel == null) Build();
+        AlignToCamera(panel.transform, 0.2f, 22.5f, 12.6f); // 현재 화면에 맞춘다.
         panel.SetActive(true);
         HideOtherLabels();
     }
@@ -138,13 +141,16 @@ public class CookingPlanManager : MonoBehaviour
     {
         if (hintPanel == null) BuildHintPanel();
         hintPanel.SetActive(!hintPanel.activeSelf);
+        if (!hintPanel.activeSelf) return; // 닫을 때는 끝
+        // 확대 중에도 지금 화면 가운데에, 화면에 맞는 크기로
+        AlignToCamera(hintPanel.transform, 0f, 14f, 11f); // 힌트도 카메라 정면에 배치한다.
     }
 
     private void BuildHintPanel()
     {
         hintPanel = new GameObject("OrderHintPanel");
         hintPanel.transform.SetParent(transform, false);
-        hintPanel.transform.position = CameraCenter(0f);
+        AlignToCamera(hintPanel.transform, 0f, 14f, 11f);
 
         CreateBackgroundQuad(hintPanel.transform, new Vector3(0f, 0f, 0.1f), new Vector2(14f, 11f), new Color(0.12f, 0.12f, 0.1f, 0.97f), false, false);
         CreateLabel(hintPanel.transform, "추천 조리 순서 (힌트)", new Vector3(0f, 4.6f, -0.05f), 32, new Color(1f, 0.85f, 0.3f));
@@ -168,11 +174,16 @@ public class CookingPlanManager : MonoBehaviour
 
     /// <summary>Screen center at the panels' depth, so they stay centered
     /// wherever the camera has been framed.</summary>
-    private static Vector3 CameraCenter(float yOffset)
+    private static void AlignToCamera(Transform target, float yOffset, float width, float height) // 화면 기준 배치
     {
-        Camera cam = Camera.main;
-        Vector3 c = cam != null ? cam.transform.position : Vector3.zero;
-        return new Vector3(c.x, c.y + yOffset, PanelZ);
+        Camera cam = Camera.main; // 현재 카메라
+        if (cam == null) return; // 카메라 생성 전에는 기다린다.
+        float depth = Mathf.Max(cam.nearClipPlane + 1f, 5f); // 주방 앞쪽에 표시한다.
+        float halfHeight = cam.orthographic ? cam.orthographicSize : depth * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad); // 화면 높이
+        float scale = Mathf.Min(halfHeight * 2f / height, halfHeight * 2f * cam.aspect / width) * 0.94f; // 화면 안에 여백을 두고 맞춘다.
+        target.rotation = cam.transform.rotation; // 화면과 평행하게 맞춘다.
+        target.localScale = Vector3.one * scale; // 모든 카드와 슬롯 크기를 함께 조정한다.
+        target.position = cam.transform.position + cam.transform.forward * depth + cam.transform.up * (yOffset * scale); // 화면 중앙
     }
 
     // ---- Build ----
@@ -182,7 +193,7 @@ public class CookingPlanManager : MonoBehaviour
         panel = new GameObject("CookingPlanPanel");
         panel.transform.SetParent(transform, false);
         // The panel's content spans local y -6.5..6.1 (center -0.2).
-        panel.transform.position = CameraCenter(0.2f);
+        AlignToCamera(panel.transform, 0.2f, 22.5f, 12.6f);
 
         string dish1 = FindDishName("ExamPage_1", "탕수육");
         string dish2 = FindDishName("ExamPage_2", "마파두부");
@@ -345,7 +356,7 @@ public class CookingPlanManager : MonoBehaviour
             if (slot.Occupant != null) continue;
             slot.Occupant = card;
             card.SetSlot(slot.Index);
-            card.transform.position = slot.transform.position + new Vector3(0f, 0f, -0.03f);
+            card.transform.localPosition = slot.transform.localPosition + new Vector3(0f, 0f, -0.03f);
             Revalidate();
             return;
         }
@@ -358,7 +369,7 @@ public class CookingPlanManager : MonoBehaviour
 
         foreach (PlanSlot slot in slots)
         {
-            float d = Vector3.Distance(slot.transform.position, card.transform.position);
+            float d = Vector3.Distance(slot.transform.localPosition, card.transform.localPosition);
             if (d < bestDist) { bestDist = d; best = slot; }
         }
 
@@ -379,13 +390,13 @@ public class CookingPlanManager : MonoBehaviour
 
             best.Occupant = card;
             card.SetSlot(best.Index);
-            card.transform.position = best.transform.position + new Vector3(0f, 0f, -0.03f);
+            card.transform.localPosition = best.transform.localPosition + new Vector3(0f, 0f, -0.03f);
         }
         else if (card.SlotIndex >= 0 && slots[card.SlotIndex] != null)
         {
             // Missed every slot while already placed - settle back into the slot
             // it was already in rather than snapping all the way back to the pool.
-            card.transform.position = slots[card.SlotIndex].transform.position + new Vector3(0f, 0f, -0.03f);
+            card.transform.localPosition = slots[card.SlotIndex].transform.localPosition + new Vector3(0f, 0f, -0.03f);
         }
         else
         {
@@ -433,7 +444,7 @@ public class CookingPlanManager : MonoBehaviour
         string blockerLabel = card.BlockedBy != null ? card.BlockedBy.Label.Replace("\n", " ") : "다음 작업";
         explainText.text = $"'{cardLabel}'은(는) '{blockerLabel}'보다 앞에 와야 해요.";
 
-        explainPopup.transform.position = card.transform.position + new Vector3(0f, 0.85f, -0.2f);
+        explainPopup.transform.localPosition = card.transform.localPosition + new Vector3(0f, 0.85f, -0.2f);
         explainPopup.SetActive(true);
 
         if (explainHideRoutine != null) StopCoroutine(explainHideRoutine);
@@ -516,6 +527,7 @@ public class CookingPlanManager : MonoBehaviour
         go.transform.localPosition = localPos;
 
         TextMesh tm = go.AddComponent<TextMesh>();
+        KoreanFontFallback.Apply(tm); // 웹에서도 한글이 보이게 한글 글꼴
         tm.text = text;
         tm.fontSize = fontSize;
         tm.characterSize = 0.1f;

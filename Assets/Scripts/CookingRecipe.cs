@@ -100,7 +100,12 @@ public class BatterLook
     [Tooltip("x: stiffness → y: how much of the coat stays on in the frying (estimate tuning): runny slides off, very stiff cracks a little.")]
     public AnimationCurve retentionByStiffness = new AnimationCurve(
         new Keyframe(0f, 0.3f), new Keyframe(0.3f, 0.7f), new Keyframe(0.55f, 1f), new Keyframe(0.85f, 0.9f), new Keyframe(1f, 0.75f));
+    [Tooltip("1차 튀김: 하얗게 굳은 튀김옷 색.")]
+    public Color firstFryColor = new Color(0.97f, 0.93f, 0.78f);
+    [Tooltip("2차 튀김부터: 노릇한 색.")]
     public Color friedColor = new Color(0.86f, 0.62f, 0.28f);
+    [Tooltip("튀김옷이 얇게 묻은 곳에 비치는 고기 색 (불투명 재질이라 투명도 대신 이 색과 섞는다).")]
+    public Color meatShowColor = new Color(0.72f, 0.42f, 0.36f);
     [Tooltip("Seconds in hot oil to go fully golden (look).")]
     public float fryBrownSeconds = 40f;
 }

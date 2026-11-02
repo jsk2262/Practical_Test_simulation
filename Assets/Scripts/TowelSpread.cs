@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -124,9 +124,14 @@ public class TowelSpread : Interactable
 
         // How far in front of the sheet the flaps must come to lie over the piece.
         float lift = 0.02f;
-        foreach (IngredientItem p in pieces)
-            lift = Mathf.Max(lift, transform.position.z - p.VisibleBounds.min.z + 0.02f);
-        float liftLocal = lift / Mathf.Max(Mathf.Abs(transform.lossyScale.z), 1e-4f);
+        foreach (IngredientItem p in pieces) // 시트 바깥 방향으로 재료를 덮을 높이를 구한다.
+        {
+            Bounds b = p.VisibleBounds;
+            Vector3 outward = -transform.forward;
+            Vector3 abs = new Vector3(Mathf.Abs(outward.x), Mathf.Abs(outward.y), Mathf.Abs(outward.z));
+            lift = Mathf.Max(lift, Vector3.Dot(b.center - transform.position, outward) + Vector3.Dot(b.extents, abs) + 0.02f);
+        }
+        float liftLocal = lift / Mathf.Max(transform.TransformVector(Vector3.forward).magnitude, 1e-4f); // 회전된 부모의 실제 축 배율
 
         flat.enabled = false;
         SetFlapsVisible(true);
@@ -142,7 +147,18 @@ public class TowelSpread : Interactable
         if (close)
         {
             HandController.Instance?.PlayChopGesture(); // press down on it
-            foreach (IngredientItem p in pieces) p.BlotWithTowel();
+            foreach (IngredientItem p in pieces) p.BlotWithTowel(); // 실제 물기·핏물 제거 상태를 기록한다.
+            foreach (IngredientItem p in pieces)
+                if (p.Category == IngredientCategory.Meat && p.DrainOnTowel == IngredientItem.DrainNeed.Blood)
+                {
+                    Material paper = center.GetComponent<Renderer>().material; // 핏물이 묻은 타올의 색
+                    Color absorbed = new Color(0.86f, 0.70f, 0.68f);
+                    paper.color = absorbed;
+                    if (paper.HasProperty("_BaseColor")) paper.SetColor("_BaseColor", absorbed);
+                    foreach (Renderer flap in GetComponentsInChildren<Renderer>(true))
+                        if (flap != flat) flap.sharedMaterial = paper;
+                    break;
+                }
         }
         else
         {
@@ -194,7 +210,7 @@ public class TowelSpread : Interactable
         if (any)
         {
             // (가장자리가 살짝 보이지 않게 크기의 15% + 고정 여유)
-            float padX = (pMaxX - pMinX) * 0.05f + 0.01f, padY = (pMaxY - pMinY) * 0.05f + 0.01f;
+            float padX = (pMaxX - pMinX) * 0.05f + 0.01f, padY = (pMaxY - pMinY) * 0.05f + 0.01f; // 재료에 바짝 붙게 덮는다.
             minX = pMinX - padX; maxX = pMaxX + padX;
             minY = pMinY - padY; maxY = pMaxY + padY;
         }
@@ -217,13 +233,13 @@ public class TowelSpread : Interactable
 
     private void Pose(float k, float liftLocal)
     {
-        float sides = Mathf.Clamp01(k * 1.5f);
+        float sides = Mathf.Clamp01(k * 1.5f); // 양옆이 조금 앞서 접힌다.
         leftHinge.localRotation = Quaternion.AngleAxis(-180f * sides, Vector3.up);
         rightHinge.localRotation = Quaternion.AngleAxis(180f * sides, Vector3.up);
-        float z = -liftLocal * k;
+        float z = -liftLocal * k; // 접히는 내내 재료 높이를 따라 올라온다.
         leftHinge.localPosition = new Vector3(coverMinX, 0f, z);
         rightHinge.localPosition = new Vector3(coverMaxX, 0f, z - 0.001f);
-        float ends = Mathf.Clamp01((k - 0.35f) / 0.65f);
+        float ends = Mathf.Clamp01((k - 0.35f) / 0.65f); // 위아래는 조금 늦게 따라 접힌다.
         topHinge.localRotation = Quaternion.AngleAxis(-180f * ends, Vector3.right);
         bottomHinge.localRotation = Quaternion.AngleAxis(180f * ends, Vector3.right);
         topHinge.localPosition = new Vector3(0f, coverMaxY, -liftLocal * ends - 0.003f);

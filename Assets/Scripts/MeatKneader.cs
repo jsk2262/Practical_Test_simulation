@@ -78,7 +78,7 @@ public class MeatKneader : MonoBehaviour
             if (mouse == null || !mouse.leftButton.isPressed) Finish();
             return;
         }
-        if (bowl == null || bowl.IsHeld || mouse == null || ConfirmDialog.IsOpen || ExamResultView.IsOpen
+        if (bowl == null || bowl.IsHeld || mouse == null || PauseMenu.IsPaused || ConfirmDialog.IsOpen || ExamResultView.IsOpen // (일시정지 중 포함)
             || (HandCarry.Instance != null && HandCarry.Instance.Current != null)
             || (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             || mouse.rightButton.wasPressedThisFrame)

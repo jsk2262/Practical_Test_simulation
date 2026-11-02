@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 public abstract class Carryable : Interactable, IDraggable
@@ -52,7 +52,7 @@ public abstract class Carryable : Interactable, IDraggable
     /// <summary>"Up" of the (tilted) counter top - things lying on it turn about
     /// this. Turning about the screen axis instead tipped the 3D ingredients over
     /// onto their sides (their models carry the counter's tilt).</summary>
-    public static readonly Vector3 CounterUp = Quaternion.Euler(-41f, 0f, 0f) * Vector3.up;
+    public static Vector3 CounterUp => CookingStationFrameManager.Up; // 실제 조리대 방향을 사용한다.
 
     public void Spin(float degrees) => UserSpin = Quaternion.AngleAxis(degrees, CounterUp) * UserSpin;
 
@@ -392,11 +392,23 @@ public abstract class Carryable : Interactable, IDraggable
         if (cam == null || Mouse.current == null) return;
 
         Vector2 screenPos = Mouse.current.position.ReadValue();
-        float depth = transform.position.z - cam.transform.position.z;
-        Vector3 world = cam.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, depth));
-        transform.position = new Vector3(world.x, world.y, transform.position.z);
+        MoveDragToPointer(cam, screenPos); // 이동과 놓기 모두 현재 카메라·조리대 기준을 따른다.
 
         UpdateDropHighlight(cam, screenPos);
+    }
+
+    private void MoveDragToPointer(Camera cam, Vector2 screenPos) // 선반의 옛 Z 깊이에 붙잡히지 않게 한다.
+    {
+        Ray ray = cam.ScreenPointToRay(screenPos); // 회전한 카메라에서 포인터 방향을 구한다.
+        if (this is MovableBowl bowl && bowl.IsDish && PlayArea.TryCounterPoint(ray, out Vector3 surface))
+        {
+            Renderer dish = bowl.VisibleDishRenderer(); // 접시 안의 재료가 아닌 접시 바닥을 기준으로 든다.
+            Vector3 offset = dish != null ? transform.position - new Vector3(dish.bounds.center.x, dish.bounds.min.y, dish.bounds.center.z) : Vector3.zero;
+            transform.position = surface + offset + Carryable.CounterUp * 0.12f; // 조리대 앞판 위로 들어서 운반한다.
+            return;
+        }
+        Plane plane = new Plane(cam.transform.forward, transform.position); // 다른 물체도 화면과 평행한 평면에서 이동한다.
+        if (plane.Raycast(ray, out float distance)) transform.position = ray.GetPoint(distance); // 월드 Z만 고정하지 않는다.
     }
 
     private void UpdateDropHighlight(Camera cam, Vector2 screenPos)
@@ -483,8 +495,13 @@ public abstract class Carryable : Interactable, IDraggable
             if (dropTarget == null && hand != null && hand.Current == this)
             {
                 Vector2 sp = Mouse.current.position.ReadValue();
-                Vector3 at = cam.ScreenToWorldPoint(new Vector3(sp.x, sp.y, transform.position.z - cam.transform.position.z));
-                hand.PlaceFreeAt(new Vector3(at.x, at.y, transform.position.z));
+                Vector3 at; // 클릭 놓기와 같은 실제 조리대 교차점을 사용한다.
+                if (!PlayArea.TryCounterPoint(cam.ScreenPointToRay(sp), out at))
+                {
+                    float depth = Vector3.Dot(transform.position - cam.transform.position, cam.transform.forward); // 이전 씬 대체 깊이
+                    at = cam.ScreenToWorldPoint(new Vector3(sp.x, sp.y, depth));
+                }
+                hand.PlaceFreeAt(at); // 접시 바닥을 조리대 위에 맞춰 내려놓는다.
             }
             else if (hitSomething)
             {

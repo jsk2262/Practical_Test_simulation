@@ -41,6 +41,7 @@ public class WaterTap : Interactable
         foreach (MovableBowl vessel in waterVessels)
         {
             if (vessel == null || !vessel.isActiveAndEnabled || vessel.IsFilledWithWater) continue;
+            if (CleanupMode.IsOn && vessel.IsPlateOrBowl) continue; // 정리 때 씻는 그릇에는 물이 차지 않게
             Vector2 v = vessel.BodyCenterWorld();
             if (Mathf.Abs(v.x - spout.x) > fillRadius) continue;
             if (v.y > spout.y + fillRadius || v.y < spout.y - fallReach) continue;

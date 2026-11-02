@@ -133,6 +133,7 @@ public abstract class CuttingBoardZoneBase : MonoBehaviour, IClickable
         labelGo.transform.SetParent(promptRoot.transform, false);
         labelGo.transform.localPosition = new Vector3(0f, 0f, -0.02f);
         promptText = labelGo.AddComponent<TextMesh>();
+        KoreanFontFallback.Apply(promptText); // 웹에서도 한글이 보이게 한글 글꼴
         promptText.fontSize = 28;
         promptText.characterSize = 0.16f;
         promptText.anchor = TextAnchor.MiddleCenter;

@@ -68,7 +68,12 @@ public static partial class DemoFilm
         float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((Time.unscaledTime - camT0) / camDur));
         c.transform.position = Vector3.Lerp(camFrom, camTo, t);
         c.orthographicSize = Mathf.Lerp(sizeFrom, sizeTo, t);
+        // 화면 고정 UI(정리 탭 · 체크리스트 · 경고 자막 · 타이머)도 카메라를 따라오게 (KitchenCamera는 꺼 둔 상태라 직접 부름)
+        if (KitchenCamera.Instance != null) placeHuds.Invoke(KitchenCamera.Instance, null); // 화면 고정 UI 다시 배치
     }
+
+    private static readonly System.Reflection.MethodInfo placeHuds = typeof(KitchenCamera).GetMethod("PlaceHuds",
+        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance); // 화면 고정 UI 배치 함수
 
     // ---- 도우미 ----
     private static HandCarry Hand => HandCarry.Instance;

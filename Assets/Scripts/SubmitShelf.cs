@@ -169,6 +169,7 @@ public class SubmitShelf : Interactable, ISlotContainer
         t.transform.SetParent(root.transform, false);
         t.transform.localPosition = new Vector3(0f, height * 0.5f - labelH * 0.5f, -0.1f);
         var text = t.AddComponent<TextMesh>();
+        KoreanFontFallback.Apply(text); // 웹에서도 한글이 보이게 한글 글꼴
         text.text = "제출대";
         text.fontSize = 60;
         text.characterSize = 0.08f;

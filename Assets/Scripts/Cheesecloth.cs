@@ -290,7 +290,7 @@ public class Cheesecloth : Carryable
             if ((m != null && m.leftButton.wasPressedThisFrame) || (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame))
                 break; // (stopped part way)
             tilt = Mathf.MoveTowards(tilt, maxTilt, maxTilt * Time.deltaTime);
-            pan.SetPourTilt(Quaternion.AngleAxis(tilt, Vector3.forward));
+            pan.SetPourTilt(MovableBowl.PourTilt(tilt));
             // 기울면서 입구가 내려가고 옆으로 오므로, 매 프레임 입구가 면보 바로 위에 있도록
             if (hc != null)
             {
@@ -331,7 +331,7 @@ public class Cheesecloth : Carryable
         sauce.PourLip = null;
         for (float t = 0f; t < 0.35f; t += Time.deltaTime)
         {
-            pan.SetPourTilt(Quaternion.AngleAxis(Mathf.Lerp(tilt, 0f, t / 0.35f), Vector3.forward));
+            pan.SetPourTilt(MovableBowl.PourTilt(Mathf.Lerp(tilt, 0f, t / 0.35f)));
             yield return null;
         }
         pan.SetPourTilt(Quaternion.identity);
@@ -614,6 +614,7 @@ public class Cheesecloth : Carryable
         {
             sign = new GameObject("BowlFullSign");
             TextMesh tm = sign.AddComponent<TextMesh>();
+            KoreanFontFallback.Apply(tm); // 웹에서도 한글이 보이게 한글 글꼴
             tm.text = "가득 참";
             tm.fontSize = 40;
             tm.characterSize = 0.08f;
@@ -632,6 +633,7 @@ public class Cheesecloth : Carryable
         var go = new GameObject("ClothNote");
         go.transform.position = transform.position + new Vector3(0f, 0.6f, -1.2f);
         TextMesh tm = go.AddComponent<TextMesh>();
+        KoreanFontFallback.Apply(tm); // 웹에서도 한글이 보이게 한글 글꼴
         tm.text = text;
         tm.fontSize = 40;
         tm.characterSize = 0.08f;

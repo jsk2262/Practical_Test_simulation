@@ -6,8 +6,6 @@ public class SequenceHintButton : MonoBehaviour, IClickable
 {
     public void OnClicked()
     {
-        // (힌트판은 전체 화면 크기로 뜬다 - 확대 중이면 먼저 전체 보기로)
-        if (KitchenCamera.IsZoomed) { KitchenCamera.Instance.ShowOverview(); return; }
-        CookingPlanManager.Instance?.ToggleOrderHint();
+        CookingPlanManager.Instance?.ToggleOrderHint(); // 확대 중이어도 화면에 맞춰 바로 띄움
     }
 }

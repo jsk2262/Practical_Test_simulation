@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>집을 내용물 종류.</summary>
@@ -153,7 +153,7 @@ public class BowlMixInteraction : MonoBehaviour
         Bounds seen = new Bounds(bowl.BodyCenterWorld(), Vector3.zero);
         foreach (Renderer r in bowl.GetComponentsInChildren<Renderer>())
             if (r.enabled && !(r is ParticleSystemRenderer)) seen.Encapsulate(r.bounds);
-        Vector3 at = new Vector3(seen.center.x, seen.center.y, seen.min.z - 1.2f);
+        Vector3 at = seen.center; // 버무린 그릇의 화면 중심
         var options = new[]
         {
             new EggPartChooser.Option("반죽\n조각", new Color(0.98f, 0.95f, 0.85f, 0.97f), HasContent(BowlPickupKind.BatterPiece), () => TryPickup(BowlPickupKind.BatterPiece)),

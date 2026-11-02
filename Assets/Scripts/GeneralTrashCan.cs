@@ -59,6 +59,7 @@ public class GeneralTrashCan : Interactable
         Vector3 top = rend != null ? new Vector3(rend.bounds.center.x, rend.bounds.max.y + 0.3f, rend.bounds.min.z - 0.5f) : transform.position;
         go.transform.SetPositionAndRotation(top, Quaternion.identity);
         hint = go.AddComponent<TextMesh>();
+        KoreanFontFallback.Apply(hint); // 웹에서도 한글이 보이게 한글 글꼴
         hint.text = "일반쓰레기 버리기";
         hint.fontSize = 48;
         hint.characterSize = 0.04f;
