@@ -24,7 +24,7 @@ public class ChecklistManager : MonoBehaviour
         public readonly List<Item> items = new List<Item>(); // 할 일들
     }
 
-    private readonly List<Stage> stages = new List<Stage>(); // 1~7단계
+    private readonly List<Stage> stages = new List<Stage>(); // 1~8단계
     private readonly Dictionary<string, List<IngredientItem>> byName = new Dictionary<string, List<IngredientItem>>(); // 재료 이름 → 재료들 (시작할 때 한 번만 찾음)
     private HandWashSequence handWash;   // 손 씻기
     private Cheesecloth cloth;           // 고추기름 거르는 면보
@@ -60,46 +60,46 @@ public class ChecklistManager : MonoBehaviour
         Refresh();                                            // 첫 글 만들기
     }
 
-    // ---- 단계 (사용자 요청 순서 1~7) ----
+    // ---- 단계 (사용자 요청 순서 1~8) ----
     private void Build()
     {
         Stage s = Add("1. 손 씻기");                                                  // 가장 처음 무조건
         Do(s, "손 씻기", () => handWash != null && handWash.HandsWashed);              // 손 씻기 완료
 
-        s = Add("2. 재료를 메뉴별로 나누기");                                          // 탕수육 · 마파두부
-        Do(s, "탕수육 · 마파두부 재료를 접시에 따로", Sorted);                          // 등심과 두부가 서로 다른 새 접시에
+        s = Add("2. 재료 나누기");                                                     // 탕수육 · 마파두부
+        Do(s, "메뉴별로 따로", Sorted);                                                 // 등심과 두부가 서로 다른 새 접시에
 
         s = Add("3. 밑준비");                                                          // 오래 걸리는 것 먼저
-        Do(s, "탕) 앙금녹말: 전분 + 물 저어 두기", StarchSlurryReady);                 // 전분물을 저었음
-        Do(s, "탕) 등심 키친타올", () => Drained("돼지등심"));                           // 핏물 제거
-        Do(s, "탕) 달걀 다른 접시에 따로", EggMoved);                                   // 달걀 옮김
-        Do(s, "탕) 물 받아 목이버섯 불리기", () => Soaking("목이버섯"));                 // 불리는 중 이상
-        Do(s, "탕) 냄비 물 올리기 (완두콩 · 두부 데칠 물)", WaterPotOnFire);             // 물 냄비가 켠 불 위에
-        Do(s, "마) 다진고기 키친타올", () => Drained("돼지고기"));                       // 다진 고기 핏물 제거
+        Do(s, "탕) 앙금녹말", StarchSlurryReady);                                       // 전분물을 저었음
+        Do(s, "고기 키친타올", () => Drained("돼지등심") && Drained("돼지고기"));         // 등심 · 다진고기 핏물 제거 (한 줄로 합침)
+        Do(s, "탕) 달걀 따로", EggMoved);                                               // 달걀 옮김
+        Do(s, "탕) 목이버섯 불리기", () => Soaking("목이버섯"));                         // 불리는 중 이상
+        Do(s, "탕) 냄비 물 올리기", WaterPotOnFire);                                    // 물 냄비가 켠 불 위에
 
-        s = Add("4. 채소 손질 · 데치기");                                              // 썰기 · 데치기
-        Do(s, "탕) 대파 · 양파 · 오이 · 당근 썰기", () => AllCut("대파") && AllCut("양파") && AllCut("오이") && AllCut("당근")); // 탕수육 채소
-        Do(s, "탕) 완두콩 데치기 → 찬물", () => Cooked("완두콩"));                       // 데쳐짐
-        Do(s, "탕) 목이버섯 뜯기", () => AllCut("목이버섯"));                            // 손으로 찢음
-        Do(s, "마) 두부 1.5cm 주사위 썰기", () => AllCut("두부"));                       // 사각썰기
+        s = Add("4. 채소 · 데치기");                                                   // 썰기 · 데치기
+        Do(s, "탕) 야채 썰기", () => AllCut("대파") && AllCut("양파") && AllCut("오이")  // 탕수육 채소
+                                  && AllCut("당근") && AllCut("목이버섯"));             // 목이버섯 뜯기도 여기에 합침
+        Do(s, "탕) 완두콩 데치기 - 찬물", () => Cooked("완두콩"));                       // 데쳐짐
+        Do(s, "마) 두부 썰기", () => AllCut("두부"));                                   // 1.5cm 주사위
         Do(s, "마) 두부 데치기", () => Cooked("두부"));                                  // 데쳐짐
-        Do(s, "마) 마늘 · 생강 · 홍고추 다지기", () => AllCut("마늘") && AllCut("생강") && AllCut("고추")); // 다지기
+        Do(s, "마) 야채 썰기", () => AllCut("마늘") && AllCut("생강") && AllCut("고추")); // 마늘 · 생강 · 홍고추 다지기
 
-        s = Add("5. 고기 손질 · 고추기름");                                            // 고기 · 기름
-        Do(s, "탕) 등심 4×1×1 썰기", () => AllCut("돼지등심"));                          // 썰기
-        Do(s, "탕) 밑간 (간장 · 청주)", Marinated);                                      // 밑간함
-        Do(s, "탕) 튀김반죽 (흰자 + 앙금) 버무리기", Battered);                          // 반죽 묻힘
-        Do(s, "마) 고추기름 만들어 면보에 거르기", () => cloth != null && cloth.HasResidue); // 면보에 고춧가루가 걸러짐
+        s = Add("5. 고기 · 고추기름");                                                 // 고기 · 기름
+        Do(s, "탕) 고기 썰기", () => AllCut("돼지등심"));                                // 4×1×1 썰기
+        Do(s, "탕) 고기 밑간", Marinated);                                              // 간장 · 청주
+        Do(s, "마) 고추기름 - 면보", () => cloth != null && cloth.HasResidue);           // 면보에 고춧가루가 걸러짐
+        Do(s, "탕) 튀김반죽", Battered);                                                // 반죽 묻힘
 
         s = Add("6. 튀기기");                                                          // 탕수육 튀김
-        Do(s, "튀김 기름 올리기", OilOnFire);                                          // 튀김 기름이 켠 불 위에
-        Do(s, "반죽 넣어 기름 온도 확인", () => MovableBowl.BatterTestCount > 0);         // 반죽 조각으로 확인
-        Do(s, "1차 튀김", () => FryPasses() >= 1);                                     // 한 번 튀김
-        Do(s, "2차 튀김", () => FryPasses() >= 2);                                     // 두 번 튀김
+        Do(s, "탕) 튀김기름", OilOnFire);                                              // 튀김 기름이 켠 불 위에
+        Do(s, "튀김 2번", () => FryPasses() >= 2);                                     // 1차 · 2차를 한 줄로
 
-        s = Add("7. 소스 · 제출");                                                     // 마무리
-        Do(s, "탕수육 소스 버무려 제출", () => SubmittedWith("돼지등심"));                // 탕수육 담은 접시 제출
-        Do(s, "마파두부 제출", () => SubmittedWith("두부"));                             // 마파두부 담은 접시 제출
+        s = Add("7. 완성");                                                            // 담기까지
+        Do(s, "탕) 탕수육 완성", () => OnPlate("돼지등심", false));                      // 담는 접시에 담김
+        Do(s, "마) 마파두부 완성", () => OnPlate("두부", false));                        // 담는 접시에 담김
+
+        s = Add("8. 정리 · 청소");                                                     // 마무리
+        Do(s, "제출 후 정리와 청소", () => OnPlate("돼지등심", true) && OnPlate("두부", true) && TidiedUp()); // 둘 다 제출하고 뒷정리까지
     }
 
     private Stage Add(string title) { var s = new Stage { title = title }; stages.Add(s); return s; } // 단계 추가
@@ -161,15 +161,22 @@ public class ChecklistManager : MonoBehaviour
         return n;
     }
 
-    private static bool SubmittedWith(string name) // 그 재료가 담긴 접시를 제출함
+    private static bool OnPlate(string name, bool submitted) // 그 재료가 담는 접시에 담김 (submitted: 제출까지 했을 때만)
     {
         foreach (PlatingDestination d in PlatingDestination.All)                      // 담는 접시들
         {
-            if (d == null || !d.Submitted || d.Plate == null) continue;                // 제출한 것만
+            if (d == null || d.Plate == null || (submitted && !d.Submitted)) continue; // 제출만 셀 때는 제출한 것만
             foreach (IngredientItem i in d.Plate.GetComponentsInChildren<IngredientItem>()) // 담긴 재료
                 if (i.IngredientName == name) return true;                             // 그 재료가 있으면
         }
         return false;
+    }
+
+    private static bool TidiedUp() // 뒷정리 끝 - 안 씻은 그릇이 없고 화구 바닥도 깨끗함
+    {
+        foreach (MovableBowl v in FindObjectsByType<MovableBowl>(FindObjectsSortMode.None)) if (v.IsDirty) return false; // 안 씻은 그릇
+        foreach (BurnerFloorDirt d in FindObjectsByType<BurnerFloorDirt>(FindObjectsSortMode.None)) if (!d.IsClean) return false; // 화구 바닥 때
+        return true;
     }
 
     // ---- 갱신 · 화면 ----
