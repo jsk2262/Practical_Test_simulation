@@ -1512,7 +1512,10 @@ public partial class IngredientItem : Carryable
         yield return Turn1(body.transform, Quaternion.identity, Quaternion.AngleAxis(90f, Vector3.right), 0.5f * diceSlowness);
         Destroy(body);
 
-        // 조각은 규격대로: 두께(X) x 길이(Y, 세워 둔 높이) x 폭(Z).
+        // 조각은 어슷썰기(반원)와 똑같은 자세로 둔다: 두께(X) x 세로(Y) x 가로(Z, 도마 앞뒤).
+        // 전에는 가로 4cm를 위로 세워 둬서 조각들이 제 길이 방향으로 포개졌고, 그래서
+        // 4 x 1 편 여러 장이 아니라 길쭉한 막대 하나처럼 보였다. 단면만 네모일 뿐
+        // 놓이는 모습은 반원과 같아야 한다.
         int n = Mathf.Clamp(Mathf.RoundToInt(job.L / job.t), 2, 12); // 규격 두께로 몇 조각인지
         float step = job.t * 1.04f;                                 // 칼금이 보이게 조각 사이를 머리카락만큼 띄운다
         float span = n * step;                                      // 조각들이 늘어서는 전체 길이
@@ -1521,14 +1524,14 @@ public partial class IngredientItem : Carryable
         {
             float x = -span * 0.5f + step * (i + 0.5f);
             job.cutX[i] = -span * 0.5f + step * i;
-            GameObject s = Block(job.rig, $"Piece_{i}", new Vector3(x, job.pieceL * 0.5f, 0f), new Vector3(job.t, job.pieceL, job.pieceW), new Material(flesh));
-            if (cucumber) Block(s.transform, "Skin", new Vector3(0f, 0f, 0.44f), new Vector3(1.02f, 1.0f, 0.13f), new Material(skin)); // 오이는 긴 쪽에 껍질 띠가 남는다
+            GameObject s = Block(job.rig, $"Piece_{i}", new Vector3(x, job.pieceW * 0.5f, 0f), new Vector3(job.t, job.pieceW, job.pieceL), new Material(flesh));
+            if (cucumber) Block(s.transform, "Skin", new Vector3(0f, 0.44f, 0f), new Vector3(1.02f, 0.13f, 1.02f), new Material(skin)); // 오이는 긴 면 한쪽에 껍질 띠가 남는다
             job.stack.Add(s.transform);
         }
-        job.rightEdge = span * 0.5f;
+        job.rightEdge = span * 0.5f + job.pieceL * 0.5f; // 반원 조각과 같은 자리에서 부채꼴이 시작되게
         job.fanStep = Mathf.Max(job.t * 0.9f, 0.018f); // (overlapping, gathered like slices set out on a plate)
-        job.lean = -76f;
-        float a = 76f * Mathf.Deg2Rad;
+        job.lean = -65f;                               // 반원 조각과 같은 기울기
+        float a = 65f * Mathf.Deg2Rad;
         job.restY = s => Mathf.Sin(a) * s.localScale.x * 0.5f + Mathf.Cos(a) * s.localScale.y * 0.5f;
     }
 
