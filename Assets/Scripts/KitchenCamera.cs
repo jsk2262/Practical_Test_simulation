@@ -71,7 +71,7 @@ public class KitchenCamera : MonoBehaviour
     {
         "RecipesSauce", "Label_Timer", "Label_HygieneCount", "Label_SpecInfoButton", "Label_HintButton",
         "Label_SauceInfoButton", "CutSpecification", "Hint", "CleanupTab", "Label_CleanupTab",
-        "SubmitButton", "SpeedModeButton",
+        "SpeedModeButton", // (제출 버튼은 뺐다 - 확대하면 화면만 확대되고 제출대는 제자리에 둔다)
     };
 
     private Camera cam;
