@@ -624,11 +624,17 @@ public partial class IngredientItem : Carryable
             Vector3 center = knifeRend != null ? knifeRend.bounds.center : transform.position;
             Camera cam = Camera.main; // 현재 카메라 방향으로 앞에 배치한다.
             if (cam != null) center -= cam.transform.forward * 0.6f; // 회전한 씬에서 세계 Z로 밀지 않는다.
-            CutMethodChooser.Instance.Show(center, PerformCut, CanTrim ? PerformTrim : (System.Action)null);
+            CutMethodChooser.Instance.Show(center, PerformCut, CanTrim ? PerformTrim : (System.Action)null,
+                category == IngredientCategory.Vegetable); // 야채면 편·어슷의 두께 칸을 뺀다
         }
     }
 
     private bool isCutting;
+
+    /// <summary>야채 편·어슷썰기의 두께(cm). 규격으로 묻지 않고 이 값으로 고정한다 - 종이처럼
+    /// 얇지도, 고기·두부처럼 두툼하지도 않은 편 두께. 두께를 따지는 건 양을 많이 주는
+    /// 메인재료(고기 채썰기, 두부 사각썰기)뿐이다.</summary>
+    public const float VeggieSliceThicknessCm = 0.3f;
 
     /// <summary>Reference (standard-spec) thickness per method, in cm - the size our
     /// baseline piece visuals were tuned for. Chosen thickness scales visuals from here.</summary>
@@ -655,6 +661,8 @@ public partial class IngredientItem : Carryable
         switch (method)
         {
             case CutMethod.Julienne: return new CutSpec(thicknessCm, 6f, thicknessCm);
+            case CutMethod.Slice:
+            case CutMethod.DiagonalCut: return new CutSpec(4f, 1f, VeggieSliceThicknessCm); // 편·어슷은 4 x 1 cm 편, 두께는 고정
             case CutMethod.Dice:
             case CutMethod.Cube:
             case CutMethod.Other: return new CutSpec(thicknessCm, thicknessCm, thicknessCm);
@@ -692,7 +700,86 @@ public partial class IngredientItem : Carryable
         CuttingBoardController.Instance.Select(this);
         // 고기 (채썰기용): 다듬기 is cutting the ends off to the strips' length (4 cm).
         if (sliceStyle == SliceStyle.MeatStrips) { StartCoroutine(WhileLocked(MeatTrimRoutine())); return; }
+        // 오이·당근·대파: 썰기의 앞단계(끝 자르기 · 네모 다듬기 · 씨/심 제거 · 펼치기)만 재생한다.
+        if (sliceStyle == SliceStyle.CucumberDiagonal || sliceStyle == SliceStyle.CarrotPlank || sliceStyle == SliceStyle.LeekFlat)
+        { StartCoroutine(WhileLocked(VeggieTrimRoutine())); return; }
+        // 양파: 위아래를 잘라 4cm로 맞추고 가운데 심을 빼낸다.
+        if (crescentSlices) { StartCoroutine(WhileLocked(OnionTrimRoutine())); return; }
         StartCoroutine(WhileLocked(ingredientName == "생강" ? GingerTrimRoutine() : chiliTrim ? ChiliTrimRoutine() : TrimRoutine())); // 생강은 겉면을 깎아 노란 속살을 드러낸다.
+    }
+
+    /// <summary>다듬기 버튼(오이·당근·대파): 썰기의 앞단계만 재생하고 칼질은 하지 않는다.
+    /// 썰 때와 같은 코드를 trimOnly로 돌리므로, 다듬기를 따로 하든 바로 썰든 보이는
+    /// 동작이 같다 - 바로 썰면 그 앞단계가 칼질에 이어 붙어 한 번에 진행된다.</summary>
+    private IEnumerator VeggieTrimRoutine()
+    {
+        isCutting = true;
+        SupportHandController.Instance?.ShowNear(transform.position); // 재료를 받치는 손
+        yield return StyledSliceRoutine(CutMethod.Slice, BuildSpec(CutMethod.Slice, VeggieSliceThicknessCm), true); // 앞단계만
+        IsTrimmed = true;                                             // 중복 다듬기를 막고 썰기에서 건너뛰게 한다
+        isCutting = false;
+        SupportHandController.Instance?.Hide();
+        Debug.Log($"{ingredientName}: 다듬기 완료 (썰기 앞단계)");
+    }
+
+    /// <summary>다듬기 버튼(양파): 위아래를 잘라 규격 길이로 맞추고 가운데 심을 빼낸다.</summary>
+    private IEnumerator OnionTrimRoutine()
+    {
+        isCutting = true;
+        HandController handCtl = HandController.Instance;
+        ToolItem knife = HandCarry.Instance?.Current as ToolItem;
+        Vector3 handBase = handCtl != null ? handCtl.RestPosition : Vector3.zero;
+        SupportHandController.Instance?.ShowNear(transform.position);
+
+        Bounds shown = VisibleBounds;                                  // 도마에 놓인 반쪽 양파
+        float R = Mathf.Max(shown.extents.x, shown.extents.y);
+        Vector3 up = Carryable.CounterUp, back = Vector3.Cross(Vector3.right, up).normalized;
+        var rig = new GameObject("TrimRig").transform;                 // 도마 기준 좌표계 (X 가로 · Y 위 · Z 뒤)
+        rig.SetParent(PieceHolder.For(transform), false);
+        rig.SetPositionAndRotation(shown.center - up * (R * 0.5f), Quaternion.LookRotation(back, up));
+
+        float knifeHoldBefore = knife != null ? knife.ChopHoldSeconds : 0f;
+        if (knife != null) knife.ChopHoldSeconds = 4f * diceSlowness;  // 칼을 든 채로 기다리게
+        if (knife != null && handCtl != null)
+        {
+            knife.PlayChopMotion();
+            yield return new WaitForSeconds(0.08f);
+            if (BladeXAt(knife, rig.position.y, out float bladeX)) handBase.x += rig.position.x - bladeX; // 칼날을 칼금에 맞춘다
+        }
+
+        yield return OnionTrim(rig, handBase, handCtl, knife, R);
+
+        if (knife != null) knife.ChopHoldSeconds = knifeHoldBefore;
+        Destroy(rig.gameObject);                                       // 임시 좌표계 정리
+        IsTrimmed = true;
+        isCutting = false;
+        SupportHandController.Instance?.Hide();
+        Debug.Log($"{ingredientName}: 다듬기 완료 (위아래 잘라 4cm · 가운데 심 제거)");
+    }
+
+    /// <summary>양파 다듬기 동작: 반쪽 양파의 위아래(꼭지·뿌리)를 잘라 규격 길이(4cm)로
+    /// 맞추고, 칼을 옆에 둔 채 가운데 뿌리심을 뒤로 뽑아낸다. 다듬기 버튼과 반달썰기
+    /// 앞단계가 이 하나를 같이 쓴다.</summary>
+    private IEnumerator OnionTrim(Transform rig, Vector3 handBase, HandController handCtl, ToolItem knife, float R)
+    {
+        Material coreM = SolidMaterial(new Color(0.96f, 0.94f, 0.82f), 0.5f); // 뿌리심 색
+        float half = Mathf.Min(4f * worldPerCm * 0.5f, R * 0.9f);             // 규격 4cm의 반 - 여기서 양 끝을 끊는다
+
+        yield return DiceChop(rig, handBase, -half, handCtl, knife);          // 꼭지 쪽 끝
+        DropScrap("꼭지", OwnColor);
+        yield return DiceChop(rig, handBase, half, handCtl, knife);           // 뿌리 쪽 끝
+        DropScrap("뿌리", OwnColor);
+
+        // 가운데 뿌리심: 칼을 옆에 두고 다른 손으로 뒤쪽으로 뽑아낸다.
+        Transform core = Block(rig, "OnionCore", new Vector3(0f, R * 0.12f, 0f),
+            new Vector3(half * 0.5f, R * 0.22f, R * 0.3f), coreM).transform;
+        Vector3 aside = handBase + rig.right * (R + 0.5f);
+        handCtl?.SlideTo(new Vector3(aside.x, aside.y, handBase.z), 0.3f * diceSlowness);
+        yield return new WaitForSeconds(0.3f * diceSlowness);
+        SupportHandController.Instance?.ShowNear(rig.TransformPoint(new Vector3(0f, R * 0.3f, R * 0.6f)));
+        yield return SlideAway(core, new Vector3(0f, R * 0.2f, R * 1.4f), 0.6f * diceSlowness); // 뽑혀 나간다
+        DropScrap("심", coreM.color);
+        handCtl?.SlideTo(handBase, 0.25f * diceSlowness);                     // 손을 제자리로
     }
 
     private IEnumerator TrimRoutine()
@@ -751,8 +838,8 @@ public partial class IngredientItem : Carryable
     {
         switch (sliceStyle)
         {
-            case SliceStyle.CucumberDiagonal: return method == CutMethod.Slice || method == CutMethod.DiagonalCut;
-            case SliceStyle.CarrotPlank:
+            case SliceStyle.CucumberDiagonal:
+            case SliceStyle.CarrotPlank: return method == CutMethod.Slice || method == CutMethod.DiagonalCut; // 당근도 어슷썰기(반원)를 지원한다
             case SliceStyle.LeekFlat: return method == CutMethod.Slice;
             case SliceStyle.MeatStrips: return method == CutMethod.Julienne;
             default: return false;
@@ -1194,6 +1281,7 @@ public partial class IngredientItem : Carryable
         public Transform rig;
         public float L, d, t;
         public float pieceL, pieceW; // 조각 한 개의 규격 길이 · 폭 (두께는 t)
+        public bool trimOnly;        // 다듬기 버튼: 앞단계만 하고 칼질은 하지 않는다
         public readonly List<Transform> stack = new List<Transform>();
         public float[] cutX;          // cutX[i]: between piece i-1 and piece i
         public float rightEdge;       // where the stack ends on the right
@@ -1209,7 +1297,7 @@ public partial class IngredientItem : Carryable
     /// the core out, pressed flat), then sliced from the right end in, each
     /// piece tipping over onto the ones before it - a fan of slices, as on the
     /// board. Thickness is the chosen spec, at most 12 cuts.</summary>
-    private IEnumerator StyledSliceRoutine(CutMethod method, CutSpec spec)
+    private IEnumerator StyledSliceRoutine(CutMethod method, CutSpec spec, bool trimOnly = false)
     {
         HandController handCtl = HandController.Instance;
         ToolItem knife = HandCarry.Instance?.Current as ToolItem;
@@ -1220,7 +1308,7 @@ public partial class IngredientItem : Carryable
         Vector3 ls = transform.lossyScale;
         float[] dims = { Mathf.Abs(ms.x * ls.x), Mathf.Abs(ms.y * ls.y), Mathf.Abs(ms.z * ls.z) };
         System.Array.Sort(dims);
-        var job = new SliceJob { L = dims[2], d = dims[1] };
+        var job = new SliceJob { L = dims[2], d = dims[1], trimOnly = trimOnly }; // 다듬기만이면 앞단계에서 멈춘다
         // 조각 한 개의 규격: 가장 긴 값이 길이, 가장 짧은 값이 두께 - 4 · 1 · 1 을 어느
         // 칸에 적든 같은 조각이 나온다 (고기 채썰기가 규격을 읽는 방식과 같다). 재료
         // 자체의 굵기가 아니라 규격이 조각 크기를 정한다 (양파 4 x 1 편과 같은 방식).
@@ -1273,10 +1361,13 @@ public partial class IngredientItem : Carryable
         switch (sliceStyle)
         {
             case SliceStyle.CucumberDiagonal:
-                yield return CucumberPrep(job, method == CutMethod.DiagonalCut ? 20f : 0f, handBase, handCtl, knife); // 살짝 어슷 (45도는 너무 비스듬했다)
-                break;
             case SliceStyle.CarrotPlank:
-                yield return CarrotPrep(job, handBase, handCtl, knife);
+                // 오이·당근 공통. 어슷썰기는 원기둥을 세로로 반 갈라 반원 조각으로, 편썰기는
+                // 옆면을 저며 내 네모난 4 x 1 편으로 (탕수육 야채는 모두 네모로 맞춘다).
+                if (method == CutMethod.DiagonalCut)
+                    yield return HalfRoundPrep(job, 20f, handBase, handCtl, knife); // 살짝 어슷 (45도는 너무 비스듬했다)
+                else
+                    yield return SquarePlankPrep(job, handBase, handCtl, knife);
                 break;
             case SliceStyle.LeekFlat:
                 yield return LeekPrep(job, handBase, handCtl, knife);
@@ -1289,6 +1380,18 @@ public partial class IngredientItem : Carryable
                 if (knife != null) knife.ChopHoldSeconds = knifeHoldBefore;
                 Destroy(job.rig.gameObject);
                 yield break;
+        }
+
+        if (trimOnly)
+        {
+            // 다듬기 버튼: 다듬은 모습(Piece_Trimmed)만 도마에 남기고 칼질은 하지 않는다.
+            handCtl?.SlideTo(handBase, 0.15f);                     // 손을 제자리로
+            if (knife != null) knife.ChopHoldSeconds = knifeHoldBefore; // 칼 들고 있는 시간 원복
+            foreach (Transform t in job.rig.GetComponentsInChildren<Transform>())
+                if (t.name.StartsWith("Piece_Trimmed")) t.SetParent(holder, true); // 리그가 사라져도 남게
+            Destroy(job.rig.gameObject);                           // 임시 좌표계 정리
+            FitColliderToVisible();                                // 다듬은 모습을 집을 수 있게
+            yield break;
         }
 
         if (job.cutX != null) yield return SliceStackFromRight(job, handBase, handCtl, knife);
@@ -1306,20 +1409,23 @@ public partial class IngredientItem : Carryable
         Debug.Log($"{ingredientName}: {CutMethodName(method)} 완료 ({job.stack.Count}조각, {job.pieceL / worldPerCm:0.0} x {job.pieceW / worldPerCm:0.0} x {job.t / worldPerCm:0.0} cm)");
     }
 
-    /// <summary>오이: two strokes along it take the outer part off (skin side,
-    /// the rest a scrap); stood on its side it's laid down flat, skin up;
-    /// turned to the diagonal (어슷) - then it's the half-oval slices it'll be
-    /// cut into, standing side by side.</summary>
-    private IEnumerator CucumberPrep(SliceJob job, float angle, Vector3 handBase, HandController handCtl, ToolItem knife)
+    /// <summary>어슷썰기(오이·당근): 양 끝을 떼고 원기둥을 세로로 반 갈라(반원 단면) 눕힌 뒤
+    /// 비스듬히 돌려 둔다 - 그 다음 썰릴 반원 조각들이 나란히 선 모습이 된다. 규격은
+    /// 반원의 지름이 가로(4cm), 눌린 높이가 세로(1cm)다.</summary>
+    private IEnumerator HalfRoundPrep(SliceJob job, float angle, Vector3 handBase, HandController handCtl, ToolItem knife)
     {
         float r = job.d * 0.5f;
-        yield return DiceChop(job.rig, handBase, -job.L * 0.25f, handCtl, knife);
-        yield return DiceChop(job.rig, handBase, job.L * 0.25f, handCtl, knife);
+        bool carrot = sliceStyle == SliceStyle.CarrotPlank; // 당근이면 주황색으로 (오이와 같은 동작)
+        if (!IsTrimmed) // 다듬기를 먼저 했으면 양 끝 떼는 칼질은 건너뛴다
+        {
+            yield return DiceChop(job.rig, handBase, -job.L * 0.25f, handCtl, knife);
+            yield return DiceChop(job.rig, handBase, job.L * 0.25f, handCtl, knife);
+        }
         rend.enabled = false;
 
-        Material skin = SolidMaterial(new Color(0.22f, 0.45f, 0.18f), 0.6f);
-        Material flesh = SolidMaterial(new Color(0.8f, 0.88f, 0.64f), 0.45f);
-        Material core = SolidMaterial(new Color(0.9f, 0.94f, 0.78f), 0.55f);
+        Material skin = SolidMaterial(carrot ? new Color(0.84f, 0.3f, 0.05f) : new Color(0.22f, 0.45f, 0.18f), 0.6f);  // 껍질
+        Material flesh = SolidMaterial(carrot ? new Color(0.9f, 0.38f, 0.07f) : new Color(0.8f, 0.88f, 0.64f), 0.45f); // 속살
+        Material core = SolidMaterial(carrot ? new Color(0.95f, 0.55f, 0.2f) : new Color(0.9f, 0.94f, 0.78f), 0.55f);  // 가운데 심
         var body = new GameObject("CucumberOuter").transform;
         body.SetParent(job.rig, false);
         // (a half disc extruded along local x: a half cylinder, flat side down)
@@ -1360,27 +1466,47 @@ public partial class IngredientItem : Carryable
         job.restY = s => 0f;
     }
 
-    /// <summary>당근: the two rounded outsides trimmed off with two strokes
-    /// (scraps), laid down on a cut side - then the flat slices it'll be cut into.</summary>
-    private IEnumerator CarrotPrep(SliceJob job, Vector3 handBase, HandController handCtl, ToolItem knife)
+    /// <summary>편썰기(오이·당근): 양 끝을 떼고 둥근 옆면을 두 번 저며 내 네모난 몸통으로
+    /// 만든다 (오이는 한 번 더 - 가운데 씨 든 속을 걷어내 세로를 규격 1cm에 맞춘다).
+    /// 그 몸통을 눕혀 규격대로 네모난 4 x 1 편을 썬다. 앞의 네모 만들기가 곧 다듬기라,
+    /// 다듬기를 먼저 했으면(IsTrimmed) 그 부분을 건너뛰고 바로 썬다.</summary>
+    private IEnumerator SquarePlankPrep(SliceJob job, Vector3 handBase, HandController handCtl, ToolItem knife)
     {
-        Material orange = SolidMaterial(new Color(0.9f, 0.38f, 0.07f), 0.45f);
+        bool cucumber = sliceStyle == SliceStyle.CucumberDiagonal; // 오이면 씨까지 걷어낸다
+        Material flesh = SolidMaterial(cucumber ? new Color(0.8f, 0.88f, 0.64f) : new Color(0.9f, 0.38f, 0.07f), 0.45f); // 속살
+        Material skin = SolidMaterial(cucumber ? new Color(0.22f, 0.45f, 0.18f) : new Color(0.84f, 0.3f, 0.05f), 0.6f);  // 껍질 띠
         float w = job.d, h = job.d, trim = job.d * 0.18f;
-        yield return DiceChop(job.rig, handBase, -job.L * 0.25f, handCtl, knife);
-        rend.enabled = false;
-        GameObject body = Block(job.rig, "CarrotBlock", new Vector3(0f, h * 0.5f, 0f), new Vector3(job.L, h, w), orange);
-        GameObject sideA = Block(job.rig, "TrimA", new Vector3(0f, h * 0.5f, -(w - trim) * 0.5f), new Vector3(job.L, h * 0.9f, trim), orange);
-        body.transform.localScale = new Vector3(job.L, h, w - trim);
-        body.transform.localPosition = new Vector3(0f, h * 0.5f, trim * 0.5f);
-        yield return SlideAway(sideA.transform, new Vector3(0f, 0f, -0.15f), 0.4f * diceSlowness);
-        DropScrap("자투리", orange.color);
+        float bodyH = cucumber ? Mathf.Min(job.pieceW, h * 0.8f) : h; // 오이는 씨를 걷어낸 뒤 세로가 규격만큼 남는다
+        GameObject body;
 
-        yield return DiceChop(job.rig, handBase, job.L * 0.25f, handCtl, knife);
-        GameObject sideB = Block(job.rig, "TrimB", new Vector3(0f, h * 0.5f, (w - trim) * 0.5f), new Vector3(job.L, h * 0.9f, trim), orange);
-        body.transform.localScale = new Vector3(job.L, h, w - 2f * trim);
-        body.transform.localPosition = new Vector3(0f, h * 0.5f, 0f);
-        yield return SlideAway(sideB.transform, new Vector3(0f, 0f, 0.15f), 0.4f * diceSlowness);
-        DropScrap("자투리", orange.color);
+        if (IsTrimmed)
+        {
+            // 이미 다듬어 둔 상태: 네모난 몸통만 다시 세우고 칼질로 바로 넘어간다.
+            rend.enabled = false;
+            body = Block(job.rig, "Piece_Trimmed", new Vector3(0f, bodyH * 0.5f, 0f), new Vector3(job.L, bodyH, w - 2f * trim), flesh);
+        }
+        else
+        {
+            yield return DiceChop(job.rig, handBase, -job.L * 0.25f, handCtl, knife); // 한쪽 끝 자르기
+            rend.enabled = false;
+            body = Block(job.rig, "Piece_Trimmed", new Vector3(0f, h * 0.5f, 0f), new Vector3(job.L, h, w), flesh);
+            GameObject sideA = Block(job.rig, "TrimA", new Vector3(0f, h * 0.5f, -(w - trim) * 0.5f), new Vector3(job.L, h * 0.9f, trim), flesh);
+            body.transform.localScale = new Vector3(job.L, h, w - trim);          // 저며 낸 만큼 몸통이 얇아진다
+            body.transform.localPosition = new Vector3(0f, h * 0.5f, trim * 0.5f);
+            yield return SlideAway(sideA.transform, new Vector3(0f, 0f, -0.15f), 0.4f * diceSlowness);
+            DropScrap("자투리", flesh.color);                                      // 저민 옆면은 자투리로
+
+            yield return DiceChop(job.rig, handBase, job.L * 0.25f, handCtl, knife); // 반대쪽 끝·옆면
+            GameObject sideB = Block(job.rig, "TrimB", new Vector3(0f, h * 0.5f, (w - trim) * 0.5f), new Vector3(job.L, h * 0.9f, trim), flesh);
+            body.transform.localScale = new Vector3(job.L, h, w - 2f * trim);
+            body.transform.localPosition = new Vector3(0f, h * 0.5f, 0f);
+            yield return SlideAway(sideB.transform, new Vector3(0f, 0f, 0.15f), 0.4f * diceSlowness);
+            DropScrap("자투리", flesh.color);
+
+            if (cucumber) yield return CucumberSeeds(job, body.transform, bodyH, handBase, handCtl, knife); // 오이: 가운데 씨 걷어내기
+        }
+
+        if (job.trimOnly) yield break; // 다듬기 버튼: 네모로 다듬은 몸통만 도마에 남긴다
 
         // laid down on a cut side
         yield return Turn1(body.transform, Quaternion.identity, Quaternion.AngleAxis(90f, Vector3.right), 0.5f * diceSlowness);
@@ -1395,7 +1521,8 @@ public partial class IngredientItem : Carryable
         {
             float x = -span * 0.5f + step * (i + 0.5f);
             job.cutX[i] = -span * 0.5f + step * i;
-            GameObject s = Block(job.rig, $"Piece_{i}", new Vector3(x, job.pieceL * 0.5f, 0f), new Vector3(job.t, job.pieceL, job.pieceW), new Material(orange));
+            GameObject s = Block(job.rig, $"Piece_{i}", new Vector3(x, job.pieceL * 0.5f, 0f), new Vector3(job.t, job.pieceL, job.pieceW), new Material(flesh));
+            if (cucumber) Block(s.transform, "Skin", new Vector3(0f, 0f, 0.44f), new Vector3(1.02f, 1.0f, 0.13f), new Material(skin)); // 오이는 긴 쪽에 껍질 띠가 남는다
             job.stack.Add(s.transform);
         }
         job.rightEdge = span * 0.5f;
@@ -1405,6 +1532,30 @@ public partial class IngredientItem : Carryable
         job.restY = s => Mathf.Sin(a) * s.localScale.x * 0.5f + Mathf.Cos(a) * s.localScale.y * 0.5f;
     }
 
+    /// <summary>오이 씨 빼기: 네모로 다듬은 몸통 위를 칼로 한 번 길게 훑어 씨가 든 가운데
+    /// 속을 걷어내고, 남은 살의 세로를 규격(1cm)에 맞춘다.</summary>
+    private IEnumerator CucumberSeeds(SliceJob job, Transform body, float keepH, Vector3 handBase, HandController handCtl, ToolItem knife)
+    {
+        Material seedM = SolidMaterial(new Color(0.93f, 0.95f, 0.78f), 0.5f);   // 씨가 든 속 색
+        Vector3 size = body.localScale;                                        // 지금 몸통 크기
+        float cut = Mathf.Max(size.y - keepH, size.y * 0.1f);                  // 걷어낼 두께
+        Transform seeds = Block(job.rig, "Seeds", new Vector3(0f, size.y - cut * 0.5f, 0f),
+            new Vector3(size.x * 0.99f, cut, size.z * 0.92f), seedM).transform; // 몸통 윗부분이 씨가 든 속
+        body.localScale = new Vector3(size.x, size.y - cut, size.z);           // 살은 규격 세로만 남는다
+        body.localPosition = new Vector3(0f, (size.y - cut) * 0.5f, 0f);
+
+        // 칼을 몸통 위로 길게 한 번 훑는다 (칼금을 내는 게 아니라 저며 걷어내는 동작).
+        Vector3 from = handBase + job.rig.right * (job.L * 0.45f);             // 오른쪽 끝에서 시작
+        Vector3 to = handBase - job.rig.right * (job.L * 0.45f);               // 왼쪽 끝까지
+        handCtl?.SlideTo(new Vector3(from.x, from.y, handBase.z), 0.25f * diceSlowness);
+        yield return new WaitForSeconds(0.3f * diceSlowness);
+        handCtl?.SlideTo(new Vector3(to.x, to.y, handBase.z), 0.5f * diceSlowness);
+        yield return new WaitForSeconds(0.55f * diceSlowness);
+        handCtl?.SlideTo(handBase, 0.2f * diceSlowness);                       // 손을 제자리로
+        yield return SlideAway(seeds, new Vector3(0f, 0.03f, -0.18f), 0.45f * diceSlowness); // 걷어낸 속을 밀어낸다
+        DropScrap("씨", seedM.color);                                           // 씨는 음식물쓰레기로
+    }
+
     /// <summary>대파 편썰기, as it's done (영상 6-8번): stood lengthwise (pointing
     /// back up the board), one cut down the middle along its length, the core
     /// - the inner tube - slid out (a scrap), the opened layers pressed flat,
@@ -1412,11 +1563,28 @@ public partial class IngredientItem : Carryable
     /// rectangles, white and green.</summary>
     private IEnumerator LeekPrep(SliceJob job, Vector3 handBase, HandController handCtl, ToolItem knife)
     {
+        if (!IsTrimmed) yield return LeekTrim(job, handBase, handCtl, knife); // 안 다듬었으면 다듬기 동작부터 이어서
+        else rend.enabled = false;                                            // 다듬어 둔 상태면 통째 모델만 숨긴다
+        if (job.trimOnly) yield break;                                        // 다듬기 버튼: 펼친 대파를 도마에 남긴다
+        yield return LeekSlice(job, handBase, handCtl, knife);                // 펼친 대파를 줄로 자르고 가로질러 썬다
+    }
+
+    /// <summary>대파 다듬기: 양 끝을 떼고 겉잎을 벗기고, 길이로 칼집을 한 번 넣어 가운데
+    /// 심을 뽑아낸 뒤 벌어진 켜를 눌러 한 장으로 펼친다. 펼친 대파(Piece_Trimmed)가
+    /// 남아 바로 썰 수 있다 - 썰기의 앞단계가 그대로 다듬기다.</summary>
+    private IEnumerator LeekTrim(SliceJob job, Vector3 handBase, HandController handCtl, ToolItem knife)
+    {
         float d = job.d, r = d * 0.5f, L = job.L;
         Material outer = SolidMaterial(new Color(0.86f, 0.93f, 0.78f), 0.5f);
         Material inner = SolidMaterial(new Color(0.85f, 0.9f, 0.45f), 0.5f);
         Material green = SolidMaterial(new Color(0.3f, 0.58f, 0.18f), 0.5f);
         Material white = SolidMaterial(new Color(0.94f, 0.96f, 0.88f), 0.5f);
+
+        // 위아래(양 끝)를 떼고 겉잎을 벗긴다 - 야채는 모두 끝을 잘라내고 시작한다.
+        yield return DiceChop(job.rig, handBase, -L * 0.42f, handCtl, knife);
+        DropScrap("자투리", green.color);
+        yield return DiceChop(job.rig, handBase, L * 0.42f, handCtl, knife);
+        DropScrap("겉잎", outer.color);
         rend.enabled = false;
 
         // A tube along x (as it lay), with its core inside...
@@ -1487,7 +1655,19 @@ public partial class IngredientItem : Carryable
             flat.localPosition = new Vector3(0f, Mathf.Lerp(r, sheet * 0.5f, k), 0f);
             yield return null;
         }
-        Destroy(flat.gameObject);
+        flat.name = "Piece_Trimmed"; // 다듬어 펼친 대파 (다듬기만 할 때 도마에 남는다)
+    }
+
+    /// <summary>대파 썰기: 펼쳐 둔 대파를 길이로 4줄 자르고, 네 줄을 한 번에 돌려
+    /// 가로질러 한 번 썰어 규격대로 네모난 편을 만든다.</summary>
+    private IEnumerator LeekSlice(SliceJob job, Vector3 handBase, HandController handCtl, ToolItem knife)
+    {
+        float r = job.d * 0.5f, L = job.L;
+        float W = Mathf.PI * r, sheet = 0.014f;                               // 펼쳤을 때의 폭 · 두께
+        Material green = SolidMaterial(new Color(0.3f, 0.58f, 0.18f), 0.5f);  // 푸른 잎 쪽
+        Material white = SolidMaterial(new Color(0.94f, 0.96f, 0.88f), 0.5f); // 흰 대 쪽
+        Transform trimmed = job.rig.Find("Piece_Trimmed");
+        if (trimmed != null) Destroy(trimmed.gameObject);                     // 펼친 대파를 줄 조각들로 바꾼다
 
         // Strips side by side (white toward the root, green toward the leaves -
         // each strip its own shade), then cut: 4 lengthwise...
@@ -1514,7 +1694,7 @@ public partial class IngredientItem : Carryable
         var pivot = new GameObject("Turn").transform;
         pivot.SetParent(job.rig, false);
         foreach (Transform b in boxes) b.SetParent(pivot, true);
-        dur = 0.6f * diceSlowness;
+        float dur = 0.6f * diceSlowness; // (다듬기와 썰기를 나눠서 여기서 선언한다)
         for (float e = 0f; e < dur; e += Time.deltaTime)
         {
             pivot.localRotation = Quaternion.AngleAxis(90f * Mathf.SmoothStep(0f, 1f, e / dur), Vector3.up);
@@ -2608,7 +2788,7 @@ public partial class IngredientItem : Carryable
         Transform holder = transform.Find("Pieces");
         if (holder == null) return;
         foreach (Transform t in holder.GetComponentsInChildren<Transform>())
-            if (t.name.StartsWith("Piece_ChiliHalf")) Destroy(t.gameObject);
+            if (t.name.StartsWith("Piece_ChiliHalf") || t.name.StartsWith("Piece_Trimmed")) Destroy(t.gameObject); // 고추 반쪽 · 야채 다듬은 몸통
     }
 
     // ---- 양파 반달썰기 (crescentSlices) ----
@@ -2628,7 +2808,13 @@ public partial class IngredientItem : Carryable
         // (the radius as it shows - the onion as it lies on the board)
         Bounds shown = VisibleBounds;
         float R = Mathf.Max(shown.extents.x, shown.extents.y);
-        float t = Mathf.Max((spec.thicknessCm > 0f ? spec.thicknessCm : ReferenceThicknessCm(CutMethod.Slice)) * worldPerCm, 0.012f);
+        // 조각 한 개의 규격: 가장 긴 값이 길이, 가장 짧은 값이 두께, 남은 값이 폭
+        // (오이·당근·대파 편썰기가 규격을 읽는 방식과 같다).
+        float lenCm = Mathf.Max(spec.widthCm, Mathf.Max(spec.lengthCm, spec.thicknessCm));  // 가장 긴 값 = 길이
+        float thinCm = Mathf.Min(spec.widthCm, Mathf.Min(spec.lengthCm, spec.thicknessCm)); // 가장 짧은 값 = 두께
+        float midCm = spec.widthCm + spec.lengthCm + spec.thicknessCm - lenCm - thinCm;     // 남은 값 = 폭
+        if (lenCm <= 0f) { lenCm = 4f; midCm = 1f; thinCm = VeggieSliceThicknessCm; }       // 규격을 안 적었을 때
+        float t = Mathf.Max(thinCm * worldPerCm, 0.012f);                                   // 칼이 들어가는 간격 = 조각 두께
         int n = Mathf.Clamp(Mathf.RoundToInt(2f * R / t), 6, 14);
         float step = 2f * R / n;
         float thick = Mathf.Clamp(t, 0.012f, step * 0.85f);
@@ -2667,9 +2853,9 @@ public partial class IngredientItem : Carryable
             var go = new GameObject($"Piece_{i}");
             go.transform.SetParent(rig, false);
             go.transform.localPosition = new Vector3(x, 0f, 0f);
-            // 탕수육 양파: 둥근 반달 단면 대신 결 방향의 4 x 1 cm 네모 편.
+            // 탕수육 양파: 둥근 반달 단면 대신 결 방향의 네모 편 - 규격대로 길이 x 폭 x 두께.
             go.AddComponent<MeshFilter>().sharedMesh = ingredientName == "양파"
-                ? OnionPlankMesh(4f * worldPerCm, worldPerCm, Mathf.Min(thick, 0.3f * worldPerCm))
+                ? OnionPlankMesh(lenCm * worldPerCm, Mathf.Max(midCm, 0.1f) * worldPerCm, thick)
                 : HalfMoonMesh(Mathf.Max(r, 0.03f), thick, 4, 14);
             go.AddComponent<MeshRenderer>().sharedMaterial = new Material(onion);
             go.AddComponent<CutResultPiece>().Init(ingredientName, AppliedCut, spec);
@@ -2686,6 +2872,8 @@ public partial class IngredientItem : Carryable
             yield return new WaitForSeconds(0.08f);
             if (BladeXAt(knife, rig.position.y, out float bladeX)) handBase.x += rig.position.x - bladeX;
         }
+
+        if (!IsTrimmed) yield return OnionTrim(rig, handBase, handCtl, knife, R); // 안 다듬었으면 다듬기 동작부터 이어서
 
         // From the right end in: each cut frees a slice, which tips onto the fan.
         for (int i = n - 1; i >= 0; i--)
@@ -2735,10 +2923,10 @@ public partial class IngredientItem : Carryable
             }
         }
         Destroy(rig.gameObject);
-        ShrinkPieces(0.85f);
+        // (조각을 규격대로 만들므로 더 줄이지 않는다 - 줄이면 4 x 1 이 어긋난다)
         FitColliderToVisible();
         DropScrap("자투리", OwnColor);
-        Debug.Log($"{ingredientName}: 반달썰기 완료 ({n}조각, {thick / worldPerCm:0.0} cm)");
+        Debug.Log($"{ingredientName}: 반달썰기 완료 ({n}조각, {lenCm:0.0} x {midCm:0.0} x {thick / worldPerCm:0.0} cm)");
     }
 
     // X는 얇은 두께, Y는 긴 결, Z는 폭. 얇은 층의 틈이 양파 결을 보여 준다.
@@ -2821,20 +3009,6 @@ public partial class IngredientItem : Carryable
         m.RecalculateNormals();
         m.RecalculateBounds();
         return m;
-    }
-
-    /// <summary>Every cut piece a little smaller, each about its own middle -
-    /// cut to the model's full size they were big for the bowls and plates
-    /// they go into.</summary>
-    private void ShrinkPieces(float factor)
-    {
-        foreach (Transform t in GetComponentsInChildren<Transform>())
-        {
-            if (!t.name.StartsWith("Piece_") || !t.TryGetComponent(out Renderer r)) continue;
-            Vector3 c = r.bounds.center;
-            t.localScale *= factor;
-            t.position += c - r.bounds.center;
-        }
     }
 
     /// <summary>One box collider round everything that shows of it (its pieces).</summary>

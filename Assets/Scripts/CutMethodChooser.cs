@@ -35,6 +35,13 @@ public class CutMethodChooser : MonoBehaviour
     /// <summary>사각썰기: a cube - one size for 가로·세로·두께, so one row only.</summary>
     private bool SingleSize => pendingMethod == IngredientItem.CutMethod.Cube || pendingMethod == IngredientItem.CutMethod.Dice; // (다지기 too: one size)
 
+    /// <summary>야채 편·어슷썰기: 두께는 묻지 않고 고정값을 쓴다 - 가로·세로 두 칸만 보인다.
+    /// 고기·두부처럼 양을 많이 주는 메인재료는 두께까지 묻는다 (지금처럼 세 칸).</summary>
+    private bool fixedThickness; // 재료가 야채일 때 Show가 켜 준다
+    private bool NoThicknessRow => fixedThickness
+        && (pendingMethod == IngredientItem.CutMethod.Slice || pendingMethod == IngredientItem.CutMethod.DiagonalCut); // 편·어슷만 해당
+    private int ShownRows => SingleSize ? 1 : NoThicknessRow ? 2 : 3; // 이 썰기에서 물어볼 칸 수
+
     private int editingRow = -1;
     private string editBuffer = "";
 
@@ -66,8 +73,7 @@ public class CutMethodChooser : MonoBehaviour
         else if (kb.tabKey.wasPressedThisFrame)
         {
             // Tab: down to the next box (round to the first again).
-            int rows = SingleSize ? 1 : 3;
-            int next = (editingRow + 1) % rows;
+            int next = (editingRow + 1) % ShownRows; // 보이는 칸들 안에서만 돈다
             CommitEdit();
             BeginEdit(next);
         }
@@ -94,11 +100,12 @@ public class CutMethodChooser : MonoBehaviour
         if (cam != null) panel.transform.rotation = cam.transform.rotation;
     }
 
-    public void Show(Vector3 worldPos, Action<IngredientItem.CutMethod, CutSpec> callback, Action onTrim = null)
+    public void Show(Vector3 worldPos, Action<IngredientItem.CutMethod, CutSpec> callback, Action onTrim = null, bool thicknessFixed = false)
     {
         CommitEdit();
         onChosen = callback;
         this.onTrim = onTrim;
+        fixedThickness = thicknessFixed; // 야채면 편·어슷에서 두께 칸을 뺀다
         Camera camera = Camera.main; // 메뉴의 화면 위치는 유지하면서 깊이만 앞으로 옮긴다.
         if (camera != null)
         {
@@ -359,8 +366,7 @@ public class CutMethodChooser : MonoBehaviour
     /// <summary>The first (shown) box still left blank, or -1.</summary>
     private int FirstEmptyRow()
     {
-        int rows = SingleSize ? 1 : 3;
-        for (int i = 0; i < rows; i++) if (rowGetters[i]() <= 0f) return i;
+        for (int i = 0; i < ShownRows; i++) if (rowGetters[i]() <= 0f) return i; // 보이는 칸만 검사
         return -1;
     }
 
@@ -503,15 +509,17 @@ public class CutMethodChooser : MonoBehaviour
         // the spec themselves (it used to come pre-filled with the usual size).
         curWidth = curLength = curThickness = 0f;
         bool single = SingleSize;
+        int rows = ShownRows;                      // 이 썰기에서 물어볼 칸 수
         for (int i = 0; i < 3; i++)
         {
-            rowRoots[i].SetActive(i == 0 || !single);
+            rowRoots[i].SetActive(i < rows);       // 안 묻는 칸은 아예 감춘다
             rowLabels[i].text = single ? "크기" : RowNames[i];
             RefreshRow(i);
         }
 
         specTitle.text = method == IngredientItem.CutMethod.Other ? "규격 입력 (가로·세로·두께)"
             : single ? IngredientItem.CutMethodName(method) + " 규격 (가로=세로=두께)"
+            : NoThicknessRow ? IngredientItem.CutMethodName(method) + " 규격 (두께 " + IngredientItem.VeggieSliceThicknessCm.ToString("0.0") + "cm)" // 두께는 고정이라 안 묻는다
             : IngredientItem.CutMethodName(method) + " 규격";
         specPanel.transform.position = shownPos;
         FaceCamera(specPanel); // 규격 입력창도 동일한 화면 방향을 쓴다.
@@ -537,6 +545,7 @@ public class CutMethodChooser : MonoBehaviour
         int empty = FirstEmptyRow();
         if (empty >= 0) { BeginEdit(empty); return; }
         if (SingleSize) curLength = curThickness = curWidth;
+        else if (NoThicknessRow) curThickness = IngredientItem.VeggieSliceThicknessCm; // 야채 편·어슷: 두께는 고정값
 
         specPanel.SetActive(false);
         RestoreSceneLabels(); // 썰기를 시작하기 전에 안내를 되돌린다.
