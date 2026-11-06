@@ -349,9 +349,15 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
             if (ml > 5f) ExamDeductions.Add(ExamDeductions.Hygiene, $"{name}: 남은 소스·기름 약 {ml:0}mL를 개수대에 버림");
             left.Take(left.Amount);
         }
+        // 양이 0이어도 탄 기록은 남는다 - 반드시 지운다 (위 if 는 양이 있을 때만 들어온다).
+        PanSauce.Of(this, false)?.Washed(); // 씻은 팬은 소스 기록이 하나도 없는 상태로
         IsDirty = false;
         IsWashed = true;
         appliedSeasonings.Clear();
+        // 찬물에 씻었으면 팬도 식는다. 씻어도 팬 온도가 그대로라 (잔열이 90초짜리라)
+        // 앞 요리에서 달군 팬을 씻고 다시 화구에 올려 불을 켜면, 이미 250°C를 넘어
+        // 있어서 켜자마자 과열 검은 연기가 났다.
+        VesselHeat.Of(this)?.CoolToRoom(); // 씻은 팬은 실온으로
         SetWet(true);
         return true;
     }
@@ -1508,7 +1514,9 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
 
             // A fresh paper towel on an empty dish is spread out first, for
             // meat/tofu to drain on (towel down first, then the ingredient).
-            if (towel.Kind == ToolKind.PaperTowel && !towel.IsWrapping && towelLiner == null && occupied.Count == 0)
+            // 접시·그릇에만. 조건에 그릇 종류가 빠져 있어서 빈 팬·웍·냄비에 떨어뜨려도
+            // 깔개로 펼쳐졌다 - 키친타월이 팬 안에 붙어 있는 것처럼 보였다.
+            if (!IsCookingVessel && towel.Kind == ToolKind.PaperTowel && !towel.IsWrapping && towelLiner == null && occupied.Count == 0)
             {
                 LayTowelLiner(towel);
                 return;
@@ -2054,7 +2062,12 @@ public class MovableBowl : Carryable, ISlotContainer, ITowelLined
                         + piece.Radius);
         }
         // 겹친다고 다른 빈자리로 옮기지 않는다. 넣은 뒤의 충돌/붙음은 조각 시뮬레이션이 처리.
-        return ClampOilDropPoint(requestedPoint, clearance) + inside.up * clearance;
+        // 기름에 넣으면 잠겨야 한다: 덩어리 가운데를 기름 표면에 둬 절반이 잠긴다
+        // (튀김 방울이 "떠오르면 중심이 기름 표면"으로 두는 것과 같은 기준). 예전에는
+        // 반지름만큼 위로 들어 올려, 넣어도 기름 위에만 얹혀 돌아다녔다.
+        Vector3 at = ClampOilDropPoint(requestedPoint, clearance); // 기름 표면 위의 자리
+        float lift = Mathf.Max(0f, clearance - OilSurfaceHeight);  // 기름보다 두꺼우면 바닥을 뚫지 않을 만큼만 올린다
+        return at + inside.up * lift;
     }
     /// <summary>그릇 바닥 평면에서 이것이 차지하는 반지름 (보이는 것 기준).</summary>
     private static float VisibleReach(Carryable c, Vector3 up)

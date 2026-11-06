@@ -10787,8 +10787,8 @@ MonoBehaviour:
   dishSoap: {fileID: 647615247}
   sponge: {fileID: 1673479354}
   dryCloth: {fileID: 1692447899}
-  sinkLean: 0
-  sinkOffset: {x: 0, y: 0.64, z: 0}
+  sinkLean: 32
+  sinkOffset: {x: 0.1, y: 1.073, z: 0}
   sinkDepthShift: -0.45
   rinseSeconds: 1.5
   scrubSeconds: 2.4

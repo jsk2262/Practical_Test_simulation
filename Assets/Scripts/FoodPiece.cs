@@ -369,6 +369,7 @@ public partial class FoodPieceGroup : MonoBehaviour
     private bool external;
     private Vector3 lastCenter, lastCenterVel;
     private bool haveLast;
+    private int restCount = -1; // 지난 프레임의 조각 수 (바뀌면 쉬지 않고 다시 계산한다)
 
     public int Count => Pieces.Count;
     public MovableBowl Container => simBowl;
@@ -598,6 +599,20 @@ public partial class FoodPieceGroup : MonoBehaviour
 
         int steps = Mathf.Clamp(Mathf.CeilToInt(dt / 0.012f), 1, 4);
         float h = dt / steps;
+        // 가만히 있는 그릇은 접촉 계산을 쉰다. 조각 묶음은 그릇 안에 있기만 하면 매 프레임
+        // Separate()(4패스 O(n^2) + 이웃 묶음까지)를 돌았다. 그래서 탕수육을 접시에 담아 둔
+        // 채로 마파두부를 하면 다 끝난 접시 몫까지 계속 계산돼 눈에 띄게 느려졌다.
+        bool canMove = simBowl.IsHeld || BeingWorked || inside.liquid || inside.boil >= 0.05f // 들렸거나 젓는 중이거나 물·끓는 중
+                     || (simBowl.HasFryingOil && simBowl.OilHeat01 > 0f)                      // 뜨거운 기름 속은 기포로 흔들림
+                     || lastCenterVel.sqrMagnitude > 1e-8f;                                   // 그릇 자체가 움직이는 중
+        if (!canMove && Pieces.Count == restCount)                                            // 조각 수가 그대로일 때만 (새로 담으면 깨어난다)
+        {
+            bool still = true;                                                                // 하나라도 움직이면 계산한다
+            foreach (FoodPiece p in Pieces)
+                if (p.simVel.sqrMagnitude > 1e-8f || p.simSpin.sqrMagnitude > 1e-6f) { still = false; break; }
+            if (still) steps = 0;                                                             // 아무것도 안 움직인다 - 이번 프레임은 건너뛴다
+        }
+        restCount = Pieces.Count;                                                             // 다음 프레임에 조각 수가 바뀌었는지 보려고
         for (int s = 0; s < steps; s++)
         {
             foreach (FoodPiece p in Pieces)
@@ -662,10 +677,17 @@ public partial class FoodPieceGroup : MonoBehaviour
                 p.simSpin *= Mathf.Exp(-(inside.liquid ? 4f : 8f) * h);
                 if (p.simSpin.sqrMagnitude > 1e-6f)
                     p.simRot = Quaternion.AngleAxis(p.simSpin.magnitude * h * Mathf.Rad2Deg, p.simSpin.normalized) * p.simRot;
-                // A cube settles back onto a face (keeping which way it's turned).
-                Vector3 fwd = Vector3.ProjectOnPlane(p.simRot * Vector3.forward, Vector3.up);
-                if (fwd.sqrMagnitude > 1e-4f)
-                    p.simRot = Quaternion.Slerp(p.simRot, Quaternion.LookRotation(fwd, Vector3.up), (inside.liquid ? 1.5f : 8f) * h);
+                // 조각이 바닥에 눕는다: 가장 얇은 축이 위로 간다. 예전엔 늘 로컬 Y 를 위로
+                // 세워서, 편(두께 x 폭 x 길이)은 폭이 위로 와 팬 안에서 모로 서 있었다
+                // (정육면체인 두부는 어느 축이나 같아 전과 똑같이 놓인다).
+                Vector3 hs = p.HalfSize;                                     // 제 축에서의 반쪽 크기
+                Vector3 flatLocal = hs == Vector3.zero ? Vector3.up          // 크기를 모르면 예전처럼 로컬 Y
+                                  : hs.x <= hs.y && hs.x <= hs.z ? Vector3.right
+                                  : hs.y <= hs.z ? Vector3.up : Vector3.forward; // 가장 얇은 축
+                Vector3 flatWorld = p.simRot * flatLocal;                    // 그 축이 지금 향하는 쪽
+                if (Vector3.Dot(flatWorld, Vector3.up) < 0f) flatWorld = -flatWorld; // 엎어져 누운 것도 누운 것으로 본다
+                Quaternion flat = Quaternion.FromToRotation(flatWorld, Vector3.up) * p.simRot; // 얇은 축만 위로 돌린다
+                p.simRot = Quaternion.Slerp(p.simRot, flat, (inside.liquid ? 1.5f : 8f) * h);
                 Contain(p);
                 // nearly still and nothing moving it: at rest (no endless slow drifting or turning)
                 if (!simBowl.IsHeld && !BeingWorked && !hotOil && p.simVel.sqrMagnitude < 0.0004f && p.simSpin.sqrMagnitude < 0.04f && inside.boil < 0.05f)
@@ -1262,6 +1284,8 @@ public class PanSauce : MonoBehaviour
     [SerializeField] private float scorchBelowSpoons = 4f;
     [Tooltip("물 · 간장 · 식초 같은 액체가 이만큼(큰술) 이하로 졸면, 양이 많아도 바닥에 눌어붙어 탄다.")]
     [SerializeField] private float scorchWetSpoons = 0.3f;
+    [Tooltip("전분으로 농도를 잡은(호화된) 소스는 물이 녹말에 붙잡혀 있다 - 이만큼(큰술) 이하로 줄어야 졸아붙은 것으로 본다.")]
+    [SerializeField] private float gelledScorchSpoons = 1f;
     [Tooltip("x: 팬 온도 °C → y: 물기 소스가 1초에 타는 정도 (0.5 넘으면 '탐').")]
     [SerializeField] private AnimationCurve scorchPerSecondByPanTemp = new AnimationCurve(
         new Keyframe(130f, 0f), new Keyframe(160f, 0.008f), new Keyframe(200f, 0.025f), new Keyframe(250f, 0.06f));
@@ -1430,6 +1454,18 @@ public class PanSauce : MonoBehaviour
         return p;
     }
 
+    /// <summary>개수대에서 씻었다 - 팬에 남아 있던 소스 기록을 전부 지운다.
+    /// 탄 정도(burn)는 양이 0이 될 때만 지워졌는데, 바싹 졸아붙어 탄 소스는 양이
+    /// 이미 0이라 Take 가 안 불려 '탐'이 그대로 남았다. 그래서 팬을 씻고 다음
+    /// 요리를 시작하면 기름을 두르는 순간 Amount 가 다시 0을 넘어, 지난번 탐이
+    /// 되살아나 처음부터 검은 연기가 났다.</summary>
+    public void Washed()
+    {
+        sauce.Clear(); // 남은 성분 · 탄 정도 · 농도 · 온도를 모두 처음 상태로
+        Amount = 0f;   // 양도 0으로
+        Recompute();   // 색 · 점도 표시도 다시 계산
+    }
+
     /// <summary>A portion mixed in (keeps its heat and its infusion).</summary>
     public void Put(SaucePortion p)
     {
@@ -1537,8 +1573,14 @@ public class PanSauce : MonoBehaviour
         // ---- 물기 소스가 졸아 타기: 물이 거의 없는 적은 양의 소스(간장·식초·설탕...)가
         // 뜨거운 팬에 오래 있으면 바닥에 눌어붙어 검게 탄다 (저으면 덜). 연기도. ----
         // (물기가 다 졸아 기름도 없이 설탕 · 전분 · 장만 남아도 바닥에 눌어 탄다)
+        // 전분으로 농도를 잡은 소스는 물이 녹말에 붙잡혀 있어, 바싹 졸아 눌어붙은 것과 다르다.
+        // 예전에는 물 양만 봤기 때문에, 물녹말로 걸쭉하게 잡는 마파두부는 정석대로 농도를
+        // 잡는 순간 '말랐다'로 보고 센 팬에서 몇 초 만에 타기 시작했다.
+        bool thickened = Thickness > 0.4f; // 전분이 호화돼 농도가 잡혔다 (장·기름의 점성만으로는 0.25를 못 넘는다)
         bool driedDown = watery
-            ? !(sauce.parts.TryGetValue(Condiments.Water, out float wetLeft) && wetLeft > 0.2f) && (Amount <= scorchBelowSpoons || WetSpoons() <= scorchWetSpoons) // 물이 거의 없고 양이 적거나 액체가 거의 다 졸음
+            ? !(sauce.parts.TryGetValue(Condiments.Water, out float wetLeft) && wetLeft > 0.2f)  // 물이 거의 없고,
+              && (thickened ? Amount <= gelledScorchSpoons                                       // 걸쭉하면 거의 다 없어져야 눌어붙는다
+                            : Amount <= scorchBelowSpoons || WetSpoons() <= scorchWetSpoons)     // 묽으면 양이 적거나 액체가 거의 다 졸음
             : OilSpoons() <= 0.01f; // 물기도 기름도 없이 마른 것만 남음
         if (driedDown && flame && !SpeedMode.On)
         {

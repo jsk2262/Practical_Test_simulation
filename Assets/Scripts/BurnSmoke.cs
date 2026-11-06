@@ -61,10 +61,17 @@ public class BurnSmoke : MonoBehaviour
         // 이 조건이 없으면 다 쓰고 선반에 내려둔 냄비에서 계속 검은 연기가 났다.
         bool onHeat = bowl.CurrentBurner != null;                                  // 아직 화구 위인가 (불만 꺼도 연기는 남는다)
         float burning = onHeat && burn >= greyFrom ? Mathf.Lerp(0.4f, 1f, heavy) : 0f; // 타는 동안은 불을 줄여도 연기가 남
-        shown = Mathf.Lerp(shown, Mathf.Max(wanted, cooking, burning), Mathf.Clamp01(Time.deltaTime * 4f));
+        // 화구에서 내리면(접시에 옮기면) 연기도 그친다 - 타는 조각이 Emit 을 계속 불러
+        // 접시에 옮긴 뒤에도 검은 연기가 쏟아졌다 (burning 만 막혀 있었다).
+        shown = Mathf.Lerp(shown, onHeat ? Mathf.Max(wanted, cooking, burning) : 0f, Mathf.Clamp01(Time.deltaTime * 4f));
         wanted = 0f;
-        // 연기 단계 (0 흰 김: 조리 중 / 0.45 회색: 다 익음 / 0.8 검은 연기: 타기 시작 / 1 진한 검은 연기: 탐)
-        float tone = burn >= blackAt ? 1f : burn >= greyFrom ? 0.8f : CookedThrough() ? 0.45f : 0f;
+        // 연기 단계: 흰 김(조리 중) → 회색(거의 다 됨) → 타기 시작하면 회색에서 검정으로
+        // 서서히 → 많이 타면 진한 검정(실격). 예전에는 조금만 그을려도 바로 0.8 = 새까만
+        // 연기여서, 재료를 넣자마자 검은 연기가 났다.
+        float tone = burn >= greyFrom ? Mathf.Lerp(0.45f, 1f, heavy) // 타기 시작 회색 → 많이 타면 검정
+                   : CookedThrough() ? 0.45f                         // 거의 다 되면 회색
+                   : 0f;                                             // 조리 중은 흰 김
+        if (SpeedMode.On) tone = Mathf.Min(tone, 0.45f);             // 빠른 모드: 회색까지만
         // (색은 천천히 - 흰 연기가 한 번에 검게 바뀌지 않게)
         shownBurn = Mathf.Lerp(shownBurn, tone, Mathf.Clamp01(Time.deltaTime * 1.5f));
         if (shown < 0.02f && ps == null) return;

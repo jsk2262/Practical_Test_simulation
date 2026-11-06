@@ -55,7 +55,8 @@ public class BoardSinkWash : MonoBehaviour
     private CuttingBoardController board;
     private Collider col;
     private Quaternion homeRot;
-    private float halfLen, halfWid;
+    private float halfLen, halfWid, halfThick;
+    private Vector3 homePos; // 조리대에서 처음 놓여 있던 자리 (다시 놓을 높이의 기준)
     private Vector3 pickedPos;
     private Quaternion pickedRot;
     private State pickedFrom;
@@ -74,6 +75,8 @@ public class BoardSinkWash : MonoBehaviour
         col = GetComponent<Collider>();
         homeRot = transform.rotation;
         Bounds home = Box; halfLen = home.extents.x * 0.92f; halfWid = home.extents.z * 0.55f; // 가로폭은 두께(y)가 아니라 깊이(z)다
+        halfThick = home.extents.y; // 도마 두께의 절반 - 기울여 놔도 가운데에서 면까지는 이 거리다
+        homePos = transform.position; // 조리대에 눕혀 둔 처음 자리
         if (dishSoap == null) dishSoap = GameObject.Find("DishSoap")?.transform;
         if (sponge == null) sponge = GameObject.Find("Sponge")?.transform;
         if (dryCloth == null) dryCloth = GameObject.Find("CleaningCloth_Top")?.transform;
@@ -154,7 +157,15 @@ public class BoardSinkWash : MonoBehaviour
         if (!mouse.leftButton.wasPressedThisFrame || waitRelease) return;
         Ray ray = cam.ScreenPointToRay(sp);
         if (OverSink(cursor)) { PlaceInSink(); StartCoroutine(Wash()); }
-        else if (OnCounter(ray)) PutDown(transform.position, homeRot, State.Home);
+        else if (OnCounter(ray, out Vector3 at))
+        {
+            // 커서가 가리킨 조리대 윗면 자리에, 높이는 처음 놓여 있던 그대로 놓는다.
+            // 예전에는 들고 있던 자리(transform.position)에 그냥 뒀는데, 그 자리는 '집어 든
+            // 지점을 지나는 화면과 나란한 평면' 위라서, 개수대에서 집어 와 놓으면 개수대
+            // 깊이 그대로 놓여 조리대 안쪽에 박혔다 - 도마도 씻기 버튼도 보이지 않았다.
+            Vector3 up = Carryable.CounterUp;                                    // 조리대 윗면 방향
+            PutDown(at - up * Vector3.Dot(at, up) + up * Vector3.Dot(homePos, up), homeRot, State.Home); // 가로 자리는 커서, 높이는 처음 자리
+        }
         else Toast("여기에 둘 수 없어요");
     }
 
@@ -198,11 +209,12 @@ public class BoardSinkWash : MonoBehaviour
         return cursor.x > b.min.x && cursor.x < b.max.x && cursor.y > b.min.y && cursor.y < b.max.y;
     }
 
-    private static bool OnCounter(Ray ray)
+    private static bool OnCounter(Ray ray, out Vector3 at)
     {
+        at = default;                                                            // 못 맞히면 쓰지 않는다
         GameObject counter = GameObject.Find("Counter_R");
         WipeableSurface s = counter != null ? counter.GetComponent<WipeableSurface>() : null;
-        return s == null || s.Raycast(ray, out _, out _);
+        return s != null && s.Raycast(ray, out at, out _);                       // 커서가 가리킨 조리대 윗면의 점
     }
 
     // ---- in the sink ----
@@ -220,7 +232,11 @@ public class BoardSinkWash : MonoBehaviour
         state = State.InSink;
         Vector3 basin = BasinCenter();
         // 도마(긴 쪽 3.4)가 개수대 폭(2.0)보다 커서, 90도 돌려야 안에 들어간다.
-        Quaternion rot = Quaternion.AngleAxis(90f, Carryable.CounterUp) * Quaternion.AngleAxis(sinkLean, Vector3.forward) * homeRot;
+        Quaternion turn = Quaternion.AngleAxis(90f, Carryable.CounterUp) * homeRot; // 긴 쪽을 개수대 길이 방향으로
+        // 돌려 놓은 긴 축을 중심으로 기울여, 옆으로 세워 개수대 벽에 기대 놓는다.
+        // 예전에는 돌리기 전에 화면 축(Vector3.forward)으로 기울였는데, 3D로 옮긴 뒤로는
+        // 그게 긴 쪽을 시소처럼 들어 올리는 꼴이 돼 세울 수가 없었다 (그래서 기울기를 0으로 둠).
+        Quaternion rot = Quaternion.AngleAxis(sinkLean, turn * Vector3.right) * turn; // 긴 축을 중심으로 세운다
         transform.rotation = rot;
         Vector3 mid = Box.center;
         transform.position += basin + sinkOffset - mid; // 깊이까지 세 축 모두 개수대 안에 맞춘다
@@ -237,11 +253,10 @@ public class BoardSinkWash : MonoBehaviour
     /// <summary>도마 윗면 바로 위의 한 점: s는 긴 쪽(-1..1), t는 가로.</summary>
     private Vector3 Face(float s, float t)
     {
-        Vector3 up = Carryable.CounterUp;
-        Vector3 u = Along(), v = Vector3.Cross(up, u); // 윗면 위에서 긴 축과 직각인 가로 방향
-        Bounds box = Box;
-        float half = Mathf.Abs(box.extents.x * up.x) + Mathf.Abs(box.extents.y * up.y) + Mathf.Abs(box.extents.z * up.z); // 중심에서 윗면까지
-        return box.center + up * (half + 0.05f) + u * (s * halfLen) + v * (t * halfWid); // 윗면 살짝 위의 점
+        Vector3 n = transform.up; // 도마 면의 법선 - 기울여 놓으면 면도 같이 기운다
+        if (Vector3.Dot(n, Carryable.CounterUp) < 0f) n = -n; // 뒤집어 놨으면 지금 위를 보는 쪽 면
+        Vector3 u = Along(), v = Vector3.Cross(n, u); // 그 면 위에서 긴 축과 직각인 가로 방향
+        return Box.center + n * (halfThick + 0.05f) + u * (s * halfLen) + v * (t * halfWid); // 면 살짝 위의 점
     }
 
     private IEnumerator Wash()

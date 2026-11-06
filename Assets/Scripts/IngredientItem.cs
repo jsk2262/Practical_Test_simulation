@@ -238,13 +238,14 @@ public partial class IngredientItem : Carryable
                 box.size = r.GetComponent<MeshFilter>().sharedMesh.bounds.size;
             }
             FoodPiece fp = r.gameObject.AddComponent<FoodPiece>();
-            Vector3 pieceSize = r.bounds.size;
-            if (ingredientName == "양파")
-            {
-                Vector3 scale = r.transform.lossyScale;
-                pieceSize = Vector3.Scale(r.GetComponent<MeshFilter>().sharedMesh.bounds.size,
-                    new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z)));
-            }
+            // 조각 제 축에서의 크기. r.bounds 는 월드 축 기준 상자라, 비스듬히 놓인
+            // 조각은 어느 축이 얇은지가 뒤바뀐다. FoodPiece.HalfSize 는 조각 제 축
+            // (simRot * right/up/forward) 기준으로 쓰이므로, 어슷썰기 조각(두께는
+            // 로컬 x, 접시 위에서는 65도 기울어 놓임)이 팬에서 모로 서 있었다.
+            // 양파만 예외로 쓰던 식이 실은 모든 조각에 맞는 식이다.
+            Vector3 scale = r.transform.lossyScale;                                        // 부모까지 더한 실제 배율
+            Vector3 pieceSize = Vector3.Scale(r.GetComponent<MeshFilter>().sharedMesh.bounds.size, // 메시 제 축 크기
+                new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z)));  // 음수 배율도 크기로
             fp.Init(this, grams, 0f, pieceSize);
             fp.UseOwnColors = true; // (조각마다 제 색 - 대파 흰·초록 등)
             group.Add(fp);
@@ -787,7 +788,10 @@ public partial class IngredientItem : Carryable
         Debug.Log($"{ingredientName}: 다듬기 완료 (위아래 잘라 4cm · 가운데 심 제거)");
     }
 
-    /// <summary>양파 다듬기 동작: 반쪽 양파를 뒤집어 둥근 쪽이 위로 오게 놓고, 위아래(꼭지·뿌리)를
+    /// <summary>다듬은 양파 몸통의 단면이 도는 각 - 지급분이 1/4조각이라 반달(180°)의 절반.</summary>
+    private const float QuarterSweep = Mathf.PI * 0.5f;
+
+    /// <summary>양파 다듬기 동작: 1/4쪽 양파를 뒤집어 둥근 쪽이 위로 오게 놓고, 위아래(꼭지·뿌리)를
     /// 좌우에 둔 채 잘라 규격 길이(4cm)로 맞추고, 칼을 옆에 둔 채 가운데 뿌리심을 뒤로 뽑아낸 뒤,
     /// 길이 방향이 앞뒤로 가게 90도 돌린다 - 이제 칼이 폭을 가로질러 썰 수 있다.
     /// 다듬기 버튼과 반달썰기 앞단계가 이 하나를 같이 쓴다.</summary>
@@ -800,7 +804,7 @@ public partial class IngredientItem : Carryable
         // 다듬을 몸통: 반원 단면(결이 보이는)을 길이 방향으로 민 반쪽 양파
         var body = new GameObject("Piece_Trimmed");                           // 다듬기만 하면 이 몸통이 도마에 남는다
         body.transform.SetParent(rig, false);
-        body.AddComponent<MeshFilter>().sharedMesh = HalfMoonMesh(R, raw, 4, 18); // 평평한 자른 면 + 둥근 겉면
+        body.AddComponent<MeshFilter>().sharedMesh = HalfMoonMesh(R, raw, 4, 18, false, QuarterSweep); // 평평한 자른 면 두 개 + 둥근 겉면 (지급분이 1/4쪽)
         body.AddComponent<MeshRenderer>().sharedMaterial = new Material(OnionSliceMaterial());
         rend.enabled = false;                                                 // 통째 모델은 숨기고 다듬을 몸통만 보인다
 
@@ -836,6 +840,7 @@ public partial class IngredientItem : Carryable
         SupportHandController.Instance?.ShowNear(rig.TransformPoint(new Vector3(0f, R * 0.3f, R * 0.6f)));
         yield return SlideAway(core, new Vector3(0f, R * 0.2f, R * 1.4f), 0.6f * diceSlowness); // 뽑혀 나간다
         DropScrap("심", coreM.color);
+        body.GetComponent<MeshFilter>().sharedMesh = HalfMoonMesh(R, raw, 4, 18, true, QuarterSweep); // 뽑아낸 자리가 비게 - 가장 안쪽 원(심)이 사라진다
         handCtl?.SlideTo(handBase, 0.25f * diceSlowness);                     // 손을 제자리로
 
         // 길이 방향을 앞뒤로 돌려 놓는다 - 칼은 이제 폭을 가로질러 들어간다.
@@ -1509,7 +1514,7 @@ public partial class IngredientItem : Carryable
         float rad = angle * Mathf.Deg2Rad;
         float pr = job.pieceL * 0.5f;                   // 반원의 반지름 = 조각 길이의 반
         float rise = job.pieceW / Mathf.Max(pr, 1e-4f); // 반원 높이(=반지름)를 조각 폭에 맞춰 누른다
-        int n = Mathf.Clamp(Mathf.RoundToInt(job.L * Mathf.Cos(rad) / job.t), 2, 12); // 규격 두께로 몇 조각인지
+        int n = Mathf.Clamp(Mathf.RoundToInt(job.L * Mathf.Cos(rad) / job.t), 2, 6); // 규격 두께로 몇 조각인지 (접시에 너무 많아 상한을 절반으로)
         float step = job.t * 1.04f;                     // 칼금이 보이게 조각 사이를 머리카락만큼 띄운다
         float span = n * step;                          // 조각들이 늘어서는 전체 길이
         job.cutX = new float[n];
@@ -1581,7 +1586,7 @@ public partial class IngredientItem : Carryable
         // 전에는 가로 4cm를 위로 세워 둬서 조각들이 제 길이 방향으로 포개졌고, 그래서
         // 4 x 1 편 여러 장이 아니라 길쭉한 막대 하나처럼 보였다. 단면만 네모일 뿐
         // 놓이는 모습은 반원과 같아야 한다.
-        int n = Mathf.Clamp(Mathf.RoundToInt(job.L / job.t), 2, 12); // 규격 두께로 몇 조각인지
+        int n = Mathf.Clamp(Mathf.RoundToInt(job.L / job.t), 2, 6); // 규격 두께로 몇 조각인지 (접시에 너무 많아 상한을 절반으로)
         float step = job.t * 1.04f;                                 // 칼금이 보이게 조각 사이를 머리카락만큼 띄운다
         float span = n * step;                                      // 조각들이 늘어서는 전체 길이
         job.cutX = new float[n];
@@ -1739,7 +1744,7 @@ public partial class IngredientItem : Carryable
 
         // Strips side by side (white toward the root, green toward the leaves -
         // each strip its own shade), then cut: 4 lengthwise...
-        const int strips = 4;
+        const int strips = 2; // 세로로 가르는 줄 수 (줄 x 2조각 - 접시에 너무 많아 절반으로)
         float sw = W / strips;
         var boxes = new List<Transform>();
         for (int i = 0; i < strips; i++)
@@ -1901,7 +1906,7 @@ public partial class IngredientItem : Carryable
             if (cuts.Count > 0)
             {
                 yield return StepGate("② 칼을 고기 오른쪽으로 빼기");
-                handCtl?.SlideTo(handBase + Vector3.right * (b.extents.x + 0.45f), 0.3f * slow);
+                handCtl?.SlideTo(handBase + Vector3.right * (ScreenRightX * (b.extents.x + 0.45f)), 0.3f * slow); // 화면 오른쪽 바깥으로
                 yield return new WaitForSeconds(0.3f * slow);
                 yield return StepGate("② 칼을 눕히기 · 왼손 바닥으로 누르기");
                 if (knife != null) yield return knife.TurnFlatAlongDepth(0.35f * slow);
@@ -2302,10 +2307,11 @@ public partial class IngredientItem : Carryable
     private IEnumerator KnifeFlatFromRight(Transform rig, Bounds b, float y, HandController handCtl, Renderer knifeR, float slow)
     {
         float wpc = worldPerCm;
-        float right = rig.TransformPoint(new Vector3(b.max.x, y, b.center.z)).x;
-        float left = rig.TransformPoint(new Vector3(b.min.x, y, b.center.z)).x;
+        float sx = ScreenRightX;                                                      // 화면 오른쪽이 월드 x 의 어느 쪽인가
+        float right = rig.TransformPoint(new Vector3(sx > 0f ? b.max.x : b.min.x, y, b.center.z)).x; // 칼이 들어가는 화면 오른쪽 끝
+        float left = rig.TransformPoint(new Vector3(sx > 0f ? b.min.x : b.max.x, y, b.center.z)).x;  // 칼이 빠져나오는 화면 왼쪽 끝
         Vector3 press = PalmPoint(rig, b);
-        float startX = right + 0.04f, endX = left - 0.06f;
+        float startX = right + 0.04f * sx, endX = left - 0.06f * sx;                  // 바깥으로 조금씩 더
 
         // 1) 고기 오른쪽 바깥에서 높이·위치 맞추기 (칼이 고기 밖에 있을 때만 높이를 바꾼다)
         for (float e = 0f, dur = 0.4f * slow; e < dur; e += Time.deltaTime)
@@ -2327,13 +2333,14 @@ public partial class IngredientItem : Carryable
             int cycle = Mathf.FloorToInt(t / period);
             // 끝까지 통과한 뒤에는 지금 하던 왕복만 마저 하고 (시작점으로 돌아와서) 끝
             if (doneCycle >= 0 && cycle > doneCycle) break;
-            x = Mathf.Max(endX, x - advance * Time.deltaTime);
+            x = Mathf.MoveTowards(x, endX, advance * Time.deltaTime);                 // 화면 왼쪽으로 전진 (월드 방향은 카메라가 정한다)
             // 0 → stroke → 0, 양 끝에서 부드럽게 방향 전환 (코사인)
             float saw = stroke * 0.5f * (1f - Mathf.Cos(t / period * Mathf.PI * 2f));
             SteerFlatKnife(rig, b, y, x, saw, handCtl, knifeR, 0.03f);
             PalmOnTop(press);
-            bool through = knifeR == null || knifeR.bounds.min.x <= left - 0.02f;
-            if (doneCycle < 0 && x <= endX && through) doneCycle = cycle;
+            // 칼의 '화면 왼쪽' 끝이 고기의 화면 왼쪽 끝을 지났나
+            bool through = knifeR == null || (sx > 0f ? knifeR.bounds.min.x <= left - 0.02f : knifeR.bounds.max.x >= left + 0.02f);
+            if (doneCycle < 0 && Mathf.Approximately(x, endX) && through) doneCycle = cycle;
             if (t > 30f) break; // (안전장치)
             yield return null;
         }
@@ -2344,21 +2351,27 @@ public partial class IngredientItem : Carryable
     /// 빼낸다 (칼 전체가 고기에서 벗어날 때까지).</summary>
     private IEnumerator KnifeFlatWithdraw(Transform rig, Bounds b, float y, HandController handCtl, Renderer knifeR, float slow)
     {
-        float right = rig.TransformPoint(new Vector3(b.max.x, y, b.center.z)).x;
+        float sx = ScreenRightX;                                                      // 화면 오른쪽의 월드 x 부호
+        float right = rig.TransformPoint(new Vector3(sx > 0f ? b.max.x : b.min.x, y, b.center.z)).x; // 빼낼 화면 오른쪽 바깥
         Vector3 press = PalmPoint(rig, b);
-        float from = knifeR != null ? knifeR.bounds.min.x : right;
+        float from = knifeR != null ? (sx > 0f ? knifeR.bounds.min.x : knifeR.bounds.max.x) : right; // 칼의 화면 왼쪽 끝
         for (float e = 0f, dur = 0.6f * slow; e < dur; e += Time.deltaTime)
         {
-            float lead = Mathf.Lerp(from, right + 0.06f, Mathf.SmoothStep(0f, 1f, e / dur));
+            float lead = Mathf.Lerp(from, right + 0.06f * sx, Mathf.SmoothStep(0f, 1f, e / dur));
             SteerFlatKnife(rig, b, y, lead, 0f, handCtl, knifeR, 0.03f);
             PalmOnTop(press);
             yield return null;
         }
     }
 
-    /// <summary>왼손 누르는 자리: 고기 윗면, 칼이 들어오는 오른쪽에서 먼 왼쪽 부분.</summary>
+    /// <summary>화면 오른쪽이 월드 x 의 어느 쪽인지 (+1 / -1). 카메라가 180도 돌아
+    /// 있어 월드 +x 가 화면 왼쪽이다 - 월드 x 를 화면 좌우로 그냥 쓰면 포 뜨기가
+    /// 거울처럼 뒤집혀 왼쪽에서 오른쪽으로 썰게 된다.</summary>
+    private static float ScreenRightX => Camera.main != null && Camera.main.transform.right.x < 0f ? -1f : 1f;
+
+    /// <summary>왼손 누르는 자리: 고기 윗면, 칼이 들어오는 화면 오른쪽에서 먼 쪽.</summary>
     private static Vector3 PalmPoint(Transform rig, Bounds b) =>
-        rig.TransformPoint(new Vector3(b.center.x - b.extents.x * 0.35f, b.max.y, b.center.z));
+        rig.TransformPoint(new Vector3(b.center.x + b.extents.x * 0.35f * -ScreenRightX, b.max.y, b.center.z));
 
     /// <summary>눕힌 칼을 손으로 움직여: 칼날 왼쪽 끝(진행 방향 끝)을 leadX(월드 x)에,
     /// 칼 길이의 조준점(poBladeAimFromTip)을 높이 y · 고기 앞뒤 가운데 + saw(앞으로,
@@ -2372,7 +2385,8 @@ public partial class IngredientItem : Carryable
         Vector3 target = rig.TransformPoint(new Vector3(b.center.x, y, b.center.z + saw));
         // (깊이 z도 절단면에 맞춘다 - 고기 안에 들어간 칼날은 윗장에 가려지고,
         // 윗면을 누르는 왼손이 칼 위에 보이게: 칼이 손·고기를 뚫고 지나가 보이지 않게)
-        Vector3 err = new Vector3(leadX - kb.min.x, target.y - aimY, target.z - kb.center.z);
+        float leadEdge = ScreenRightX > 0f ? kb.min.x : kb.max.x; // 진행 방향(화면 왼쪽) 쪽 칼 끝 - 월드 x 의 어느 끝인지는 카메라가 정한다
+        Vector3 err = new Vector3(leadX - leadEdge, target.y - aimY, target.z - kb.center.z);
         handCtl.SlideTo(handCtl.RestPosition + err, seconds);
     }
 
@@ -2912,9 +2926,9 @@ public partial class IngredientItem : Carryable
         // 결이 여러 장 떨어진다. 다른 재료(반달)는 예전처럼 두께 간격으로 한 장씩.
         bool onionPlanks = ingredientName == "양파";
         float stripW = onionPlanks ? Mathf.Max(midCm, 0.1f) * worldPerCm : t;               // 칼이 들어가는 간격
-        int cuts = Mathf.Clamp(Mathf.RoundToInt(2f * R / stripW), onionPlanks ? 2 : 6, onionPlanks ? 8 : 14); // 칼질 횟수
+        int cuts = Mathf.Clamp(Mathf.RoundToInt(2f * R / stripW), onionPlanks ? 2 : 6, onionPlanks ? 4 : 14); // 칼질 횟수 (양파는 접시에 너무 많아 상한을 절반으로)
         float strip = 2f * R / cuts;                                                        // 끝이 남지 않게 고르게 나눈 간격
-        int layers = onionPlanks ? Mathf.Clamp(Mathf.FloorToInt(strip / t), 1, 4) : 1;       // 한 칼에 떨어지는 결 장수
+        int layers = onionPlanks ? Mathf.Clamp(Mathf.FloorToInt(strip / t), 1, 2) : 1;       // 한 칼에 떨어지는 결 장수 (같은 이유로 상한 절반)
         int n = cuts * layers;                                                              // 조각 수
         float step = strip / layers;                                                        // 조각들이 나란히 서는 간격
         float thick = Mathf.Clamp(t, 0.012f, step * (onionPlanks ? 1f : 0.85f));            // 조각 두께
@@ -3076,8 +3090,10 @@ public partial class IngredientItem : Carryable
     /// <summary>A half-moon slice of onion standing on its flat edge: the half
     /// disc (radius r, in the local Y-Z plane, curved edge up) made of `layers`
     /// rings with a hairline between them (the onion's layers), thickness along
-    /// local X.</summary>
-    private static Mesh HalfMoonMesh(float r, float thickness, int layers, int segments)
+    /// local X. hollowCore: 가운데 심(가장 안쪽 링)을 빼고 그 자리를 비운다 - 다듬기에서
+    /// 심을 뽑아낸 뒤의 몸통. sweep: 단면이 도는 각 - 기본 180°(반달), 90°면 1/4쪽
+    /// (지급되는 양파가 1/4조각이라 다듬은 몸통은 이쪽).</summary>
+    private static Mesh HalfMoonMesh(float r, float thickness, int layers, int segments, bool hollowCore = false, float sweep = Mathf.PI)
     {
         var v = new List<Vector3>();
         var tri = new List<int>();
@@ -3090,13 +3106,13 @@ public partial class IngredientItem : Carryable
             if (!flip) tri.AddRange(new[] { o, o + 1, o + 2, o, o + 2, o + 3 });
             else tri.AddRange(new[] { o, o + 2, o + 1, o, o + 3, o + 2 });
         }
-        for (int k = 0; k < layers; k++)
+        for (int k = hollowCore ? 1 : 0; k < layers; k++) // 심을 뺐으면 가장 안쪽 링(k=0)은 그리지 않는다
         {
             float ri = k == 0 ? 0f : r * k / layers + gap;
             float ro = r * (k + 1) / layers;
             for (int s = 0; s < segments; s++)
             {
-                float a0 = Mathf.PI * s / segments, a1 = Mathf.PI * (s + 1) / segments;
+                float a0 = sweep * s / segments, a1 = sweep * (s + 1) / segments; // 도는 각만큼만 (반달 180° · 1/4쪽 90°)
                 Vector3 d0 = new Vector3(0f, Mathf.Sin(a0), Mathf.Cos(a0)), d1 = new Vector3(0f, Mathf.Sin(a1), Mathf.Cos(a1));
                 Vector3 px = Vector3.right * hx, nx = -px;
                 Quad(px + d0 * ri, px + d0 * ro, px + d1 * ro, px + d1 * ri, Vector3.right);

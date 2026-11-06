@@ -50,6 +50,18 @@ public abstract class CuttingBoardZoneBase : MonoBehaviour, IClickable
         if (!show && promptRoot != null && hideRoutine == null) promptRoot.SetActive(false);
     }
 
+    /// <summary>버튼이 꺼질 때 (도마를 들고 개수대로 가면 BoardSinkWash 가 버튼을
+    /// 전부 SetActive(false) 한다) 떠 있던 말풍선을 직접 닫는다.
+    /// 「씻기」를 누르면 ShowToast 가 HideAfterDelay 코루틴을 돌리는데, 바로 이어서
+    /// 버튼이 꺼져 그 코루틴이 죽어 버렸다. 그래서 promptRoot 가 켜진 채로, hideRoutine
+    /// 도 null 이 안 된 채로 남아, 도마를 다시 조리대에 놓아 버튼이 켜지면 Update 가
+    /// `if (hideRoutine != null) return;` 에서 멈춰 「씻기」 말풍선이 영구히 떠 있었다.</summary>
+    void OnDisable()
+    {
+        hideRoutine = null;                                 // 죽은 코루틴 기록을 지운다 (Update 가 다시 돌게)
+        if (promptRoot != null) promptRoot.SetActive(false); // 떠 있던 말풍선을 닫는다
+    }
+
     public void OnClicked()
     {
         ShowToast(Label);

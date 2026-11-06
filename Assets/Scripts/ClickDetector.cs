@@ -495,11 +495,16 @@ public class ClickDetector : MonoBehaviour
 
     private bool OverBowl(MovableBowl b, Vector2 screen)
     {
+        // 커서를 그릇 안쪽 평면에 내려 실제 안쪽 바닥에서의 거리를 잰다 (CursorInOil 과 같은 방식).
+        // 옛 판정은 floorCenter 를 화면에 찍고 '가로' 반지름으로 화면 원을 그렸다 - 수평 조리대를
+        // 비스듬히 내려보면 팬은 납작한 타원으로 보여, 그 원이 팬 위쪽 허공까지 덮고 팬 안쪽
+        // 앞뒤 끝은 빠져 팬 안에서는 안 먹고 위에 떨어진 자리에서 작용했다.
         MovableBowl.Interior i = b.GetInterior();
-        Vector3 c = targetCamera.WorldToScreenPoint(i.floorCenter);
-        Vector3 e = targetCamera.WorldToScreenPoint(i.floorCenter + Vector3.right * i.radius);
-        float r = Mathf.Abs(e.x - c.x) * 1.25f;
-        return ((Vector2)c - screen).sqrMagnitude <= r * r;
+        Ray ray = targetCamera.ScreenPointToRay(screen);             // 커서가 나아가는 광선
+        Plane plane = new Plane(i.up, i.floorCenter);                // 그릇 안쪽 바닥이 놓인 평면
+        if (!plane.Raycast(ray, out float d)) return false;          // 평면과 나란히 보면 가리킨 곳이 없다
+        float r = i.radius * 1.25f;                                  // 안쪽 반지름에 옛 판정과 같은 여유
+        return (ray.GetPoint(d) - i.floorCenter).sqrMagnitude <= r * r; // 안쪽 원 안을 가리켰는지
     }
 
     /// <summary>One stroke through it: 버무리기, the starch water, the egg, or the pan.</summary>

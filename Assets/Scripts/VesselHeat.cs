@@ -59,6 +59,13 @@ public class VesselHeat : MonoBehaviour
         if (was - PanTemp > 3f) Debug.Log($"[팬 온도] {name}: 재료 {grams:0}g 넣음 → {was:0}°C → {PanTemp:0}°C");
     }
 
+    /// <summary>개수대에서 찬물로 씻었다 - 잔열이 다 가시고 실온이 된다.</summary>
+    public void CoolToRoom()
+    {
+        if (PanTemp - roomTemp > 3f) Debug.Log($"[팬 온도] {name}: 씻어서 식음 → {PanTemp:0}°C → {roomTemp:0}°C"); // 확인용 기록
+        PanTemp = roomTemp; // 찬물에 씻으면 잔열이 남지 않는다
+    }
+
     void Update()
     {
         if (bowl == null) return;

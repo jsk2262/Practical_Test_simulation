@@ -87,7 +87,9 @@ public class ChecklistManager : MonoBehaviour
         s = Add("5. 고기 · 고추기름");                                                 // 고기 · 기름
         Do(s, "탕) 고기 썰기", () => AllCut("돼지등심"));                                // 4×1×1 썰기
         Do(s, "탕) 고기 밑간", Marinated);                                              // 간장 · 청주
-        Do(s, "마) 고추기름 - 면보", () => cloth != null && cloth.HasResidue);           // 면보에 고춧가루가 걸러짐
+        // 거른 양은 남는 기록이다. 면보 위 찌꺼기로 보면, 찌꺼기를 음식물쓰레기에 버리는
+        // 순간 비워져(HasResidue = false) 다 하고도 체크가 도로 풀렸다.
+        Do(s, "마) 고추기름 - 면보", () => ChiliOilLog.StrainedSpoons > 0.001f || (cloth != null && cloth.HasResidue)); // 고추기름을 면보로 걸렀음
         Do(s, "탕) 튀김반죽", Battered);                                                // 반죽 묻힘
 
         s = Add("6. 튀기기");                                                          // 탕수육 튀김
