@@ -302,6 +302,8 @@ public partial class FoodPieceGroup : MonoBehaviour
     [SerializeField] private float softDamagePerStir = 0.035f;
     [Tooltip("Sauce taken on while sliding through it, per unit of speed per second.")]
     [SerializeField] private float coatPerMove = 0.3f;
+    [Tooltip("완성 접시에 담긴 요리가 자리를 잡을 시간 (초). 이 뒤로는 계산을 멈추고 담긴 모양 그대로 둔다.")]
+    [SerializeField] private float platedSettleSeconds = 2f;
 
     [Header("Pan cooking (a dry pan, a wok, oil) - look tuning, not measured")]
     [Tooltip("x: the piece's temperature °C → y: cooking per second (1 = one second's worth of TimeToCooked at a good frying heat).")]
@@ -377,6 +379,7 @@ public partial class FoodPieceGroup : MonoBehaviour
     private Vector3 lastCenter, lastCenterVel;
     private bool haveLast;
     private int restCount = -1; // 지난 프레임의 조각 수 (바뀌면 쉬지 않고 다시 계산한다)
+    private float platedRestAt;  // 완성 접시에 담긴 요리를 이 시각부터 얼린다 (0이면 접시가 아님)
 
     public int Count => Pieces.Count;
     public MovableBowl Container => simBowl;
@@ -429,8 +432,18 @@ public partial class FoodPieceGroup : MonoBehaviour
         {
             simBowl = bowl;
             if (bowl != null) EnterContainer();
+            // 완성 접시(PlatingPlate1/2)에 담겼으면 자리 잡을 시간만 재 둔다 (다른 그릇이면 0)
+            platedRestAt = bowl != null && bowl.GetComponent<PlatingDestination>() != null ? Time.time + platedSettleSeconds : 0f;
         }
-        if (simBowl != null) Step(Mathf.Min(Time.deltaTime, 0.05f));
+        // 완성 접시에 담긴 요리는 자리를 잡고 나면 더 계산하지 않고 담긴 모양 그대로 둔다.
+        // 담은 다음은 그대로 제출 선반으로 가는 것뿐이라 움직일 일이 없는데, 한 접시에
+        // 조각이 259개까지 올라가 겹침 계산만 매 프레임 36 ms 를 먹고 있었다.
+        bool plated = platedRestAt > 0f && Time.time > platedRestAt; // 자리를 다 잡았는지
+        if (simBowl != null)
+        {
+            if (plated) PlaceOnly();                            // 얼린 요리는 제자리에 놓기만
+            else Step(Mathf.Min(Time.deltaTime, 0.05f));        // 아니면 평소대로 계산
+        }
 
         Color rawRef = cookable != null ? cookable.ColorAt(0f) : Color.white;
         bool rough = cookable != null && cookable.RoughWhenOvercooked; // 너무 익은 모습을 보이는 재료인지
@@ -561,6 +574,26 @@ public partial class FoodPieceGroup : MonoBehaviour
             p.simRot = inv * p.transform.rotation;
         }
         haveLast = false;
+    }
+
+    /// <summary>얼린 요리를 그릇 기준 제자리에 놓기만 한다 (움직임 계산 없이).
+    /// 조각의 세계 좌표는 매 프레임 그릇 안쪽에서 다시 구해 왔다 - 그래서 계산을 아예
+    /// 멈췄더니 완성 접시를 제출 선반으로 옮길 때 요리가 조리대에 그대로 남았다.
+    /// Step 의 마지막 자리 잡기 부분만 떼어 낸 것으로, 조각 수에 비례하는 값싼 일이다.</summary>
+    private void PlaceOnly()
+    {
+        if (Pieces.Count == 0) return;                                    // 놓을 것이 없으면 끝
+        inside = simBowl.GetInterior();                                   // 그릇 안쪽 (옮겼으면 새 자리)
+        Quaternion frame = Frame(out _, out _);                           // 그릇 기준 좌표계
+        Vector3 mid = Vector3.zero;                                       // 조각들의 한가운데
+        foreach (FoodPiece p in Pieces) mid += p.simPos;                  // 그릇 좌표로 모아서
+        mid /= Pieces.Count;                                              // 평균
+        transform.position = inside.floorCenter + frame * mid;            // 재료 자체는 그 한가운데에
+        foreach (FoodPiece p in Pieces)
+        {
+            p.transform.position = inside.floorCenter + frame * p.simPos; // 조각은 담겼던 자리 그대로
+            p.transform.rotation = frame * p.simRot;                      // 방향도 그대로
+        }
     }
 
     private void Step(float dt)
