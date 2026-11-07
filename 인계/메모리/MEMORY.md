@@ -1,0 +1,13 @@
+- [Reply in Korean](reply-in-korean.md) — 모든 응답 한국어, 새 코드 주석도 한국어, 식별자·경로·원본 오류는 원문
+- [Blender socket workaround](blender-mcp-socket-workaround.md) — MCP server won't install; use addon socket 127.0.0.1:9876 directly
+- [Parallel ChatGPT work](parallel-chatgpt-work.md) — ChatGPT도 같은 프로젝트 수정 중: 그쪽 파일·변경 건드리지 말고, 커밋은 내 파일만(섞이면 먼저 묻기)
+- [Explain code simply in Korean](explain-code-simply-korean.md) — 코드 짠 뒤 요약+어떻게 구현했는지 쉽고 자세히 가르치듯 한글 설명
+- [No recompile during play](no-recompile-during-play.md) — 플레이 중 컴파일하면 static·Action이 비어 순서 화면·TTS가 사라진 것처럼 보임
+- [Read CLAUDE.md every answer](read-claude-md-every-answer.md) — 답할 때마다 프로젝트 CLAUDE.md 다시 읽고 규칙대로
+- [팀 기록 위치](team-records-locations.md) — 팀 QuietPlace 기록 정리본은 Desktop\팀프로젝트\팀_작업기록_정리.md, 원본은 다른 프로젝트 메모리·세션 jsonl·팀 폴더
+- [씬 좌표계 진실](scene-coordinate-frame.md) — 조리대는 수평 3D(CounterUp=월드 up), CounterBody·Floor는 죽은 2.5D 배경판, 인스펙터에 옛 값 잔존
+- [unityMCP 연결](unity-mcp-version-pin.md) — Server disconnected는 uv 캐시 잠김; 서버 버전 ==10.1.2로 고정하면 붙음
+- [체크리스트 문구 짧게](checklist-text-short.md) — 한 줄 10자 내외, 괄호·나열·규격숫자 금지, 다른 메뉴도 같은 방식
+- [메시 측정은 플레이에서 검증](mesh-readable-verify-in-play.md) — 에디터는 non-readable 메시도 읽혀 통과함, 런타임은 기본값으로 떨어짐
+- [프레임 측정법](frame-measure-in-unity.md) — DemoFilm.RunFull 로 부하, get_frame_timing 으로만 측정(deltaTime 은 timeScale 곱해져 못 믿음)
+- [인계 문서 위치](handoff-doc-location.md) — 진행·남은 과제는 루트 작업_인계_2026-11-06.md, 다른 컴퓨터용 묶음은 인계/ 폴더

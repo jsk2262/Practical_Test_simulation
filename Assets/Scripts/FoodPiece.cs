@@ -137,7 +137,13 @@ public class FoodPiece : MonoBehaviour
     {
         Radius = (worldSize.x + worldSize.y + worldSize.z) / 6f;
         HalfSize = worldSize * 0.5f;
+        boundRadius = Mathf.Max(Radius, HalfSize.magnitude); // 조각을 다 감싸는 공의 반지름도 함께 갱신
     }
+
+    /// <summary>조각을 다 감싸는 공의 반지름 (중심에서 가장 먼 꼭짓점까지). Contact 가
+    /// 쓰는 Extent 는 어느 축으로도 이 값을 넘지 않으므로, 두 조각의 중심 거리가
+    /// 이 둘의 합보다 멀면 15축 검사를 하지 않아도 떨어져 있는 것이 확실하다.</summary>
+    internal float boundRadius = 0.05f;
 
     /// <summary>Half its size along its own axes (world) - a long strip reaches
     /// further toward a wall one way than the other.</summary>
@@ -161,6 +167,7 @@ public class FoodPiece : MonoBehaviour
         SourceName = o.SourceName; Category = o.Category; WasWashed = o.WasWashed; Grams = o.Grams;
         Cook = o.Cook; Coat = o.Coat; CoatColor = o.CoatColor; CoatViscosity = o.CoatViscosity;
         HalfSize = o.HalfSize;
+        boundRadius = o.boundRadius; // 감싸는 공의 반지름도 이어받음 (여기서는 SetSize 를 거치지 않는다)
         Radius = o.Radius; Sear = o.Sear; Char = o.Char; PanCooked = o.PanCooked; Temp = o.Temp;
         Damage = o.Damage; SearBrown = o.SearBrown; CharBlack = o.CharBlack;
         if (o.shownRough) ShowRough(); // 너무 익은 표면도 이어받음 (크기는 복제된 그대로)
@@ -697,8 +704,22 @@ public partial class FoodPieceGroup : MonoBehaviour
                 }
             }
             if (oilLevel > 0f) HoldBonds();
-            Separate(); // 붙음 계산 뒤에도 조각 표면이 관통하지 않도록 한다.
         }
+        // 겹침 풀이는 한 프레임에 한 번만 한다. 전에는 적분 잔걸음(한 프레임에 최대 4번)마다
+        // 돌려서, 같은 4패스 O(n^2) 계산을 한 프레임에 네 번씩 되풀이했다. 조각이 1 mm/s 로
+        // 움직이는데 잔걸음마다 풀 필요는 없고, 어차피 화면에 그려지기 전에 다 풀린다.
+        if (steps > 0) Separate(); // 붙음 계산 뒤에도 조각 표면이 관통하지 않도록 한다.
+        // 겹침을 푼 뒤의 속도로 '멈춤'을 한 번 더 판정한다. 위 판정은 조각을 움직인 직후에만
+        // 했는데, 바로 뒤의 Separate() 가 겹친 만큼 밀어내며 속도를 다시 넣어, 다른 조각 위에
+        // 쌓인 조각은 영원히 '움직이는 중'으로 남았다. 그래서 다 담아 둔 접시(한 접시에 259조각)도
+        // 매 프레임 O(n^2) 접촉 계산을 계속 돌아 8 FPS 까지 떨어졌다 (실제 속도는 중간값 1 mm/s).
+        if (steps > 0 && !simBowl.IsHeld && !BeingWorked && !hotOil && inside.boil < 0.05f) // 위 판정과 같은 조건
+            foreach (FoodPiece p in Pieces)
+                if (p.simVel.sqrMagnitude < 0.0004f && p.simSpin.sqrMagnitude < 0.04f) // 눈에 안 보일 만큼 느리면
+                {
+                    p.simVel = Vector3.zero;  // 완전히 멈춘 것으로 본다 (다음 프레임부터 계산을 쉰다)
+                    p.simSpin = Vector3.zero; // 회전도 같이
+                }
 
         if (InDryHeat) CookInPan(SpeedMode.Wait(dt));
         else if (!inside.liquid) CoolOff(dt);
@@ -773,6 +794,8 @@ public partial class FoodPieceGroup : MonoBehaviour
     {
         normal = Vector3.zero; depth = float.MaxValue; // 가장 짧게 밀어낼 축을 찾는다.
         Vector3 d = b.simPos - a.simPos; // 그릇 내부 좌표의 중심 차이
+        float reach = a.boundRadius + b.boundRadius + 0.002f; // 두 조각이 닿을 수 있는 가장 먼 거리
+        if (d.sqrMagnitude > reach * reach) return false; // 그보다 멀면 15축 검사 없이 끝 (결과는 같고, 멀리 떨어진 쌍이 97%다)
         for (int i = 0; i < 15; i++) // 양쪽 면 법선 6개와 모서리 교차축 9개
         {
             Vector3 axis; // 이번에 검사할 축
